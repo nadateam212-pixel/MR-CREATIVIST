@@ -47,7 +47,6 @@ import {
   type PublishingStatus,
   usePlatformStore
 } from "@/hooks/use-platform-store";
-import { DEFAULT_PREVIEW_VIDEO } from "@/lib/course-media";
 import { normalizedExternalVideoUrl } from "@/lib/video-sources";
 
 const courseImage =
@@ -666,8 +665,8 @@ export function InstructorCourseStudio({
   const [assetForm, setAssetForm] = useState({
     type: "video" as "image" | "video" | "book" | "document",
     title: "Lesson asset",
-    url: DEFAULT_PREVIEW_VIDEO,
-    fileName: "preview-video.mp4",
+    url: "",
+    fileName: "lesson-video.mp4",
     chapterId: ""
   });
   const [quizForm, setQuizForm] = useState({

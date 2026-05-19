@@ -7,7 +7,18 @@ const LearningEventSchema = new mongoose.Schema(
     moduleTitle: { type: String, trim: true },
     action: {
       type: String,
-      enum: ["viewed", "played", "read", "watched", "completed", "quiz_passed", "assignment_submitted", "downloaded"],
+      enum: [
+        "viewed",
+        "played",
+        "studied",
+        "read",
+        "watched",
+        "completed",
+        "quiz_passed",
+        "quiz_failed",
+        "assignment_submitted",
+        "downloaded"
+      ],
       default: "viewed"
     },
     seconds: { type: Number, min: 0, default: 0 },

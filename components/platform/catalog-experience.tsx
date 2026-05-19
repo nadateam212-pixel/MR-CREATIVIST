@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { toast } from "sonner";
 import {
   BookOpen,
   CheckCircle2,
@@ -152,8 +153,15 @@ export function CatalogExperience({
       }
 
       setActionMessage(payload.message ?? "Enrollment saved.");
+      toast.success(payload.message ?? "Enrollment saved.");
     } catch (error) {
-      setActionMessage(error instanceof Error ? error.message : "Enrollment saved on this device. Please try again if it does not appear in your dashboard.");
+      const nextMessage = error instanceof Error ? error.message : "Enrollment saved on this device. Please try again if it does not appear in your dashboard.";
+      setActionMessage(nextMessage);
+      if (nextMessage.toLowerCase().includes("saved")) {
+        toast.success(nextMessage);
+      } else {
+        toast.error(nextMessage);
+      }
     } finally {
       setPendingAction("");
     }
@@ -162,6 +170,7 @@ export function CatalogExperience({
   function handleAddToCart(product: CatalogProduct) {
     addToCart(product.slug);
     setActionMessage(`${product.name} added to cart.`);
+    toast.success(`${product.name} added to cart.`);
   }
 
   return (

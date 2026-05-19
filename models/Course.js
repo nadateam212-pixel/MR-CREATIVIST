@@ -3,10 +3,21 @@ import mongoose from "mongoose";
 const LessonSchema = new mongoose.Schema(
   {
     title: { type: String, required: true, trim: true, maxlength: 180 },
-    type: { type: String, enum: ["video", "article", "quiz", "assignment", "download"], default: "video" },
+    type: { type: String, enum: ["video", "article", "image", "quiz", "assignment", "download"], default: "video" },
     durationMinutes: { type: Number, min: 0, default: 0 },
+    summary: { type: String, trim: true, maxlength: 1200 },
     videoUrl: String,
+    imageUrl: String,
     resources: [{ label: String, url: String }],
+    quizQuestions: [
+      {
+        id: { type: String, trim: true },
+        question: { type: String, required: true, trim: true, maxlength: 500 },
+        options: [{ type: String, trim: true, maxlength: 240 }],
+        correctIndex: { type: Number, min: 0, default: 0 },
+        explanation: { type: String, trim: true, maxlength: 700 }
+      }
+    ],
     isPreview: { type: Boolean, default: false }
   },
   { _id: false }

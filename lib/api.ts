@@ -15,13 +15,21 @@ export function apiOk<T>(data: T, status = 200) {
   return NextResponse.json(data, { status });
 }
 
+function zodErrorMessage(error: ZodError) {
+  const issue = error.issues[0];
+  if (!issue) return "Invalid request.";
+
+  const path = issue.path.length ? issue.path.join(".") : "request";
+  return `Invalid request: ${path} ${issue.message}`;
+}
+
 export function apiError(error: unknown) {
   if (error instanceof ApiError) {
     return NextResponse.json({ error: error.message }, { status: error.status });
   }
 
   if (error instanceof ZodError) {
-    return NextResponse.json({ error: "Invalid request.", issues: error.issues }, { status: 422 });
+    return NextResponse.json({ error: zodErrorMessage(error), issues: error.issues }, { status: 422 });
   }
 
   if (typeof error === "object" && error !== null) {

@@ -4,7 +4,13 @@ import Course from "@/models/Course";
 import Enrollment from "@/models/Enrollment";
 import LearningProgress from "@/models/LearningProgress";
 import User from "@/models/User";
-import { buildCourseStructure, calculateProgressPercent, nextLessonKey, publicLearningProgress } from "@/lib/learning-engine";
+import {
+  buildCourseStructure,
+  calculateProgressPercent,
+  moduleCompletionReady,
+  nextLessonKey,
+  publicLearningProgress
+} from "@/lib/learning-engine";
 import { jsonError, jsonOk, mongoIdOrSlug, readJson, requireMongo } from "@/lib/mongo-api";
 
 const progressSchema = z.object({
@@ -12,7 +18,18 @@ const progressSchema = z.object({
   lessonKey: z.string().trim().max(80).optional(),
   currentLessonKey: z.string().trim().max(80).optional(),
   action: z
-    .enum(["viewed", "played", "read", "watched", "completed", "quiz_passed", "assignment_submitted", "downloaded"])
+    .enum([
+      "viewed",
+      "played",
+      "studied",
+      "read",
+      "watched",
+      "completed",
+      "quiz_passed",
+      "quiz_failed",
+      "assignment_submitted",
+      "downloaded"
+    ])
     .default("completed"),
   seconds: z.coerce.number().min(0).max(86400).optional(),
   score: z.coerce.number().min(0).max(100).optional(),
@@ -20,6 +37,33 @@ const progressSchema = z.object({
 });
 
 const completionActions = new Set(["read", "watched", "completed", "quiz_passed", "assignment_submitted", "downloaded"]);
+
+function studySecondsByLesson(events: { lessonKey?: string; seconds?: number }[] = []) {
+  const totals = new Map<string, number>();
+
+  for (const event of events) {
+    const lessonKey = String(event.lessonKey ?? "");
+    const seconds = Math.max(0, Number(event.seconds ?? 0));
+
+    if (!lessonKey || !seconds) continue;
+    totals.set(lessonKey, (totals.get(lessonKey) ?? 0) + seconds);
+  }
+
+  return Object.fromEntries(totals.entries());
+}
+
+function previousModulesReady(
+  structure: ReturnType<typeof buildCourseStructure>,
+  moduleIndex: number,
+  completedLessonKeys: string[],
+  lessonSeconds: Record<string, number>
+) {
+  return structure.modules
+    .slice(0, moduleIndex)
+    .every((module: { key: string; lessons: { key: string; durationMinutes: number }[] }) =>
+      moduleCompletionReady(structure, module, completedLessonKeys, lessonSeconds).ready
+    );
+}
 
 export async function GET(request: Request, { params }: { params: Promise<{ courseId: string }> }) {
   try {
@@ -86,6 +130,24 @@ export async function POST(request: Request, { params }: { params: Promise<{ cou
     const normalizedEmail = learnerEmail.toLowerCase();
     const existingProgress = await LearningProgress.findOne({ courseId: course._id, learnerEmail: normalizedEmail }).lean();
     const completedLessonKeys = new Set(existingProgress?.completedLessonKeys ?? []);
+    const existingLessonSeconds = studySecondsByLesson(existingProgress?.events ?? []);
+
+    if (lesson && !previousModulesReady(structure, lesson.moduleIndex, Array.from(completedLessonKeys).map(String), existingLessonSeconds)) {
+      return jsonOk(
+        {
+          error: "Finish the previous chapter lessons and required study time before unlocking this chapter."
+        },
+        403
+      );
+    }
+
+    if (lesson?.type === "quiz" && completionActions.has(body.action) && body.action !== "quiz_passed") {
+      return jsonOk({ error: "Submit and pass the quiz before this lesson can be completed." }, 422);
+    }
+
+    if (body.action === "quiz_passed" && Number(body.score ?? 0) < 75) {
+      return jsonOk({ error: "Quiz score must be at least 75% before the next chapter can unlock." }, 422);
+    }
 
     if (lesson && completionActions.has(body.action)) {
       completedLessonKeys.add(lesson.key);

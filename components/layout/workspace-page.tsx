@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Activity, Archive, ArrowRight, CheckCircle2, Copy, Database, Download, Edit3, Eye, FileCheck2, Settings, Share2, Sparkles } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -94,6 +95,8 @@ export function WorkspacePage({
   const [activity, setActivity] = useState("Workspace ready");
   const [busy, setBusy] = useState("");
   const [syncing, setSyncing] = useState(true);
+  const [editingRecord, setEditingRecord] = useState<WorkspaceRecord | null>(null);
+  const [editForm, setEditForm] = useState({ name: "", description: "", kind: "" });
   const resource = pathname.split("/").filter(Boolean).slice(1).join("-") || slugify(title);
   const heroImage = stableImageFor(title);
 
@@ -154,6 +157,7 @@ export function WorkspacePage({
       anchor.click();
       URL.revokeObjectURL(url);
       setActivity("Exported workspace records");
+      toast.success("Workspace records exported.");
       return;
     }
 
@@ -172,14 +176,22 @@ export function WorkspacePage({
       if (workspaceResponse.ok) {
         setRecords(payload.records ?? []);
         setActivity(payload.activity ?? `${label} recorded`);
+        toast.success(`${label} completed.`);
       } else if (adminResponse) {
         const adminPayload = await adminResponse.json();
         setActivity(adminResponse.ok ? `${adminPayload.action ?? label} completed` : adminPayload.error ?? `${label} failed`);
+        if (adminResponse.ok) {
+          toast.success(`${label} completed.`);
+        } else {
+          toast.error(adminPayload.error ?? `${label} failed`);
+        }
       } else {
         setActivity(payload.error ?? `${label} failed`);
+        toast.error(payload.error ?? `${label} failed`);
       }
     } catch {
       setActivity(`${label} failed. Check the server log.`);
+      toast.error(`${label} failed.`);
     } finally {
       setBusy("");
     }
@@ -204,11 +216,16 @@ export function WorkspacePage({
         if (response.ok) {
           setRecords(payload.records ?? []);
           setActivity(payload.activity ?? "Record created");
+          toast.success("Record added successfully.");
         } else {
           setActivity(payload.error ?? "Create failed");
+          toast.error(payload.error ?? "Create failed");
         }
       })
-      .catch(() => setActivity("Create failed. Check the server log."))
+      .catch(() => {
+        setActivity("Create failed. Check the server log.");
+        toast.error("Create failed.");
+      })
       .finally(() => setBusy(""));
   }
 
@@ -225,11 +242,14 @@ export function WorkspacePage({
       if (response.ok) {
         setRecords(payload.records ?? []);
         setActivity(payload.activity ?? `${action} recorded`);
+        toast.success(`${action} completed.`);
       } else {
         setActivity(payload.error ?? `${action} failed`);
+        toast.error(payload.error ?? `${action} failed`);
       }
     } catch {
       setActivity(`${action} failed. Check the server log.`);
+      toast.error(`${action} failed.`);
     } finally {
       setBusy("");
     }
@@ -237,12 +257,62 @@ export function WorkspacePage({
 
   function viewRecord(record: WorkspaceRecord) {
     setActivity(`${record.name}: ${record.description ?? "No description saved."}`);
+    toast.message(`${record.name} opened.`);
+  }
+
+  function startEditRecord(record: WorkspaceRecord) {
+    setEditingRecord(record);
+    setEditForm({
+      name: record.name,
+      description: record.description ?? "",
+      kind: record.kind ?? "record"
+    });
+    setActivity(`Editing ${record.name}`);
+  }
+
+  async function saveEditRecord() {
+    if (!editingRecord) return;
+
+    setBusy("Edit");
+    try {
+      const response = await fetch("/api/workspace", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "Edit",
+          recordId: editingRecord.id,
+          pathname,
+          title,
+          tags: normalizedTags,
+          name: editForm.name,
+          description: editForm.description,
+          kind: editForm.kind
+        })
+      });
+      const payload = await response.json();
+
+      if (response.ok) {
+        setRecords(payload.records ?? []);
+        setEditingRecord(null);
+        setActivity(payload.activity ?? "Record edited");
+        toast.success("Record edited successfully.");
+      } else {
+        setActivity(payload.error ?? "Edit failed");
+        toast.error(payload.error ?? "Edit failed");
+      }
+    } catch {
+      setActivity("Edit failed. Check the server log.");
+      toast.error("Edit failed.");
+    } finally {
+      setBusy("");
+    }
   }
 
   function shareRecord(record: WorkspaceRecord) {
     const text = `${title} / ${record.name} / ${statusLabel(record.status)} / ${pathname}`;
     void navigator.clipboard?.writeText(text);
     setActivity("Record share summary copied");
+    toast.success("Share summary copied.");
   }
 
   function duplicateRecord(record: WorkspaceRecord) {
@@ -268,11 +338,16 @@ export function WorkspacePage({
         if (response.ok) {
           setRecords(payload.records ?? []);
           setActivity(payload.activity ?? "Record duplicated");
+          toast.success("Record copied successfully.");
         } else {
           setActivity(payload.error ?? "Duplicate failed");
+          toast.error(payload.error ?? "Duplicate failed");
         }
       })
-      .catch(() => setActivity("Duplicate failed. Check the server log."))
+      .catch(() => {
+        setActivity("Duplicate failed. Check the server log.");
+        toast.error("Duplicate failed.");
+      })
       .finally(() => setBusy(""));
   }
 
@@ -378,6 +453,43 @@ export function WorkspacePage({
           </Button>
         </div>
 
+        {editingRecord ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Edit record</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-3 md:grid-cols-[1fr_1.5fr_12rem_auto]">
+              <input
+                value={editForm.name}
+                onChange={(event) => setEditForm((current) => ({ ...current, name: event.target.value }))}
+                className="h-10 rounded-md border border-[hsl(var(--border))] bg-transparent px-3 text-sm"
+                placeholder="Record name"
+              />
+              <input
+                value={editForm.description}
+                onChange={(event) => setEditForm((current) => ({ ...current, description: event.target.value }))}
+                className="h-10 rounded-md border border-[hsl(var(--border))] bg-transparent px-3 text-sm"
+                placeholder="Description"
+              />
+              <input
+                value={editForm.kind}
+                onChange={(event) => setEditForm((current) => ({ ...current, kind: event.target.value }))}
+                className="h-10 rounded-md border border-[hsl(var(--border))] bg-transparent px-3 text-sm"
+                placeholder="Kind"
+              />
+              <div className="flex gap-2">
+                <Button onClick={() => void saveEditRecord()} disabled={busy === "Edit"}>
+                  <CheckCircle2 className="size-4" />
+                  Save
+                </Button>
+                <Button variant="outline" onClick={() => setEditingRecord(null)}>
+                  Cancel
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
+
         <Card className="overflow-hidden">
           <CardContent className="overflow-x-auto p-0">
             <table className="w-full min-w-[48rem] text-left text-sm">
@@ -417,7 +529,7 @@ export function WorkspacePage({
                           <Eye className="size-4" />
                           View
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => void updateRecord(record.id, "Edit")}>
+                        <Button size="sm" variant="outline" onClick={() => startEditRecord(record)}>
                           <Edit3 className="size-4" />
                           Edit
                         </Button>

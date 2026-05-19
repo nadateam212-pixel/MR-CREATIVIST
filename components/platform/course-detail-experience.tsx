@@ -24,7 +24,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PriceDisplay } from "@/components/ui/price-display";
 import { Progress } from "@/components/ui/progress";
 import { SafeImage } from "@/components/ui/safe-image";
-import { DEFAULT_PREVIEW_VIDEO, courseImageForCategory, normalizeCourseImage, titleFromCourseSlug } from "@/lib/course-media";
+import { courseImageForCategory, normalizeCourseImage, titleFromCourseSlug } from "@/lib/course-media";
 import { videoSourceForUrl } from "@/lib/video-sources";
 import { type PlatformCourseDraft, usePlatformStore } from "@/hooks/use-platform-store";
 
@@ -95,7 +95,7 @@ function fallbackCourseToPreview(slug: string): CoursePreview {
     instructor: "MR Creativist Instructor",
     certificate: "Completion certificate",
     image: courseImageForCategory("Course"),
-    trailerUrl: DEFAULT_PREVIEW_VIDEO,
+    trailerUrl: "",
     description:
       "This preview is ready for your instructor workspace data. Add chapters, videos, outcomes, and assessments to turn it into a complete course path.",
     outcomes: ["Define the learner goal", "Add lessons and resources", "Publish assessments and certificates"],
@@ -231,7 +231,7 @@ export function CourseDetailExperience({
     firstVideoAsset?.embedUrl ||
     firstVideoAsset?.playbackUrl ||
     firstVideoAsset?.url ||
-    DEFAULT_PREVIEW_VIDEO;
+    "";
   const videos = assets.filter((asset) => asset.type === "video").length;
   const resources = assets.filter((asset) => asset.type !== "video").length;
   const enrolled = course ? enrolledCourseSlugs.includes(course.slug) : false;

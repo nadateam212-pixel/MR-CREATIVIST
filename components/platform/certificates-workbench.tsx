@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Award, CheckCircle2, Copy, Download, Eye, Search, ShieldCheck, Sparkles } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -98,7 +99,7 @@ export function CertificatesWorkbench({
     () =>
       courseCatalog.filter(
         (course) =>
-          (courseProgress[course.slug] ?? course.progress) >= 90 &&
+          (courseProgress[course.slug] ?? course.progress) >= 100 &&
           !certificates.some((certificate) => certificate.courseSlug === course.slug)
       ),
     [certificates, courseCatalog, courseProgress]
@@ -129,6 +130,7 @@ export function CertificatesWorkbench({
       if (response.ok) {
         setRemoteCertificates(payload.items ?? []);
         setSelectedCode(payload.item?.verificationCode ?? null);
+        toast.success("Certificate generated successfully.");
         return;
       }
     } catch {
@@ -140,6 +142,7 @@ export function CertificatesWorkbench({
       courseTitle: course.title,
       template: "Professional"
     });
+    toast.message("Certificate generated locally.");
   }
 
   return (
@@ -278,17 +281,7 @@ export function CertificatesWorkbench({
                   </div>
                 </div>
 
-                <div className="relative mt-8 grid gap-4 border-t border-slate-200 pt-6 text-sm md:grid-cols-[1fr_auto] md:items-end">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div>
-                      <div className="h-px bg-slate-400" />
-                      <p className="mt-2 text-xs uppercase tracking-[0.14em] text-slate-500">Platform Director</p>
-                    </div>
-                    <div>
-                      <div className="h-px bg-slate-400" />
-                      <p className="mt-2 text-xs uppercase tracking-[0.14em] text-slate-500">Instructor Signature</p>
-                    </div>
-                  </div>
+                <div className="relative mt-8 flex justify-end border-t border-slate-200 pt-6 text-sm">
                   <div className="rounded-md border border-slate-200 bg-white p-4">
                     <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Verification code</p>
                     <p className="mt-1 font-mono text-sm font-black">{selectedCertificate.verificationCode}</p>
@@ -329,7 +322,10 @@ export function CertificatesWorkbench({
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => void navigator.clipboard?.writeText(certificate.verificationCode)}
+                  onClick={() => {
+                    void navigator.clipboard?.writeText(certificate.verificationCode);
+                    toast.success("Verification code copied.");
+                  }}
                 >
                   <Copy className="size-4" />
                   Code

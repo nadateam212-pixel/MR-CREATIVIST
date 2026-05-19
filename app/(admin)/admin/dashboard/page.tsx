@@ -13,7 +13,9 @@ import {
   CreditCard,
   Database,
   FileCheck2,
+  GraduationCap,
   Headphones,
+  MessageSquare,
   Newspaper,
   ReceiptText,
   Settings,
@@ -286,6 +288,8 @@ export default async function AdminDashboardPage() {
     bookingCount,
     requestedBookingCount,
     freelancerCount,
+    freelancerUserCount,
+    instructorUserCount,
     serviceCount,
     aiToolCount,
     projectCount,
@@ -329,6 +333,8 @@ export default async function AdminDashboardPage() {
     Booking.countDocuments({}),
     Booking.countDocuments({ status: "requested" }),
     FreelancerProfile.countDocuments({}),
+    User.countDocuments({ $or: [{ role: "freelancer" }, { validatedRoles: "freelancer" }] }),
+    User.countDocuments({ $or: [{ role: "instructor" }, { validatedRoles: "instructor" }] }),
     ConsultingService.countDocuments({}),
     AITool.countDocuments({}),
     MultimediaProject.countDocuments({}),
@@ -362,8 +368,9 @@ export default async function AdminDashboardPage() {
   const marketplaceRevenue = Number(orderRevenue[0]?.total ?? 0);
   const learningRevenue = Number(enrollmentRevenue[0]?.total ?? 0);
   const totalRevenue = marketplaceRevenue + learningRevenue;
+  const totalFreelancerCount = Math.max(freelancerCount, freelancerUserCount);
   const approvalQueueCount = pendingApplicationCount + reviewApplicationCount + draftCourseCount + draftProductCount + draftJobCount + draftBlogCount + draftShopCount + requestedBookingCount + newMessageCount;
-  const totalContentCount = courseCount + productCount + jobCount + blogCount + shopCount + serviceCount + freelancerCount + aiToolCount + projectCount;
+  const totalContentCount = courseCount + productCount + jobCount + blogCount + shopCount + serviceCount + totalFreelancerCount + instructorUserCount + aiToolCount + projectCount;
   const queueRows = toQueueRows({
     applications: queueApplications,
     courses: queueCourses,
@@ -381,7 +388,8 @@ export default async function AdminDashboardPage() {
     { label: "Businesses", total: shopCount, active: publishedShopCount, review: draftShopCount, href: "/admin/shops" },
     { label: "Orders", total: orderCount, active: paidOrderCount, review: orderCount - paidOrderCount, href: "/admin/marketplace/orders" },
     { label: "Consulting", total: serviceCount + bookingCount, active: serviceCount, review: requestedBookingCount, href: "/admin/consulting/bookings" },
-    { label: "Freelancers", total: freelancerCount, active: freelancerCount, review: 0, href: "/admin/users" },
+    { label: "Freelancers", total: totalFreelancerCount, active: totalFreelancerCount, review: 0, href: "/admin/freelancers" },
+    { label: "Instructors", total: instructorUserCount, active: instructorUserCount, review: 0, href: "/admin/instructors" },
     { label: "AI tools", total: aiToolCount, active: aiToolCount, review: 0, href: "/admin/developer-tools" },
     { label: "Uploads", total: uploadCount, active: uploadCount, review: 0, href: "/admin/compliance" }
   ];
@@ -389,6 +397,9 @@ export default async function AdminDashboardPage() {
   const tools = [
     { label: "Users", href: "/admin/users", icon: Users, count: userCount, body: "Roles, validation, status, and account controls." },
     { label: "Applications", href: "/admin/account-applications", icon: ShieldCheck, count: pendingApplicationCount + reviewApplicationCount, body: "Instructor, seller, freelancer, and consultant approvals." },
+    { label: "Messages", href: "/admin/messages", icon: MessageSquare, count: newMessageCount, body: "Private replies, user conversations, contact follow-up, and support handoff." },
+    { label: "Instructors", href: "/admin/instructors", icon: GraduationCap, count: instructorUserCount, body: "Instructor accounts, moderation state, course ownership, and messaging." },
+    { label: "Freelancers", href: "/admin/freelancers", icon: BriefcaseBusiness, count: totalFreelancerCount, body: "Freelancer profiles, jobs, profile visibility, blocking, and contact controls." },
     { label: "Courses", href: "/admin/courses", icon: BookOpen, count: courseCount, body: "Curriculum quality, publishing, and instructor oversight." },
     { label: "Products", href: "/admin/marketplace/products", icon: ShoppingBag, count: productCount, body: "Marketplace catalog, inventory, and seller trust checks." },
     { label: "Jobs", href: "/admin/jobs", icon: BriefcaseBusiness, count: jobCount, body: "Public job posts, hiring details, applications, and featured placement." },
@@ -419,6 +430,8 @@ export default async function AdminDashboardPage() {
       orderCount,
       enrollmentCount,
       bookingCount,
+      freelancerCount: totalFreelancerCount,
+      instructorUserCount,
       pendingApplicationCount,
       newMessageCount,
       uploadCount

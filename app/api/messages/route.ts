@@ -141,6 +141,18 @@ export async function POST(request: Request) {
 
     await connectMongoDB();
 
+    if (String(session.user.id) === body.receiverId) {
+      throw new ApiError("Choose another user before sending a private message.", 422);
+    }
+
+    const receiver = await User.findOne({ _id: body.receiverId, accountStatus: { $ne: "suspended" } })
+      .select("_id")
+      .lean();
+
+    if (!receiver) {
+      throw new ApiError("Selected user is not available for private messages.", 404);
+    }
+
     const message = await Message.create({
       senderId: session.user.id,
       receiverId: body.receiverId,

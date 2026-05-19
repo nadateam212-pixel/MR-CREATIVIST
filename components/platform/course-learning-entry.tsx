@@ -5,7 +5,7 @@ import { AlertTriangle, BookOpen } from "lucide-react";
 import { CourseLearningWorkspace } from "@/components/platform/course-learning-workspace";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DEFAULT_PREVIEW_VIDEO, normalizeCourseImage, titleFromCourseSlug } from "@/lib/course-media";
+import { normalizeCourseImage, titleFromCourseSlug } from "@/lib/course-media";
 import { videoSourceForUrl } from "@/lib/video-sources";
 import { type CourseAssetDraft, type CourseLessonDraft, type CourseQuizDraft, usePlatformStore } from "@/hooks/use-platform-store";
 
@@ -22,7 +22,7 @@ function playableVideoUrl(...urls: Array<string | undefined>) {
     return source.provider !== "empty" && source.provider !== "unsupported";
   });
 
-  return playable || DEFAULT_PREVIEW_VIDEO;
+  return playable || "";
 }
 
 function assetUrl(asset?: CourseAssetDraft) {
@@ -97,7 +97,7 @@ function localCourseStructure(courseId: string): SnapshotCourse | null {
   const storedLessons = state.courseLessons[course.slug] ?? [];
   const quizzes = state.courseQuizzes.filter((quiz) => quiz.courseSlug === course.slug);
   const firstVideo = assets.find((asset) => asset.type === "video");
-  const firstVideoUrl = playableVideoUrl(course.trailerUrl, assetUrl(firstVideo), DEFAULT_PREVIEW_VIDEO);
+  const firstVideoUrl = playableVideoUrl(course.trailerUrl, assetUrl(firstVideo));
   const lessonAssetIds = new Set(storedLessons.flatMap((lesson) => lesson.assetIds));
   const generatedAssetLessons = assets
     .filter((asset) => !lessonAssetIds.has(asset.id))

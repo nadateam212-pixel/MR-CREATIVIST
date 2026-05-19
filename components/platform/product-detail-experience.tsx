@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Download, PackageCheck, ShieldCheck, Star, Store, Truck, Wallet } from "lucide-react";
+import { toast } from "sonner";
 import { PageShell } from "@/components/layout/page-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -60,6 +61,7 @@ export function ProductDetailExperience({ slug, initialProduct }: { slug: string
   function addProductToCart(openCheckout = false) {
     addToCart(activeProduct.slug);
     setCartMessage(`${activeProduct.name} added to cart.`);
+    toast.success(`${activeProduct.name} added to cart.`);
     if (openCheckout) {
       router.push("/marketplace/cart");
     }

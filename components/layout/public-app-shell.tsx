@@ -22,6 +22,7 @@ import {
   Search,
   Settings,
   ShoppingBag,
+  ShoppingCart,
   Sparkles,
   User,
   Users
@@ -33,6 +34,7 @@ import { ModeToggle } from "@/components/mode-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/hooks/use-i18n";
+import { usePlatformStore } from "@/hooks/use-platform-store";
 import { brand } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 
@@ -76,6 +78,7 @@ export function PublicAppShell({
   const { data: session } = useSession();
   const user = session?.user;
   const { t } = useI18n();
+  const cartCount = usePlatformStore((state) => state.cartCount);
   const [profileOpen, setProfileOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
 
@@ -89,7 +92,7 @@ export function PublicAppShell({
             </span>
             <span className="min-w-0">
               <span className="block truncate text-lg font-black uppercase tracking-wide">MR CREATIVIST</span>
-              <span className="mt-1 block text-[0.65rem] font-bold uppercase tracking-[0.22em] text-cyan-300">Create. Learn. Sell.</span>
+              <span className="mt-1 block text-[0.65rem] font-bold uppercase tracking-[0.22em] text-[hsl(var(--primary))] dark:text-cyan-300">Create. Learn. Sell.</span>
             </span>
           </Link>
 
@@ -161,6 +164,21 @@ export function PublicAppShell({
                 asChild
                 size="icon"
                 variant="outline"
+                className="relative border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] dark:border-white/10 dark:bg-white/[0.04] dark:text-white dark:hover:bg-white/10"
+              >
+                <Link href="/marketplace/cart" aria-label="Shopping cart">
+                  <ShoppingCart className="size-4" />
+                  {cartCount ? (
+                    <span className="absolute -right-2 -top-2 flex min-w-5 items-center justify-center rounded-full bg-[hsl(var(--primary))] px-1 text-[0.65rem] font-black text-[hsl(var(--primary-foreground))]">
+                      {cartCount > 99 ? "99+" : cartCount}
+                    </span>
+                  ) : null}
+                </Link>
+              </Button>
+              <Button
+                asChild
+                size="icon"
+                variant="outline"
                 className="hidden border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] sm:inline-flex dark:border-white/10 dark:bg-white/[0.04] dark:text-white dark:hover:bg-white/10"
               >
                 <Link href="/messages" aria-label="Messages">
@@ -177,7 +195,7 @@ export function PublicAppShell({
                   <Bell className="size-4" />
                 </Link>
               </Button>
-              <Button asChild size="icon" variant="outline" className="border-cyan-400/30 bg-cyan-400/10 text-cyan-100 hover:bg-cyan-400/20">
+              <Button asChild size="icon" variant="outline" className="border-[hsl(var(--primary))]/30 bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/15 dark:border-cyan-400/30 dark:bg-cyan-400/10 dark:text-cyan-100 dark:hover:bg-cyan-400/20">
                 <Link href="/ai-tools" aria-label="AI generation">
                   <Bot className="size-4" />
                 </Link>

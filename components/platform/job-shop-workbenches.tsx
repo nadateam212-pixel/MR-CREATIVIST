@@ -19,6 +19,7 @@ import {
   Save,
   Search,
   Send,
+  Share2,
   Sparkles,
   Star,
   Store,
@@ -26,6 +27,7 @@ import {
   Upload,
   X
 } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -129,6 +131,7 @@ function statusTone(status?: string) {
 export function JobsDirectory({ jobs }: { jobs: PublicJobPost[] }) {
   const [query, setQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("All");
+  const [selectedJob, setSelectedJob] = useState<PublicJobPost | null>(null);
   const preferences = useUserPreferences();
   const categories = useMemo(() => ["All", ...Array.from(new Set(jobs.map((job) => job.category)))], [jobs]);
   const filtered = jobs.filter((job) => {
@@ -209,14 +212,10 @@ export function JobsDirectory({ jobs }: { jobs: PublicJobPost[] }) {
                   ))}
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {job.applyUrl ? (
-                    <Button asChild>
-                      <a href={job.applyUrl} target="_blank" rel="noreferrer">
-                        <ExternalLink className="size-4" />
-                        Apply
-                      </a>
-                    </Button>
-                  ) : null}
+                  <Button onClick={() => setSelectedJob(job)}>
+                    <ExternalLink className="size-4" />
+                    Apply
+                  </Button>
                   {job.contactEmail ? (
                     <Button asChild variant="outline">
                       <a href={`mailto:${job.contactEmail}?subject=${encodeURIComponent(job.title)}`}>
@@ -237,6 +236,93 @@ export function JobsDirectory({ jobs }: { jobs: PublicJobPost[] }) {
           </Card>
         )}
       </div>
+
+      {selectedJob ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 p-4">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5 shadow-2xl">
+            <div className="flex flex-col gap-4 border-b border-[hsl(var(--border))] pb-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="flex flex-wrap gap-2">
+                  <Badge>{selectedJob.category}</Badge>
+                  <Badge>{selectedJob.employmentType}</Badge>
+                  <Badge>{selectedJob.workplaceType}</Badge>
+                </div>
+                <h2 className="mt-3 text-2xl font-semibold">{selectedJob.title}</h2>
+                <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
+                  {selectedJob.companyName} - {selectedJob.location}
+                </p>
+              </div>
+              <Button size="icon" variant="outline" onClick={() => setSelectedJob(null)} aria-label="Close job details">
+                <X className="size-4" />
+              </Button>
+            </div>
+
+            <div className="mt-5 grid gap-5">
+              <div>
+                <h3 className="font-semibold">Job details</h3>
+                <p className="mt-2 text-sm leading-7 text-[hsl(var(--muted-foreground))]">{selectedJob.description}</p>
+              </div>
+              {[
+                ["Responsibilities", selectedJob.responsibilities ?? []],
+                ["Requirements", selectedJob.requirements ?? []],
+                ["Benefits", selectedJob.benefits ?? []]
+              ].map(([title, items]) =>
+                (items as string[]).length ? (
+                  <div key={title as string}>
+                    <h3 className="font-semibold">{title as string}</h3>
+                    <ul className="mt-2 grid gap-2 text-sm text-[hsl(var(--muted-foreground))]">
+                      {(items as string[]).map((item) => (
+                        <li key={item} className="rounded-md border border-[hsl(var(--border))] p-3">
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null
+              )}
+              <div className="grid gap-3 rounded-md border border-[hsl(var(--border))] p-4 text-sm sm:grid-cols-2">
+                <p>
+                  <span className="font-semibold">Salary: </span>
+                  {money(selectedJob.salaryMin, selectedJob.salaryMax, selectedJob.currency, preferences.currency, preferences.usdToFrw)}
+                </p>
+                <p>
+                  <span className="font-semibold">Deadline: </span>
+                  {selectedJob.applicationDeadline
+                    ? new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(new Date(selectedJob.applicationDeadline))
+                    : "Open until filled"}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {selectedJob.applyUrl ? (
+                  <Button asChild>
+                    <a href={selectedJob.applyUrl} target="_blank" rel="noreferrer">
+                      <ExternalLink className="size-4" />
+                      Apply on external site
+                    </a>
+                  </Button>
+                ) : selectedJob.contactEmail ? (
+                  <Button asChild>
+                    <a href={`mailto:${selectedJob.contactEmail}?subject=${encodeURIComponent(selectedJob.title)}`}>
+                      <Mail className="size-4" />
+                      Apply by email
+                    </a>
+                  </Button>
+                ) : (
+                  <Button asChild>
+                    <Link href={`/messages?subject=${encodeURIComponent(selectedJob.title)}&contextType=job&contextId=${selectedJob.slug}`}>
+                      <MessageSquare className="size-4" />
+                      Apply through platform
+                    </Link>
+                  </Button>
+                )}
+                <Button variant="outline" onClick={() => setSelectedJob(null)}>
+                  Close details
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -472,8 +558,11 @@ export function JobAdminConsole({ initialJobs = [] }: { initialJobs?: PublicJobP
 
       update("companyLogo", imageUrl);
       setMessage("Company image attached.");
+      toast.success("Company image uploaded successfully.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Image upload failed.");
+      const nextMessage = error instanceof Error ? error.message : "Image upload failed.";
+      setMessage(nextMessage);
+      toast.error(nextMessage);
     } finally {
       setUploadingField("");
     }
@@ -508,9 +597,13 @@ export function JobAdminConsole({ initialJobs = [] }: { initialJobs?: PublicJobP
           : [payload, ...current]
       );
       setEditingJobId(null);
-      setMessage(editingJobId ? "Job updated on the public jobs page." : "Job published to the public jobs page.");
+      const nextMessage = editingJobId ? "Job updated on the public jobs page." : "Job published to the public jobs page.";
+      setMessage(nextMessage);
+      toast.success(nextMessage);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Job save failed.");
+      const nextMessage = error instanceof Error ? error.message : "Job save failed.";
+      setMessage(nextMessage);
+      toast.error(nextMessage);
     }
   }
 
@@ -529,9 +622,19 @@ export function JobAdminConsole({ initialJobs = [] }: { initialJobs?: PublicJobP
       setJobs((current) => current.filter((item) => String(item.id ?? item.slug) !== recordId));
       if (editingJobId === recordId) resetForm();
       setMessage("Job removed from the public jobs page.");
+      toast.success("Job archived successfully.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Job delete failed.");
+      const nextMessage = error instanceof Error ? error.message : "Job delete failed.";
+      setMessage(nextMessage);
+      toast.error(nextMessage);
     }
+  }
+
+  function shareJob(job: PublicJobPost) {
+    const text = `${job.title} at ${job.companyName} - ${window.location.origin}/jobs`;
+    void navigator.clipboard?.writeText(text);
+    setMessage("Job share summary copied.");
+    toast.success("Job share summary copied.");
   }
 
   return (
@@ -570,7 +673,7 @@ export function JobAdminConsole({ initialJobs = [] }: { initialJobs?: PublicJobP
               </select>
               <Input value={form.salaryMin} onChange={(event) => update("salaryMin", event.target.value)} inputMode="numeric" placeholder="Salary min" />
               <Input value={form.salaryMax} onChange={(event) => update("salaryMax", event.target.value)} inputMode="numeric" placeholder="Salary max" />
-              <Input value={form.applyUrl} onChange={(event) => update("applyUrl", event.target.value)} placeholder="Apply URL" />
+              <Input value={form.applyUrl} onChange={(event) => update("applyUrl", event.target.value)} placeholder="External apply URL (optional)" />
               <Input value={form.contactEmail} onChange={(event) => update("contactEmail", event.target.value)} placeholder="Contact email" />
             </div>
             <textarea value={form.description} onChange={(event) => update("description", event.target.value)} className="min-h-28 rounded-md border border-[hsl(var(--border))] bg-transparent p-3" placeholder="Job description" />
@@ -613,9 +716,19 @@ export function JobAdminConsole({ initialJobs = [] }: { initialJobs?: PublicJobP
                     <Pencil className="size-4" />
                     Edit
                   </Button>
+                  <Button asChild size="sm" variant="outline">
+                    <Link href="/jobs" target="_blank">
+                      <ExternalLink className="size-4" />
+                      View
+                    </Link>
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => shareJob(job)}>
+                    <Share2 className="size-4" />
+                    Share
+                  </Button>
                   <Button size="sm" variant="outline" onClick={() => void deleteJob(job)}>
                     <Trash2 className="size-4" />
-                    Delete
+                    Archive
                   </Button>
                 </div>
               </div>
@@ -719,8 +832,11 @@ export function ShopBuilder({ initialShops = [], sellerName = "MR Creativist Sel
 
       update(field, imageUrl);
       setMessage("Business image attached.");
+      toast.success("Business image uploaded successfully.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Image upload failed.");
+      const nextMessage = error instanceof Error ? error.message : "Image upload failed.";
+      setMessage(nextMessage);
+      toast.error(nextMessage);
     } finally {
       setUploadingImageField("");
     }
@@ -770,9 +886,13 @@ export function ShopBuilder({ initialShops = [], sellerName = "MR Creativist Sel
           : [payload, ...current]
       );
       setEditingShopId(null);
-      setMessage(editingShopId ? "Business updated on the public business page." : "Business published to the public business page.");
+      const nextMessage = editingShopId ? "Business updated on the public business page." : "Business published to the public business page.";
+      setMessage(nextMessage);
+      toast.success(nextMessage);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Business save failed.");
+      const nextMessage = error instanceof Error ? error.message : "Business save failed.";
+      setMessage(nextMessage);
+      toast.error(nextMessage);
     }
   }
 
@@ -791,9 +911,19 @@ export function ShopBuilder({ initialShops = [], sellerName = "MR Creativist Sel
       setShops((current) => current.filter((item) => String(item.id ?? item.slug) !== recordId));
       if (editingShopId === recordId) resetForm();
       setMessage("Business removed from the public business page.");
+      toast.success("Business archived successfully.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Business delete failed.");
+      const nextMessage = error instanceof Error ? error.message : "Business delete failed.";
+      setMessage(nextMessage);
+      toast.error(nextMessage);
     }
+  }
+
+  function shareShop(shop: PublicShopProfile) {
+    const text = `${shop.name} - ${window.location.origin}/business-directory`;
+    void navigator.clipboard?.writeText(text);
+    setMessage("Business share summary copied.");
+    toast.success("Business share summary copied.");
   }
 
   return (
@@ -883,9 +1013,19 @@ export function ShopBuilder({ initialShops = [], sellerName = "MR Creativist Sel
                     <Pencil className="size-4" />
                     Edit
                   </Button>
+                  <Button asChild size="sm" variant="outline">
+                    <Link href="/business-directory" target="_blank">
+                      <ExternalLink className="size-4" />
+                      View
+                    </Link>
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => shareShop(shop)}>
+                    <Share2 className="size-4" />
+                    Share
+                  </Button>
                   <Button size="sm" variant="outline" onClick={() => void deleteShop(shop)}>
                     <Trash2 className="size-4" />
-                    Delete
+                    Archive
                   </Button>
                 </div>
               </div>

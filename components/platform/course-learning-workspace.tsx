@@ -17,19 +17,22 @@ import {
   Play,
   QrCode,
   RotateCcw,
+  Send,
   Sparkles,
   SkipBack,
   SkipForward,
   Timer,
   Unlock,
+  Users,
   Video
 } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { SafeImage } from "@/components/ui/safe-image";
-import { DEFAULT_PREVIEW_VIDEO, courseImageForCategory } from "@/lib/course-media";
+import { courseImageForCategory } from "@/lib/course-media";
 import { videoSourceForUrl } from "@/lib/video-sources";
 
 type CourseResource = {
@@ -99,9 +102,15 @@ type LearningProgressSnapshot = {
     lessonTitle?: string;
     moduleTitle?: string;
     action: string;
+    seconds?: number;
     score?: number;
     createdAt?: string;
   }[];
+  studySecondsByLesson?: Record<string, number>;
+  studySecondsByModule?: Record<string, number>;
+  moduleRequiredSeconds?: Record<string, number>;
+  totalStudySeconds?: number;
+  quizAttempts?: Record<string, { score: number; passed: boolean; at?: string }>;
 };
 
 type QuizQuestion = {
@@ -117,6 +126,31 @@ type CertificateResult = {
   verificationCode: string;
   issuedAt: string;
   template: string;
+};
+
+type QuizResult = {
+  score: number;
+  correct: number;
+  total: number;
+  passingScore: number;
+  passed: boolean;
+  corrections: {
+    id: string;
+    selectedIndex: number | null;
+    correctIndex: number;
+    correctAnswer: string;
+    explanation?: string;
+  }[];
+};
+
+type CommunityMessage = {
+  id: string;
+  senderId: string;
+  senderName: string;
+  senderRole?: string;
+  content: string;
+  isInstructor?: boolean;
+  createdAt?: string;
 };
 
 function embeddedVideoClass(provider: string) {
@@ -148,6 +182,15 @@ function formatClock(seconds: number) {
   const rest = safeSeconds % 60;
 
   return `${minutes}:${String(rest).padStart(2, "0")}`;
+}
+
+function formatStudyTime(seconds: number) {
+  const minutes = Math.floor(Math.max(0, seconds) / 60);
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+
+  if (hours > 0) return rest ? `${hours}h ${rest}m` : `${hours}h`;
+  return `${minutes}m`;
 }
 
 function lessonIcon(type: string) {
@@ -224,11 +267,22 @@ export function CourseLearningWorkspace({
   const [savingKey, setSavingKey] = useState("");
   const [message, setMessage] = useState("");
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
+  const [quizAnswers, setQuizAnswers] = useState<Record<string, number>>({});
+  const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
   const [quizLoading, setQuizLoading] = useState(false);
   const [certificate, setCertificate] = useState<CertificateResult | null>(null);
+  const [studySecondsByLesson, setStudySecondsByLesson] = useState<Record<string, number>>(
+    initialProgress.studySecondsByLesson ?? {}
+  );
+  const [activeStudySeconds, setActiveStudySeconds] = useState(0);
+  const [communityMessages, setCommunityMessages] = useState<CommunityMessage[]>([]);
+  const [communityDraft, setCommunityDraft] = useState("");
+  const [communityLoading, setCommunityLoading] = useState(false);
+  const [communityError, setCommunityError] = useState("");
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const vimeoRef = useRef<HTMLIFrameElement | null>(null);
   const youtubeRef = useRef<HTMLIFrameElement | null>(null);
+  const studyDeltaRef = useRef(0);
   const [mediaPlaying, setMediaPlaying] = useState(false);
   const [mediaSeconds, setMediaSeconds] = useState(0);
   const [playbackRate, setPlaybackRate] = useState(1);
@@ -243,12 +297,31 @@ export function CourseLearningWorkspace({
   const activeIndex = course.flatLessons.findIndex((lesson) => lesson.key === activeLesson?.key);
   const previousLesson = activeIndex > 0 ? course.flatLessons[activeIndex - 1] : null;
   const nextLesson = course.flatLessons.find((lesson) => !completedSet.has(lesson.key) && lesson.key !== activeLesson?.key);
-  const allComplete = progressPercent >= 100;
+  const allComplete =
+    progressPercent >= 100 &&
+    course.modules.every((module) => {
+      const lessonsComplete = module.lessons.every((lesson) => completedSet.has(lesson.key));
+      const requiredSeconds = module.lessons.reduce((total, lesson) => total + Number(lesson.durationMinutes ?? 0), 0) * 60;
+      const studiedSeconds = module.lessons.reduce(
+        (total, lesson) => total + Number(effectiveStudySecondsByLesson[lesson.key] ?? 0),
+        0
+      );
+
+      return lessonsComplete && studiedSeconds >= requiredSeconds;
+    });
+  const effectiveStudySecondsByLesson = {
+    ...studySecondsByLesson,
+    ...(activeLesson
+      ? {
+          [activeLesson.key]: (studySecondsByLesson[activeLesson.key] ?? 0) + activeStudySeconds
+        }
+      : {})
+  };
   const activeVideoSource = useMemo(
     () => {
-      const source = videoSourceForUrl(
+      return videoSourceForUrl(
         activeLesson?.type === "video"
-          ? activeLesson?.videoUrl || DEFAULT_PREVIEW_VIDEO
+          ? activeLesson?.videoUrl
           : activeLesson?.videoUrl,
         {
           controls: false,
@@ -257,10 +330,6 @@ export function CourseLearningWorkspace({
           origin: typeof window === "undefined" ? undefined : window.location.origin
         }
       );
-
-      return source.provider === "unsupported" && activeLesson?.type === "video"
-        ? videoSourceForUrl(DEFAULT_PREVIEW_VIDEO)
-        : source;
     },
     [activeLesson?.key, activeLesson?.type, activeLesson?.videoUrl, vimeoNonce]
   );
@@ -271,10 +340,29 @@ export function CourseLearningWorkspace({
     return Boolean(courseModule?.lessons.length) && Boolean(courseModule?.lessons.every((lesson) => completed.has(lesson.key)));
   }
 
+  function moduleRequiredSeconds(moduleKey: string) {
+    const courseModule = course.modules.find((item) => item.key === moduleKey);
+
+    return Math.max(
+      0,
+      (courseModule?.lessons ?? []).reduce((total, lesson) => total + Number(lesson.durationMinutes ?? 0), 0) * 60
+    );
+  }
+
+  function moduleStudySeconds(moduleKey: string, lessonSeconds = effectiveStudySecondsByLesson) {
+    const courseModule = course.modules.find((item) => item.key === moduleKey);
+
+    return (courseModule?.lessons ?? []).reduce((total, lesson) => total + Number(lessonSeconds[lesson.key] ?? 0), 0);
+  }
+
+  function moduleStudyReady(moduleKey: string, lessonSeconds = effectiveStudySecondsByLesson) {
+    return moduleStudySeconds(moduleKey, lessonSeconds) >= moduleRequiredSeconds(moduleKey);
+  }
+
   function moduleUnlocked(moduleIndex: number, completed = completedSet) {
     if (moduleIndex <= 0) return true;
 
-    return course.modules.slice(0, moduleIndex).every((module) => moduleComplete(module.key, completed));
+    return course.modules.slice(0, moduleIndex).every((module) => moduleComplete(module.key, completed) && moduleStudyReady(module.key));
   }
 
   function lessonUnlocked(key: string, completed = completedSet) {
@@ -313,7 +401,24 @@ export function CourseLearningWorkspace({
     setMediaPlaying(false);
     setMediaSeconds(0);
     setPlaybackRate(1);
+    setActiveStudySeconds(0);
+    studyDeltaRef.current = 0;
+    setQuizResult(null);
   }
+
+  useEffect(() => {
+    if (!activeLesson) return undefined;
+
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "hidden") return;
+      if (activeLesson.type === "video" && !mediaPlaying) return;
+
+      setActiveStudySeconds((current) => current + 1);
+      studyDeltaRef.current += 1;
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [activeLesson, mediaPlaying]);
 
   async function persistLesson(
     lesson: FlatLesson,
@@ -347,12 +452,16 @@ export function CourseLearningWorkspace({
 
       setCompletedLessonKeys(data.progress.completedLessonKeys ?? []);
       setServerProgressPercent(data.progress.progressPercent ?? 0);
+      setStudySecondsByLesson(data.progress.studySecondsByLesson ?? studySecondsByLesson);
       if (options.complete === false) {
         setActiveKey(data.progress.currentLessonKey || optimisticNextKey);
       } else {
         activateLesson(data.progress.currentLessonKey || optimisticNextKey);
       }
       setMessage(options.complete === false ? "Activity saved." : "Lesson completed and saved.");
+      if (options.complete !== false) {
+        toast.success("Lesson completed and saved.");
+      }
 
       return data.progress as LearningProgressSnapshot;
     } catch (error) {
@@ -360,17 +469,26 @@ export function CourseLearningWorkspace({
       const nextPercent = course.totalLessons ? Math.round((nextCompletedKeys.length / course.totalLessons) * 100) : 0;
 
       setCompletedLessonKeys(nextCompletedKeys);
+      setStudySecondsByLesson((current) => ({
+        ...current,
+        [lesson.key]: (current[lesson.key] ?? 0) + Number(options.seconds ?? 0)
+      }));
       setServerProgressPercent(nextPercent);
       if (shouldComplete) {
         activateLesson(optimisticNextKey);
       }
-      setMessage(
+      const nextMessage =
         shouldComplete
           ? "Lesson completed locally. The course will sync when the database record is available."
           : error instanceof Error
             ? error.message
-            : "Activity could not be saved."
-      );
+            : "Activity could not be saved.";
+      setMessage(nextMessage);
+      if (shouldComplete) {
+        toast.success("Lesson completed locally.");
+      } else if (error instanceof Error) {
+        toast.error(error.message);
+      }
       return {
         completedLessonKeys: nextCompletedKeys,
         currentLessonKey: optimisticNextKey,
@@ -392,10 +510,39 @@ export function CourseLearningWorkspace({
     }
   }
 
+  async function saveStudyTime() {
+    if (!activeLesson) return;
+
+    const seconds = Math.max(studyDeltaRef.current, activeStudySeconds);
+    if (seconds <= 0) {
+      setMessage("Spend a little time in this lesson before saving study time.");
+      return;
+    }
+
+    const progress = await persistLesson(activeLesson, "studied", { seconds, complete: false });
+
+    studyDeltaRef.current = 0;
+    setActiveStudySeconds(0);
+    setStudySecondsByLesson(progress.studySecondsByLesson ?? {});
+    toast.success("Study time saved.");
+  }
+
   async function completeActive(action: LearningProgressSnapshot["events"][number]["action"], score?: number) {
     if (!activeLesson) return;
 
-    await persistLesson(activeLesson, action, { seconds: activeLesson.durationMinutes * 60, score });
+    if (activeLesson.type === "quiz" && action !== "quiz_passed") {
+      const nextMessage = "Submit the quiz and score at least 75% to complete this lesson.";
+      setMessage(nextMessage);
+      toast.error(nextMessage);
+      return;
+    }
+
+    const seconds = Math.max(studyDeltaRef.current, activeStudySeconds, Math.floor(mediaSeconds));
+    const progress = await persistLesson(activeLesson, action, { seconds, score });
+
+    studyDeltaRef.current = 0;
+    setActiveStudySeconds(0);
+    setStudySecondsByLesson(progress.studySecondsByLesson ?? {});
   }
 
   function sendVimeoCommand(method: string, value?: number | string) {
@@ -558,22 +705,28 @@ export function CourseLearningWorkspace({
   async function loadQuiz() {
     setQuizLoading(true);
     setMessage("");
+    setQuizAnswers({});
+    setQuizResult(null);
 
     try {
-      const response = await fetch(`/api/courses/${encodeURIComponent(course.slug)}/quiz`);
+      const params = new URLSearchParams();
+      if (activeLesson?.key) params.set("lessonKey", activeLesson.key);
+      const response = await fetch(`/api/courses/${encodeURIComponent(course.slug)}/quiz?${params.toString()}`);
       const data = await response.json();
 
       if (!response.ok || data.error) throw new Error(data.error ?? "Quiz could not be generated.");
       setQuizQuestions(data.questions ?? []);
+      toast.success("Quiz ready.");
     } catch (error) {
       const fallback = fallbackQuizQuestions(course, activeLesson);
 
       setQuizQuestions(fallback);
-      setMessage(
+      const nextMessage =
         error instanceof Error
           ? `${error.message} A local chapter quiz is ready.`
-          : "A local chapter quiz is ready."
-      );
+          : "A local chapter quiz is ready.";
+      setMessage(nextMessage);
+      toast.message("Local quiz ready.");
     } finally {
       setQuizLoading(false);
     }
@@ -582,6 +735,14 @@ export function CourseLearningWorkspace({
   async function submitQuiz() {
     const questions = quizQuestions.length ? quizQuestions : fallbackQuizQuestions(course, activeLesson);
     if (!quizQuestions.length) setQuizQuestions(questions);
+    const missingAnswer = questions.find((question) => typeof quizAnswers[question.id] !== "number");
+
+    if (missingAnswer) {
+      const nextMessage = "Answer every quiz question before submitting.";
+      setMessage(nextMessage);
+      toast.error(nextMessage);
+      return;
+    }
 
     setQuizLoading(true);
     setMessage("");
@@ -590,20 +751,28 @@ export function CourseLearningWorkspace({
       const response = await fetch(`/api/courses/${encodeURIComponent(course.slug)}/quiz`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ answers: questions.map(() => 0) })
+        body: JSON.stringify({ lessonKey: activeLesson.key, answers: quizAnswers })
       });
       const data = await response.json();
 
       if (!response.ok || data.error) throw new Error(data.error ?? "Quiz could not be submitted.");
-      if (!data.passed) throw new Error(`Quiz score ${data.score}%. Review the lesson and try again.`);
+      setQuizResult(data);
+      if (!data.passed) {
+        await persistLesson(activeLesson, "quiz_failed", { seconds: Math.max(activeStudySeconds, 60), score: data.score, complete: false });
+        const nextMessage = `Quiz score ${data.score}%. You need ${data.passingScore ?? 75}% or higher. Review the correct answers and try again.`;
+        setMessage(nextMessage);
+        toast.error(nextMessage);
+        return;
+      }
       await completeActive("quiz_passed", data.score);
+      toast.success(`Quiz passed with ${data.score}%. Next chapter can unlock when study time is complete.`);
     } catch (error) {
-      await completeActive("quiz_passed", 100);
-      setMessage(
+      const nextMessage =
         error instanceof Error
-          ? `${error.message} Local quiz passed and the next chapter can unlock.`
-          : "Local quiz passed and the next chapter can unlock."
-      );
+          ? error.message
+          : "Quiz could not be submitted.";
+      setMessage(nextMessage);
+      toast.error(nextMessage);
     } finally {
       setQuizLoading(false);
     }
@@ -614,6 +783,7 @@ export function CourseLearningWorkspace({
 
     if (!allComplete) {
       setMessage("Complete every lesson before generating the certificate.");
+      toast.error("Complete every lesson before generating the certificate.");
       return;
     }
 
@@ -627,6 +797,7 @@ export function CourseLearningWorkspace({
 
       setCertificate(data.certificate);
       setMessage("Verified certificate generated.");
+      toast.success("Verified certificate generated.");
       if (options.openPdf) {
         window.open(certificatePdfUrl(data.certificate, course, learnerName), "_blank", "noopener,noreferrer");
       }
@@ -641,6 +812,9 @@ export function CourseLearningWorkspace({
       );
       if (options.openPdf) {
         window.open(certificatePdfUrl(localCertificate, course, learnerName), "_blank", "noopener,noreferrer");
+      }
+      if (!options.auto) {
+        toast.message("Local certificate PDF is ready.");
       }
     } finally {
       setSavingKey("");
@@ -659,6 +833,67 @@ export function CourseLearningWorkspace({
     // generateCertificate intentionally stays outside deps; this effect only reacts to completion state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allComplete, certificate, savingKey]);
+
+  async function loadCommunity() {
+    setCommunityLoading(true);
+    setCommunityError("");
+
+    try {
+      const response = await fetch(`/api/courses/${encodeURIComponent(course.slug)}/community`, { cache: "no-store" });
+      const data = await response.json();
+
+      if (!response.ok || data.error) throw new Error(data.error ?? "Community could not load.");
+      setCommunityMessages(data.items ?? []);
+    } catch (error) {
+      setCommunityError(error instanceof Error ? error.message : "Community could not load.");
+    } finally {
+      setCommunityLoading(false);
+    }
+  }
+
+  async function sendCommunityMessage() {
+    if (!communityDraft.trim()) return;
+
+    setCommunityLoading(true);
+    setCommunityError("");
+
+    try {
+      const response = await fetch(`/api/courses/${encodeURIComponent(course.slug)}/community`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: communityDraft.trim() })
+      });
+      const data = await response.json();
+
+      if (!response.ok || data.error) throw new Error(data.error ?? "Message could not be sent.");
+
+      setCommunityMessages((current) => [...current, data]);
+      setCommunityDraft("");
+      toast.success("Community message sent.");
+    } catch (error) {
+      const nextMessage = error instanceof Error ? error.message : "Message could not be sent.";
+      setCommunityError(nextMessage);
+      toast.error(nextMessage);
+    } finally {
+      setCommunityLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    const initialLoad = window.setTimeout(() => {
+      void loadCommunity();
+    }, 0);
+    const timer = window.setInterval(() => {
+      void loadCommunity();
+    }, 30000);
+
+    return () => {
+      window.clearTimeout(initialLoad);
+      window.clearInterval(timer);
+    };
+    // Community polling follows the current course only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [course.slug]);
 
   if (!activeLesson) {
     return (
@@ -736,6 +971,12 @@ export function CourseLearningWorkspace({
                 </p>
               </div>
               <div className="rounded-md border border-[hsl(var(--border))] p-3">
+                <p className="text-xs text-[hsl(var(--muted-foreground))]">Study time saved</p>
+                <p className="mt-1 text-2xl font-semibold">
+                  {formatStudyTime(Object.values(effectiveStudySecondsByLesson).reduce((total, seconds) => total + Number(seconds ?? 0), 0))}
+                </p>
+              </div>
+              <div className="rounded-md border border-[hsl(var(--border))] p-3">
                 <p className="text-xs text-[hsl(var(--muted-foreground))]">Certificate status</p>
                 <p className="mt-1 text-sm font-semibold">
                   {certificate ? "Issued and verified" : allComplete ? "Generating automatically" : "Locked until completion"}
@@ -776,6 +1017,9 @@ export function CourseLearningWorkspace({
             {course.modules.map((module, moduleIndex) => {
               const completedInModule = module.lessons.filter((lesson) => completedSet.has(lesson.key)).length;
               const modulePercent = Math.round((completedInModule / module.lessons.length) * 100);
+              const requiredSeconds = moduleRequiredSeconds(module.key);
+              const studiedSeconds = moduleStudySeconds(module.key);
+              const timeReady = studiedSeconds >= requiredSeconds;
 
               return (
                 <div key={module.key} className="space-y-2">
@@ -786,7 +1030,12 @@ export function CourseLearningWorkspace({
                       </p>
                       <h2 className="text-sm font-semibold">{module.title}</h2>
                     </div>
-                    <Badge>{modulePercent}%</Badge>
+                    <div className="flex flex-col items-end gap-1">
+                      <Badge>{modulePercent}%</Badge>
+                      <Badge className={timeReady ? "border-[hsl(var(--primary))] text-[hsl(var(--primary))]" : ""}>
+                        {formatStudyTime(studiedSeconds)} / {formatStudyTime(requiredSeconds)}
+                      </Badge>
+                    </div>
                   </div>
                   <Progress value={modulePercent} />
                   <div className="space-y-2">
@@ -826,6 +1075,7 @@ export function CourseLearningWorkspace({
                           </span>
                           <span className="mt-2 block text-xs text-[hsl(var(--muted-foreground))]">
                             {lesson.type} - {formatMinutes(lesson.durationMinutes)}
+                            {!unlocked && moduleIndex > 0 ? " - locked until previous chapter is complete" : ""}
                           </span>
                         </button>
                       );
@@ -1009,10 +1259,56 @@ export function CourseLearningWorkspace({
                       <div key={question.id} className="rounded-md border border-[hsl(var(--border))] p-3">
                         <p className="text-sm font-semibold">Question {index + 1}</p>
                         <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{question.question}</p>
-                        <p className="mt-2 text-xs text-[hsl(var(--primary))]">Correct path: {question.options[question.correctIndex]}</p>
+                        <div className="mt-3 grid gap-2">
+                          {question.options.map((option, optionIndex) => {
+                            const correction = quizResult?.corrections.find((item) => item.id === question.id);
+                            const isCorrect = correction?.correctIndex === optionIndex;
+                            const selectedWrong =
+                              correction?.selectedIndex === optionIndex && correction.selectedIndex !== correction.correctIndex;
+
+                            return (
+                              <label
+                                key={`${question.id}-${option}`}
+                                className={`flex cursor-pointer items-start gap-2 rounded-md border border-[hsl(var(--border))] p-3 text-sm ${
+                                  isCorrect && quizResult
+                                    ? "border-[hsl(var(--primary))]/50 bg-[hsl(var(--primary))]/10"
+                                    : selectedWrong
+                                      ? "border-[hsl(var(--destructive))]/50 bg-[hsl(var(--destructive))]/10"
+                                      : "hover:bg-[hsl(var(--muted))]/45"
+                                }`}
+                              >
+                                <input
+                                  type="radio"
+                                  name={question.id}
+                                  checked={quizAnswers[question.id] === optionIndex}
+                                  onChange={() => setQuizAnswers((current) => ({ ...current, [question.id]: optionIndex }))}
+                                  className="mt-1"
+                                />
+                                <span>{option}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                        {quizResult ? (
+                          <p className="mt-2 text-xs text-[hsl(var(--primary))]">
+                            Correct answer: {question.options[question.correctIndex]}
+                          </p>
+                        ) : null}
                       </div>
                     ))}
                   </div>
+                  {quizResult ? (
+                    <div className="rounded-md border border-[hsl(var(--border))] p-4 text-sm">
+                      <p className="font-semibold">
+                        Score: {quizResult.score}% ({quizResult.correct}/{quizResult.total})
+                      </p>
+                      <p className="mt-1 text-[hsl(var(--muted-foreground))]">
+                        {quizResult.passed
+                          ? "Passed. This quiz can unlock progress."
+                          : `Not passed. You need ${quizResult.passingScore}% or higher, then submit the quiz again.`}
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
 
@@ -1078,10 +1374,15 @@ export function CourseLearningWorkspace({
 
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-sm text-[hsl(var(--muted-foreground))]">
-                {completedSet.has(activeLesson.key) ? "Completed" : "In progress"} - {activeLesson.moduleTitle}
+                {completedSet.has(activeLesson.key) ? "Completed" : "In progress"} - {activeLesson.moduleTitle} -{" "}
+                {formatStudyTime(effectiveStudySecondsByLesson[activeLesson.key] ?? 0)} saved
               </p>
               <div className="flex flex-wrap gap-2">
-                <Button variant="outline" onClick={() => void completeActive("completed")} disabled={savingKey === activeLesson.key}>
+                <Button variant="outline" onClick={() => void saveStudyTime()} disabled={savingKey === activeLesson.key || activeStudySeconds <= 0}>
+                  <Timer className="size-4" />
+                  Save study time
+                </Button>
+                <Button variant="outline" onClick={() => void completeActive("completed")} disabled={savingKey === activeLesson.key || activeLesson.type === "quiz"}>
                   <CheckCircle2 className="size-4" />
                   Complete lesson
                 </Button>
@@ -1131,6 +1432,47 @@ export function CourseLearningWorkspace({
               ) : (
                 <p className="text-sm text-[hsl(var(--muted-foreground))]">Your saved lesson activity will appear here.</p>
               )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <Users className="size-5 text-[hsl(var(--primary))]" />
+                <CardTitle>Community</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="max-h-64 space-y-2 overflow-y-auto rounded-md border border-[hsl(var(--border))] p-3">
+                {communityLoading && communityMessages.length === 0 ? (
+                  <p className="text-sm text-[hsl(var(--muted-foreground))]">Loading community...</p>
+                ) : null}
+                {communityMessages.map((item) => (
+                  <div key={item.id} className="rounded-md border border-[hsl(var(--border))] p-3 text-sm">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-semibold">{item.senderName}</p>
+                      {item.isInstructor ? <Badge>Instructor</Badge> : null}
+                    </div>
+                    <p className="mt-2 whitespace-pre-wrap leading-6 text-[hsl(var(--muted-foreground))]">{item.content}</p>
+                  </div>
+                ))}
+                {!communityLoading && communityMessages.length === 0 ? (
+                  <p className="text-sm text-[hsl(var(--muted-foreground))]">
+                    Students in this course can meet here. The instructor can guide the group.
+                  </p>
+                ) : null}
+              </div>
+              <textarea
+                value={communityDraft}
+                onChange={(event) => setCommunityDraft(event.target.value)}
+                placeholder="Ask the course community..."
+                className="min-h-20 w-full rounded-md border border-[hsl(var(--border))] bg-transparent p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
+              />
+              <Button className="w-full" onClick={() => void sendCommunityMessage()} disabled={communityLoading || !communityDraft.trim()}>
+                <Send className="size-4" />
+                Send to community
+              </Button>
+              {communityError ? <p className="text-sm text-[hsl(var(--destructive))]">{communityError}</p> : null}
             </CardContent>
           </Card>
         </div>

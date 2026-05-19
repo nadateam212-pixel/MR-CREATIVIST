@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import Image from "next/image";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Inbox, Loader2, MessageSquare, Search, Send, ShieldCheck } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -48,6 +49,7 @@ function formatTime(value?: string) {
 }
 
 export function MessageCenter({ recipientId }: { recipientId?: string }) {
+  const router = useRouter();
   const { data: session } = useSession();
   const searchParams = useSearchParams();
   const initialRecipient = recipientId ?? searchParams.get("to") ?? "";
@@ -117,6 +119,7 @@ export function MessageCenter({ recipientId }: { recipientId?: string }) {
 
   async function selectContact(contactId: string) {
     setSelectedId(contactId);
+    router.replace(`/messages/${contactId}`);
     await loadMessages(contactId);
   }
 
@@ -144,9 +147,12 @@ export function MessageCenter({ recipientId }: { recipientId?: string }) {
       setMessages((current) => [...current, payload]);
       setContent("");
       setStatus("Message sent.");
+      toast.success("Private message sent.");
       await loadMessages(selectedId);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Message failed.");
+      const nextStatus = error instanceof Error ? error.message : "Message failed.";
+      setStatus(nextStatus);
+      toast.error(nextStatus);
     }
   }
 
@@ -292,6 +298,11 @@ export function MessageCenter({ recipientId }: { recipientId?: string }) {
               <textarea
                 value={content}
                 onChange={(event) => setContent(event.target.value)}
+                onKeyDown={(event) => {
+                  if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+                    event.currentTarget.form?.requestSubmit();
+                  }
+                }}
                 disabled={!selectedId}
                 placeholder="Write a message..."
                 className="min-h-24 rounded-md border border-[hsl(var(--border))] bg-transparent p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"

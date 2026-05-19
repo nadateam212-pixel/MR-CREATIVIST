@@ -2,7 +2,7 @@ import { auth } from "@/auth";
 import Course from "@/models/Course";
 import Enrollment from "@/models/Enrollment";
 import LearningProgress from "@/models/LearningProgress";
-import { buildCourseStructure, publicLearningProgress } from "@/lib/learning-engine";
+import { buildCourseStructure, moduleCompletionReady, publicLearningProgress } from "@/lib/learning-engine";
 import { issueCertificateCredential } from "@/lib/platform-ledger";
 import { jsonError, jsonOk, mongoIdOrSlug, requireMongo } from "@/lib/mongo-api";
 
@@ -25,11 +25,16 @@ export async function POST(_request: Request, { params }: { params: Promise<{ co
     ]);
     const structure = buildCourseStructure(course);
     const snapshot = publicLearningProgress(progress, enrollment, structure);
+    const timeReady = structure.modules.every((module: { key: string; lessons: { key: string; durationMinutes: number }[] }) =>
+      moduleCompletionReady(structure, module, snapshot.completedLessonKeys, snapshot.studySecondsByLesson).ready
+    );
 
-    if (snapshot.progressPercent < 100) {
+    if (snapshot.progressPercent < 100 || !timeReady) {
       return jsonOk(
         {
-          error: "Complete every lesson, reading, video, quiz, and assignment before generating this certificate.",
+          error: timeReady
+            ? "Complete every lesson, reading, video, quiz, and assignment before generating this certificate."
+            : "Complete every chapter's required learning time before generating this certificate.",
           progressPercent: snapshot.progressPercent
         },
         403

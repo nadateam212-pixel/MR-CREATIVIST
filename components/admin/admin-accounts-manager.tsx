@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, CheckCircle2, ExternalLink, FileCheck2, ShieldCheck, Users, XCircle } from "lucide-react";
+import { ArrowRight, CheckCircle2, ExternalLink, FileCheck2, MessageSquare, Share2, ShieldCheck, ShieldOff, Users, XCircle } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -66,26 +67,35 @@ function UserRoleRow({ user, onSave }: { user: AdminUser; onSave: (user: AdminUs
     );
   }
 
-  async function save() {
+  async function save(nextStatus = accountStatus) {
     setSaving(true);
     try {
       const response = await fetch(`/api/admin/users/${user.id}/roles`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: activeRole, validatedRoles, accountStatus })
+        body: JSON.stringify({ role: activeRole, validatedRoles, accountStatus: nextStatus })
       });
       const payload = await response.json();
-      if (response.ok) {
-        onSave({
-          ...user,
-          role: payload.user.role,
-          validatedRoles: payload.user.validatedRoles ?? [],
-          accountStatus: payload.user.accountStatus ?? "active"
-        });
-      }
+      if (!response.ok) throw new Error(payload.error ?? "User update failed.");
+
+      setAccountStatus(payload.user.accountStatus ?? nextStatus);
+      onSave({
+        ...user,
+        role: payload.user.role,
+        validatedRoles: payload.user.validatedRoles ?? [],
+        accountStatus: payload.user.accountStatus ?? nextStatus
+      });
+      toast.success("User controls saved.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "User update failed.");
     } finally {
       setSaving(false);
     }
+  }
+
+  function shareUser() {
+    void navigator.clipboard?.writeText(`${user.name} - ${user.email} - ${user.role}`);
+    toast.success("User share summary copied.");
   }
 
   return (
@@ -131,9 +141,25 @@ function UserRoleRow({ user, onSave }: { user: AdminUser; onSave: (user: AdminUs
         </div>
       </td>
       <td className="p-4 text-right">
-        <Button size="sm" onClick={save} disabled={saving || validatedRoles.length === 0}>
-          Save
-        </Button>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button size="sm" onClick={() => void save()} disabled={saving || validatedRoles.length === 0}>
+            Save
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link href={`/messages/${user.id}`}>
+              <MessageSquare className="size-4" />
+              Message
+            </Link>
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => void save(accountStatus === "suspended" ? "active" : "suspended")} disabled={saving || validatedRoles.length === 0}>
+            {accountStatus === "suspended" ? <CheckCircle2 className="size-4" /> : <ShieldOff className="size-4" />}
+            {accountStatus === "suspended" ? "Activate" : "Block"}
+          </Button>
+          <Button size="sm" variant="outline" onClick={shareUser}>
+            <Share2 className="size-4" />
+            Share
+          </Button>
+        </div>
       </td>
     </tr>
   );
@@ -174,6 +200,9 @@ export function AdminAccountsManager({
           application.id === applicationId ? { ...application, ...payload.application, id: applicationId } : application
         )
       );
+      toast.success(payload.message ?? "Application review saved.");
+    } else {
+      toast.error(payload.error ?? "Application review failed.");
     }
   }
 

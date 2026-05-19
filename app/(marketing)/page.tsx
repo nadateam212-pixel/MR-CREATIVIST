@@ -22,6 +22,61 @@ function fallbackItems<T>(items: T[], fallback: T[]) {
   return items.length ? items : fallback;
 }
 
+type RankedItem = {
+  [key: string]: unknown;
+  name?: string;
+  title?: string;
+  slug?: string;
+  image?: string;
+  price?: string | number;
+  category?: string;
+  companyName?: string;
+  location?: string;
+  instructor?: string;
+  isFeatured?: boolean;
+  rating?: number;
+  learners?: number;
+  downloads?: number;
+  completed?: number;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
+  productsOrServices?: unknown[];
+};
+
+function numberValue(value: unknown) {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function timeValue(value: unknown) {
+  const time = value ? new Date(String(value)).getTime() : 0;
+  return Number.isFinite(time) ? time / 10_000_000_000 : 0;
+}
+
+function topItems<T extends RankedItem>(items: T[], score: (item: T) => number) {
+  return [...items].sort((left, right) => score(right) - score(left));
+}
+
+function courseScore(course: RankedItem) {
+  return (course.isFeatured ? 100000 : 0) + numberValue(course.learners) * 2 + numberValue(course.rating) * 1000 + timeValue(course.updatedAt ?? course.createdAt);
+}
+
+function productScore(product: RankedItem) {
+  return (product.isFeatured ? 100000 : 0) + numberValue(product.downloads) * 3 + numberValue(product.rating) * 1000 + timeValue(product.updatedAt ?? product.createdAt);
+}
+
+function freelancerScore(freelancer: RankedItem) {
+  return numberValue(freelancer.rating) * 1000 + numberValue(freelancer.completed) * 4 + timeValue(freelancer.updatedAt ?? freelancer.createdAt);
+}
+
+function freshFeaturedScore(item: RankedItem) {
+  return (item.isFeatured ? 100000 : 0) + numberValue(item.rating) * 1000 + (item.productsOrServices?.length ?? 0) * 20 + timeValue(item.updatedAt ?? item.createdAt);
+}
+
+function formatCompact(value: number) {
+  return new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(value);
+}
+
 const fallbackCourses = [
   {
     title: "UI/UX Design Masterclass",
@@ -183,17 +238,25 @@ function SectionTitle({ title, href }: { title: string; href: string }) {
 
 export default async function HomePage() {
   const [courses, products, freelancers, jobs, shops] = await Promise.all([
-    getCourses({ limit: 6 }),
-    getProducts({ limit: 10 }),
-    getFreelancers({ limit: 6 }),
-    getJobPosts({ limit: 4 }),
-    getShopProfiles({ limit: 4 })
+    getCourses({ limit: 12 }),
+    getProducts({ limit: 12 }),
+    getFreelancers({ limit: 12 }),
+    getJobPosts({ limit: 8 }),
+    getShopProfiles({ limit: 8 })
   ]);
-  const courseItems = fallbackItems(courses, fallbackCourses).slice(0, 4);
-  const productItems = fallbackItems(products, fallbackProducts).slice(0, 8);
-  const freelancerItems = fallbackItems(freelancers, fallbackFreelancers).slice(0, 6);
-  const jobItems = fallbackItems(jobs, fallbackJobs).slice(0, 3);
-  const shopItems = shops.slice(0, 3);
+  const courseItems = topItems(fallbackItems(courses, fallbackCourses), courseScore).slice(0, 4);
+  const productItems = topItems(fallbackItems(products, fallbackProducts), productScore).slice(0, 8);
+  const freelancerItems = topItems(fallbackItems(freelancers, fallbackFreelancers), freelancerScore).slice(0, 6);
+  const jobItems = topItems(fallbackItems(jobs, fallbackJobs), freshFeaturedScore).slice(0, 3);
+  const shopItems = topItems(shops, freshFeaturedScore).slice(0, 3);
+  const ratingValues = [...courseItems, ...freelancerItems, ...productItems, ...shopItems]
+    .map((item) => numberValue((item as RankedItem).rating))
+    .filter((rating) => rating > 0);
+  const averageRating = ratingValues.length
+    ? ratingValues.reduce((total, rating) => total + rating, 0) / ratingValues.length
+    : 4.9;
+  const learnerTotal = courseItems.reduce((total, course) => total + numberValue(course.learners), 0);
+  const liveRecordCount = courses.length + products.length + freelancers.length + jobs.length + shops.length;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6">
@@ -230,9 +293,9 @@ export default async function HomePage() {
 
           <div className="grid content-center gap-3 sm:grid-cols-3 xl:grid-cols-1">
             {[
-              { value: "4.9", label: "Creator rating", icon: Star },
-              { value: "125", label: "New enrollments", icon: Users },
-              { value: "Live", label: "Jobs, businesses and products", icon: BadgeCheck }
+              { value: averageRating.toFixed(1), label: "Average platform rating", icon: Star },
+              { value: formatCompact(learnerTotal), label: "Course learners", icon: Users },
+              { value: formatCompact(liveRecordCount || courseItems.length + productItems.length + freelancerItems.length + jobItems.length + shopItems.length), label: "Live public records", icon: BadgeCheck }
             ].map(({ value, label, icon: Icon }) => (
               <div key={label} className="flex items-center gap-3 rounded-md border border-white/10 bg-white/10 p-3 backdrop-blur">
                 <Icon className="size-5 shrink-0 text-cyan-100" />
@@ -340,8 +403,8 @@ export default async function HomePage() {
                   Browse public jobs
                 </Link>
               )}
-              {shopItems.length ? shopItems.map((shop: { slug: string; name: string }) => (
-                <Link key={shop.slug} href="/business-directory" className="rounded-md border border-[hsl(var(--border))] p-3 hover:bg-[hsl(var(--muted))]/45 dark:border-white/10 dark:hover:bg-white/10">
+              {shopItems.length ? shopItems.map((shop) => (
+                <Link key={String(shop.slug ?? shop.name)} href="/business-directory" className="rounded-md border border-[hsl(var(--border))] p-3 hover:bg-[hsl(var(--muted))]/45 dark:border-white/10 dark:hover:bg-white/10">
                   <Building2 className="mr-2 inline size-5 text-fuchsia-300" />
                   {shop.name}
                 </Link>

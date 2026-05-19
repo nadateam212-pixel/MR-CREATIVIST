@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { CheckCircle2, CreditCard, Download, Minus, PackageCheck, Plus, ShieldCheck, ShoppingCart, Tag, Wallet } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -88,13 +89,17 @@ export function CheckoutWorkbench({ mode = "cart", products = [] }: { mode?: "ca
       }
 
       setOrderStatus("Order saved.");
+      toast.success("Order saved successfully.");
     } catch (error) {
-      setOrderStatus(error instanceof Error ? error.message : "Order completed on this device. Please try again if it does not appear in your orders.");
+      const nextMessage = error instanceof Error ? error.message : "Order completed on this device. Please try again if it does not appear in your orders.";
+      setOrderStatus(nextMessage);
+      toast.error(nextMessage);
     }
 
     purchase(total, `Marketplace checkout by ${paymentMethod}`);
     clearCart();
     setOrderComplete(true);
+    toast.success("Checkout completed.");
   }
 
   return (
@@ -149,7 +154,14 @@ export function CheckoutWorkbench({ mode = "cart", products = [] }: { mode?: "ca
                     <Badge>{product.type}</Badge>
                     <h3 className="mt-3 font-semibold">{product.name}</h3>
                     <PriceDisplay price={product.price} className="mt-2 text-sm font-medium text-[hsl(var(--muted-foreground))]" />
-                    <Button className="mt-4 w-full" size="sm" onClick={() => addToCart(product.slug)}>
+                    <Button
+                      className="mt-4 w-full"
+                      size="sm"
+                      onClick={() => {
+                        addToCart(product.slug);
+                        toast.success(`${product.name} added to cart.`);
+                      }}
+                    >
                       <ShoppingCart className="size-4" />
                       Add
                     </Button>

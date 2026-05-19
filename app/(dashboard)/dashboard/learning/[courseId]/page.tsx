@@ -39,7 +39,7 @@ export default async function CoursePlayerPage({ params }: { params: Promise<{ c
   return (
     <CourseLearningWorkspace
       course={course}
-      initialProgress={progress}
+      initialProgress={progress as unknown as Parameters<typeof CourseLearningWorkspace>[0]["initialProgress"]}
       learnerName={session.user.name ?? "MR Creativist Learner"}
     />
   );

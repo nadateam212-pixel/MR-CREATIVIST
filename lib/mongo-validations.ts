@@ -6,8 +6,18 @@ const slug = z
   .max(100)
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Use a URL-safe slug.");
 
-const url = z.url().or(z.literal(""));
-const optionalUrl = url.optional().transform((value) => value || undefined);
+function normalizeOptionalUrl(value: unknown) {
+  if (typeof value !== "string") return value;
+
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) return trimmed;
+  if (/^(www\.|[a-z0-9-]+(?:\.[a-z0-9-]+)+)(?:[/:?#]|$)/i.test(trimmed)) return `https://${trimmed}`;
+
+  return trimmed;
+}
+
+const optionalUrl = z.preprocess(normalizeOptionalUrl, z.url().optional());
 const assetUrl = z.url().or(z.string().regex(/^\/[^\s]*$/, "Use a valid URL or public asset path.")).or(z.literal(""));
 const optionalAssetUrl = assetUrl.optional().transform((value) => value || undefined);
 
@@ -22,7 +32,7 @@ export const courseSchema = z.object({
   price: z.coerce.number().min(0),
   compareAtPrice: z.coerce.number().min(0).optional(),
   currency: z.enum(["USD", "FRW"]).default("USD"),
-  image: z.url(),
+  image: assetUrl,
   trailerUrl: optionalUrl,
   duration: z.string().min(2).max(80).default("Self-paced"),
   lessonsCount: z.coerce.number().int().min(0).default(0),
@@ -41,10 +51,23 @@ export const courseSchema = z.object({
           .array(
             z.object({
               title: z.string().min(2).max(180),
-              type: z.enum(["video", "article", "quiz", "assignment", "download"]).default("video"),
+              type: z.enum(["video", "article", "image", "quiz", "assignment", "download"]).default("video"),
               durationMinutes: z.coerce.number().int().min(0).default(0),
+              summary: z.string().max(1200).optional(),
               videoUrl: optionalUrl,
-              resources: z.array(z.object({ label: z.string(), url: z.url() })).default([]),
+              imageUrl: optionalAssetUrl,
+              resources: z.array(z.object({ label: z.string(), url: assetUrl })).default([]),
+              quizQuestions: z
+                .array(
+                  z.object({
+                    id: z.string().max(80).optional(),
+                    question: z.string().min(4).max(500),
+                    options: z.array(z.string().min(1).max(240)).min(2).max(6),
+                    correctIndex: z.coerce.number().int().min(0).default(0),
+                    explanation: z.string().max(700).optional()
+                  })
+                )
+                .default([]),
               isPreview: z.boolean().default(false)
             })
           )
@@ -65,7 +88,7 @@ export const productSchema = z.object({
   price: z.coerce.number().min(0),
   compareAtPrice: z.coerce.number().min(0).optional(),
   currency: z.enum(["USD", "FRW"]).default("USD"),
-  images: z.array(z.url()).min(1),
+  images: z.array(assetUrl).min(1),
   category: z.string().min(2).max(120),
   stock: z.coerce.number().int().min(0).default(0),
   rating: z.coerce.number().min(0).max(5).default(0),

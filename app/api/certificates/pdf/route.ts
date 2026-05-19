@@ -158,16 +158,9 @@ async function buildCertificatePdf(input: CertificateInput) {
   drawLabel(page, "Template", input.template, 310, 473, 110, regular, bold);
   drawLabel(page, "Verification", input.code, 444, 473, 118, regular, bold);
 
-  page.drawLine({ start: { x: 100, y: yFromTop(540) }, end: { x: 306, y: yFromTop(540) }, thickness: 0.8, color: color("#94a3b8") });
-  page.drawLine({ start: { x: 360, y: yFromTop(540) }, end: { x: 566, y: yFromTop(540) }, thickness: 0.8, color: color("#94a3b8") });
-  drawCentered(page, "Platform Director", 548, 8, regular, "#64748b", 203);
-  drawCentered(page, "Instructor Signature", 548, 8, regular, "#64748b", 463);
-
   drawRect(page, 390, 620, 142, 142, { fill: "#ffffff", border: "#dbe4ee", borderWidth: 0.8 });
   page.drawImage(qrImage, { x: 629, y: yFromTop(399, 124), width: 124, height: 124 });
   drawCentered(page, "SCAN TO VERIFY", 540, 8, bold, "#0f172a", 691);
-  drawCentered(page, "Original credential by MR Creativist", 552, 7, regular, "#64748b", 691);
-  drawCentered(page, "Learn. Sell. Create.", 568, 8, regular, "#64748b");
 
   return pdf.save();
 }

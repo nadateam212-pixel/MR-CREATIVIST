@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { CreditCard, PackageCheck } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -50,8 +51,11 @@ export function ProductBuyPanel({ product }: { product: BuyProduct }) {
       if (!response.ok) throw new Error(payload.error ?? "Order failed.");
 
       setStatus("Order saved. Check your email for fulfillment details.");
+      toast.success("Order saved successfully.");
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Order failed.");
+      const nextMessage = error instanceof Error ? error.message : "Order failed.";
+      setStatus(nextMessage);
+      toast.error(nextMessage);
     }
   }
 

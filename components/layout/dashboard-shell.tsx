@@ -4,6 +4,8 @@ import type { Session } from "next-auth";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Activity,
+  Archive,
   Award,
   BarChart3,
   BookOpen,
@@ -90,14 +92,22 @@ const adminNavItems: NavItem[] = [
   { href: "/admin/dashboard", label: "Main admin", icon: BarChart3 },
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/account-applications", label: "Account applications", icon: ShieldCheck },
+  { href: "/admin/messages", label: "Messages", icon: MessageSquare },
+  { href: "/admin/instructors", label: "Instructors", icon: GraduationCap },
+  { href: "/admin/freelancers", label: "Freelancers", icon: BriefcaseBusiness },
   { href: "/admin/courses", label: "Courses", icon: GraduationCap },
-  { href: "/admin/blogs", label: "Blogs", icon: Newspaper },
-  { href: "/admin/jobs", label: "Jobs", icon: BriefcaseBusiness },
   { href: "/admin/shops", label: "Businesses", icon: ShoppingBag },
   { href: "/admin/marketplace/products", label: "Products", icon: ShoppingBag },
+  { href: "/admin/jobs", label: "Jobs", icon: BriefcaseBusiness },
+  { href: "/admin/blogs", label: "Blogs", icon: Newspaper },
   { href: "/admin/marketplace/orders", label: "Orders", icon: ReceiptText },
+  { href: "/admin/consulting/bookings", label: "Consulting", icon: CalendarDays },
   { href: "/admin/certificates", label: "Certificates", icon: Award },
   { href: "/admin/payments", label: "Payments", icon: CreditCard },
+  { href: "/admin/reports", label: "Reports", icon: BarChart3 },
+  { href: "/admin/support", label: "Support", icon: Headphones },
+  { href: "/admin/health", label: "Health", icon: Activity },
+  { href: "/admin/backups", label: "Backups", icon: Archive },
   { href: "/admin/settings", label: "Settings", icon: Settings }
 ];
 
