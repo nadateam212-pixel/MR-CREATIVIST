@@ -1,5 +1,5 @@
-import { WorkspacePage } from "@/components/layout/workspace-page";
+import { NotificationCenter } from "@/components/notifications/notification-center";
 
 export default function NotificationsPage() {
-  return <WorkspacePage title="Notifications" description="In-app notifications, email delivery, push readiness, multi-channel routing, and read state." tags={["In-app", "Email", "Push"]} />;
+  return <NotificationCenter />;
 }

@@ -9,7 +9,20 @@ export const metadata: Metadata = {
   title: "Login"
 };
 
-export default function LoginPage() {
+function cleanCallback(value: string | string[] | undefined) {
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (!raw?.startsWith("/") || raw.startsWith("//") || raw.includes("://")) return "";
+  return raw;
+}
+
+export default async function LoginPage({
+  searchParams
+}: {
+  searchParams: Promise<{ callbackUrl?: string | string[] }>;
+}) {
+  const params = await searchParams;
+  const callbackUrl = cleanCallback(params.callbackUrl);
+
   return (
     <main className="min-h-screen bg-slate-950 text-white">
       <div className="mx-auto grid min-h-screen w-full max-w-7xl px-4 py-8 sm:px-6 lg:grid-cols-[0.92fr_1.08fr] lg:items-center lg:gap-10">
@@ -49,7 +62,7 @@ export default function LoginPage() {
               <h2 className="text-2xl font-black tracking-tight">Sign in</h2>
               <p className="mt-2 text-sm text-slate-300">Access dashboard, messages, certificates, jobs, businesses and seller tools.</p>
             </div>
-            <LoginForm />
+            <LoginForm callbackUrl={callbackUrl} />
             <p className="mt-6 text-center text-sm text-slate-300">
               New here?{" "}
               <Link href="/register" className="font-bold text-cyan-200 hover:text-white">

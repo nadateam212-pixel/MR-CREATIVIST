@@ -21,6 +21,14 @@ Clean Next.js App Router rewrite of the legacy PHP project.
 4. Seed MongoDB with `npm run db:seed`.
 5. Start the app with `npm run dev`.
 
+## Production Auth Checklist
+
+- Set `NEXTAUTH_URL` and `NEXT_PUBLIC_APP_URL` to `https://mrcreativist.vercel.app`.
+- Set `RESEND_API_KEY` and a verified `RESEND_FROM_EMAIL` so OTP and password reset emails reach users.
+- In Firebase Console, add `mrcreativist.vercel.app` under Authentication -> Settings -> Authorized domains.
+- Enable the Google provider in Firebase Authentication.
+- Add `FIREBASE_SERVICE_ACCOUNT_JSON` only if server push notifications should be sent from the app.
+
 Seeded admin credentials:
 
 - Email: `admin@mrcreativist.com`

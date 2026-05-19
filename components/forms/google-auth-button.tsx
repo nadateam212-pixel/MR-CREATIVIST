@@ -1,0 +1,84 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
+import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { getFirebaseAuth } from "@/lib/firebase-client";
+
+export function GoogleAuthButton({
+  label = "Continue with Google",
+  callbackUrl = ""
+}: {
+  label?: string;
+  callbackUrl?: string;
+}) {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  function getGoogleErrorMessage(error: unknown) {
+    const code =
+      typeof error === "object" && error && "code" in error
+        ? String((error as { code?: unknown }).code)
+        : "";
+
+    if (code === "auth/unauthorized-domain") {
+      const host = typeof window !== "undefined" ? window.location.hostname : "this domain";
+      return `Google sign-in is blocked in Firebase for ${host}. Add ${host} and mrcreativist.vercel.app to Firebase Auth authorized domains. You can use email and password now.`;
+    }
+
+    if (code === "auth/popup-closed-by-user") {
+      return "Google sign-in was cancelled.";
+    }
+
+    if (code === "auth/popup-blocked") {
+      return "The browser blocked the Google sign-in popup. Allow popups or use email and password.";
+    }
+
+    return error instanceof Error ? error.message : "Google sign-in failed. Use email and password instead.";
+  }
+
+  async function continueWithGoogle() {
+    setLoading(true);
+    setErrorMessage("");
+    try {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: "select_account" });
+      const credential = await signInWithPopup(getFirebaseAuth(), provider);
+      const idToken = await credential.user.getIdToken();
+      const result = await signIn("firebase-google", {
+        idToken,
+        redirect: false,
+        callbackUrl: callbackUrl || "/dashboard"
+      });
+
+      if (result?.error) {
+        throw new Error("Google sign-in failed. Try again.");
+      }
+
+      toast.success("Signed in with Google.");
+      router.push(result?.url || callbackUrl || "/dashboard");
+      router.refresh();
+    } catch (error) {
+      const message = getGoogleErrorMessage(error);
+      setErrorMessage(message);
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <Button type="button" variant="outline" className="w-full border-white/20 bg-white/10 text-white hover:bg-white/15" onClick={() => void continueWithGoogle()} disabled={loading}>
+        {loading ? <Loader2 className="size-4 animate-spin" /> : <span className="grid size-5 place-items-center rounded-full bg-white text-sm font-black text-slate-900">G</span>}
+        {label}
+      </Button>
+      {errorMessage ? <p className="rounded-md border border-amber-400/30 bg-amber-400/10 p-3 text-xs leading-5 text-amber-100">{errorMessage}</p> : null}
+    </div>
+  );
+}

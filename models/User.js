@@ -24,6 +24,12 @@ const UserSchema = new mongoose.Schema(
       index: true
     },
     profileImage: { type: String, default: null },
+    emailVerifiedAt: Date,
+    firebaseUid: { type: String, trim: true, index: true },
+    authProviders: {
+      type: [{ type: String, enum: ["credentials", "google", "firebase"] }],
+      default: ["credentials"]
+    },
     bio: { type: String, maxlength: 1200 },
     location: { type: String, maxlength: 160 },
     phone: { type: String, maxlength: 40 },

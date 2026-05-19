@@ -3,8 +3,8 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { apiError, apiOk, ApiError } from "@/lib/api";
 import connectMongoDB from "@/lib/mongodb";
+import { notifyUser } from "@/lib/notifications";
 import Message from "@/models/Message";
-import Notification from "@/models/Notification";
 import User from "@/models/User";
 
 const gigRequestSchema = z.object({
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
       contextId: body.gigSlug
     });
 
-    await Notification.create({
+    await notifyUser({
       userId: receiverId,
       title: subject,
       body: `${session.user.name ?? "A client"} wants to start a gig conversation.`,
@@ -71,7 +71,8 @@ export async function POST(request: Request) {
         senderId: String(session.user.id),
         contextType: "gig",
         contextId: body.gigSlug,
-        ownerName: body.ownerName
+        ownerName: body.ownerName,
+        url: `/messages/${session.user.id}`
       }
     });
 

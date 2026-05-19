@@ -3,8 +3,8 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { apiError, apiOk, ApiError } from "@/lib/api";
 import connectMongoDB from "@/lib/mongodb";
+import { notifyUser } from "@/lib/notifications";
 import Message from "@/models/Message";
-import Notification from "@/models/Notification";
 import User from "@/models/User";
 
 const objectIdSchema = z.string().refine((value) => mongoose.Types.ObjectId.isValid(value), "Invalid user id.");
@@ -164,7 +164,7 @@ export async function POST(request: Request) {
       attachments: body.attachments
     });
 
-    await Notification.create({
+    await notifyUser({
       userId: body.receiverId,
       title: body.subject || "New message",
       body: `${session.user.name ?? "A user"} sent you a message.`,
@@ -173,7 +173,8 @@ export async function POST(request: Request) {
         senderId: String(session.user.id),
         conversationKey: conversationKey(String(session.user.id), body.receiverId),
         contextType: body.contextType,
-        contextId: body.contextId
+        contextId: body.contextId,
+        url: `/messages/${session.user.id}`
       }
     });
 

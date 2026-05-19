@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { createAndSendAuthOtp } from "@/lib/auth-otp";
 import connectMongoDB from "@/lib/mongodb";
 import { rateLimit } from "@/lib/rate-limit";
 import { apiError, apiOk, ApiError } from "@/lib/api";
@@ -26,11 +27,20 @@ export async function POST(request: Request) {
       email: normalizedEmail,
       passwordHash: await bcrypt.hash(body.password, 12),
       role: "client",
-      validatedRoles: ["client"]
+      validatedRoles: ["client"],
+      authProviders: ["credentials"]
+    });
+
+    const otp = await createAndSendAuthOtp(user.email, "register", {
+      userId: String(user._id),
+      name: user.name
     });
 
     return apiOk(
       {
+        requiresOtp: otp.delivery.ok,
+        verifyUrl: otp.delivery.ok ? `/verify-otp?email=${encodeURIComponent(user.email)}&mode=register` : null,
+        emailDelivery: otp.delivery,
         user: {
           id: String(user._id),
           name: user.name,
