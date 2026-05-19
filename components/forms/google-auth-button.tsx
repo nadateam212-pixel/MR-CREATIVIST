@@ -8,6 +8,7 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { getFirebaseAuth } from "@/lib/firebase-client";
+import { firebaseConfigStatus } from "@/lib/firebase-config";
 
 export function GoogleAuthButton({
   label = "Continue with Google",
@@ -25,10 +26,21 @@ export function GoogleAuthButton({
       typeof error === "object" && error && "code" in error
         ? String((error as { code?: unknown }).code)
         : "";
+    const rawMessage = error instanceof Error ? error.message : "";
+    const normalizedError = `${code} ${rawMessage}`.toLowerCase();
 
     if (code === "auth/unauthorized-domain") {
       const host = typeof window !== "undefined" ? window.location.hostname : "this domain";
       return `Google sign-in is blocked in Firebase for ${host}. Add ${host} and mrcreativist.vercel.app to Firebase Auth authorized domains. You can use email and password now.`;
+    }
+
+    if (
+      code === "auth/api-key-not-valid.-please-pass-a-valid-api-key." ||
+      code === "auth/invalid-api-key" ||
+      normalizedError.includes("api-key-not-valid") ||
+      normalizedError.includes("invalid api key")
+    ) {
+      return "Google sign-in is not ready because the Firebase Web API key is invalid. Use email and password now, then update NEXT_PUBLIC_FIREBASE_API_KEY in Vercel.";
     }
 
     if (code === "auth/popup-closed-by-user") {
@@ -39,10 +51,17 @@ export function GoogleAuthButton({
       return "The browser blocked the Google sign-in popup. Allow popups or use email and password.";
     }
 
-    return error instanceof Error ? error.message : "Google sign-in failed. Use email and password instead.";
+    return rawMessage || "Google sign-in failed. Use email and password instead.";
   }
 
   async function continueWithGoogle() {
+    if (!firebaseConfigStatus.googleAuthReady) {
+      const message = "Google sign-in is not configured yet. Use email and password while Firebase settings are updated.";
+      setErrorMessage(message);
+      toast.error(message);
+      return;
+    }
+
     setLoading(true);
     setErrorMessage("");
     try {

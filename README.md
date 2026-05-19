@@ -24,10 +24,12 @@ Clean Next.js App Router rewrite of the legacy PHP project.
 ## Production Auth Checklist
 
 - Set `NEXTAUTH_URL` and `NEXT_PUBLIC_APP_URL` to `https://mrcreativist.vercel.app`.
-- Set `RESEND_API_KEY` and a verified `RESEND_FROM_EMAIL` so OTP and password reset emails reach users.
+- Set either `RESEND_API_KEY` plus a verified sender, or SMTP credentials (`SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_PORT`, `EMAIL_FROM`) so OTP and password reset emails reach users.
 - In Firebase Console, add `mrcreativist.vercel.app` under Authentication -> Settings -> Authorized domains.
 - Enable the Google provider in Firebase Authentication.
 - Add `FIREBASE_SERVICE_ACCOUNT_JSON` only if server push notifications should be sent from the app.
+- Check `/api/auth/firebase/status` after deployment. It should say `googleAuthReady: true`.
+- Check `/api/auth/email/status` after deployment. It should say `canSend: true`.
 
 Seeded admin credentials:
 
