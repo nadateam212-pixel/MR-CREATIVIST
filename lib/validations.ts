@@ -1,0 +1,31 @@
+import { z } from "zod";
+
+export const loginSchema = z.object({
+  email: z.email("Enter a valid email address."),
+  password: z.string().min(8, "Password must be at least 8 characters.")
+});
+
+export const registerSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters.").max(80),
+  email: z.email("Enter a valid email address."),
+  password: z
+    .string()
+    .min(8, "Password must be at least 8 characters.")
+    .regex(/[A-Z]/, "Use at least one uppercase letter.")
+    .regex(/[0-9]/, "Use at least one number.")
+});
+
+export const postCreateSchema = z.object({
+  title: z.string().min(3).max(140),
+  excerpt: z.string().max(240).optional(),
+  content: z.string().min(10),
+  categoryId: z.string().min(1).max(120).optional()
+});
+
+export const cursorQuerySchema = z.object({
+  cursor: z.string().min(1).optional(),
+  take: z.coerce.number().int().min(1).max(50).default(10)
+});
+
+export type LoginInput = z.infer<typeof loginSchema>;
+export type RegisterInput = z.infer<typeof registerSchema>;
