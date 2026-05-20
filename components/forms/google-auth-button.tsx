@@ -20,6 +20,25 @@ export function GoogleAuthButton({
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const safeCallbackUrl =
+    callbackUrl.startsWith("/") && !callbackUrl.startsWith("//") && !callbackUrl.includes("://")
+      ? callbackUrl
+      : "";
+
+  function toCurrentOriginPath(value?: string | null) {
+    const fallback = safeCallbackUrl || "/dashboard";
+    if (!value) return fallback;
+
+    try {
+      const url = new URL(value, window.location.origin);
+      if (url.origin !== window.location.origin && !["localhost", "127.0.0.1", "::1"].includes(url.hostname)) {
+        return fallback;
+      }
+      return `${url.pathname}${url.search}${url.hash}`;
+    } catch {
+      return fallback;
+    }
+  }
 
   function getGoogleErrorMessage(error: unknown) {
     const code =
@@ -72,7 +91,7 @@ export function GoogleAuthButton({
       const result = await signIn("firebase-google", {
         idToken,
         redirect: false,
-        callbackUrl: callbackUrl || "/dashboard"
+        callbackUrl: safeCallbackUrl || "/dashboard"
       });
 
       if (result?.error) {
@@ -80,7 +99,7 @@ export function GoogleAuthButton({
       }
 
       toast.success("Signed in with Google.");
-      router.push(result?.url || callbackUrl || "/dashboard");
+      router.push(toCurrentOriginPath(result?.url));
       router.refresh();
     } catch (error) {
       const message = getGoogleErrorMessage(error);

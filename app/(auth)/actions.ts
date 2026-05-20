@@ -92,7 +92,10 @@ export async function loginAction(_state: FormState, formData: FormData): Promis
 }
 
 export async function registerAction(_state: FormState, formData: FormData): Promise<FormState> {
-  const parsed = registerSchema.safeParse(Object.fromEntries(formData));
+  const raw = Object.fromEntries(formData);
+  const callbackUrl = sanitizeRedirectTarget(raw.callbackUrl);
+  const redirectTo = callbackUrl || "/dashboard";
+  const parsed = registerSchema.safeParse(raw);
 
   if (!parsed.success) {
     return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid registration details." };
@@ -122,8 +125,8 @@ export async function registerAction(_state: FormState, formData: FormData): Pro
         });
         redirect(
           otp.delivery.ok
-            ? `/verify-otp?email=${encodeURIComponent(normalizedEmail)}&mode=register&optional=1`
-            : "/dashboard"
+            ? `/verify-otp?email=${encodeURIComponent(normalizedEmail)}&mode=register&optional=1&callbackUrl=${encodeURIComponent(redirectTo)}`
+            : redirectTo
         );
       }
     }
@@ -154,8 +157,8 @@ export async function registerAction(_state: FormState, formData: FormData): Pro
 
   redirect(
     otp.delivery.ok
-      ? `/verify-otp?email=${encodeURIComponent(user.email)}&mode=register&optional=1`
-      : "/dashboard"
+      ? `/verify-otp?email=${encodeURIComponent(user.email)}&mode=register&optional=1&callbackUrl=${encodeURIComponent(redirectTo)}`
+      : redirectTo
   );
 }
 

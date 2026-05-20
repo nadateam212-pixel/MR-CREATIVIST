@@ -424,34 +424,34 @@ export function ShopDirectory({ shops, showHeader = true }: { shops: PublicShopP
                     </div>
                   ))}
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="grid grid-cols-4 gap-2">
                   {shop.ownerId ? (
-                    <Button asChild size="sm">
-                      <Link href={`/messages/${shop.ownerId}`}>
+                    <Button asChild size="sm" className="h-9 min-w-0 gap-1 px-2 text-xs font-semibold">
+                      <Link href={`/messages/${shop.ownerId}`} className="whitespace-nowrap">
                         <MessageSquare className="size-4" />
                         Message
                       </Link>
                     </Button>
                   ) : null}
                   {shop.phone ? (
-                    <Button asChild size="sm" variant="outline">
-                      <a href={`tel:${shop.phone.replaceAll(" ", "")}`}>
+                    <Button asChild size="sm" variant="outline" className="h-9 min-w-0 gap-1 px-2 text-xs font-semibold">
+                      <a href={`tel:${shop.phone.replaceAll(" ", "")}`} className="whitespace-nowrap">
                         <Phone className="size-4" />
                         Call
                       </a>
                     </Button>
                   ) : null}
                   {shop.contactEmail ? (
-                    <Button asChild size="sm" variant="outline">
-                      <a href={`mailto:${shop.contactEmail}?subject=${encodeURIComponent(shop.name)}`}>
+                    <Button asChild size="sm" variant="outline" className="h-9 min-w-0 gap-1 px-2 text-xs font-semibold">
+                      <a href={`mailto:${shop.contactEmail}?subject=${encodeURIComponent(shop.name)}`} className="whitespace-nowrap">
                         <Mail className="size-4" />
                         Email
                       </a>
                     </Button>
                   ) : null}
                   {shop.whatsapp ? (
-                    <Button asChild size="sm" variant="outline">
-                      <a href={`https://wa.me/${shop.whatsapp.replace(/\D/g, "")}`} target="_blank" rel="noreferrer">
+                    <Button asChild size="sm" variant="outline" className="h-9 min-w-0 gap-1 px-2 text-xs font-semibold">
+                      <a href={`https://wa.me/${shop.whatsapp.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="whitespace-nowrap">
                         <MessageSquare className="size-4" />
                         WhatsApp
                       </a>

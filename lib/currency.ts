@@ -60,9 +60,15 @@ export function formatMoney(amount: number, currency: SupportedCurrency) {
 export function formatConvertedPrice(value: string, targetCurrency: SupportedCurrency, usdToFrw = USD_TO_FRW_RATE) {
   const parsed = parseMoney(value);
   if (!parsed) return value;
+  if (parsed.amount <= 0) return "Free";
 
   const converted = convertMoney(parsed.amount, parsed.currency, targetCurrency, usdToFrw);
   return formatMoney(converted, targetCurrency);
+}
+
+export function isFreePrice(value: string) {
+  const parsed = parseMoney(value);
+  return Boolean(parsed && parsed.amount <= 0);
 }
 
 export function formatConvertedAmount(

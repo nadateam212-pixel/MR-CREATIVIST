@@ -5,8 +5,17 @@ import connectMongoDB from "@/lib/mongodb";
 import { normalizeRoles } from "@/lib/account-roles";
 import { verifyAuthOtp, type AuthOtpPurpose } from "@/lib/auth-otp";
 import { firebaseConfig } from "@/lib/firebase-config";
+import { getSiteUrl } from "@/lib/site-url";
 import User from "@/models/User";
 import type { PlatformRole } from "@/types";
+
+const authBaseUrl = getSiteUrl();
+
+if (process.env.NODE_ENV === "production") {
+  process.env.AUTH_URL = authBaseUrl;
+  process.env.NEXTAUTH_URL = authBaseUrl;
+  process.env.AUTH_TRUST_HOST ??= "true";
+}
 
 type FirebaseLookupUser = {
   localId: string;
@@ -171,6 +180,27 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     })
   ],
   callbacks: {
+    redirect({ url }) {
+      const siteUrl = getSiteUrl();
+      if (url.startsWith("/")) return `${siteUrl}${url}`;
+
+      try {
+        const parsed = new URL(url);
+        const target = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+
+        if (["localhost", "127.0.0.1", "::1"].includes(parsed.hostname)) {
+          return `${siteUrl}${target}`;
+        }
+
+        if (parsed.origin === siteUrl) {
+          return `${siteUrl}${target}`;
+        }
+      } catch {
+        return siteUrl;
+      }
+
+      return siteUrl;
+    },
     jwt({ token, user }) {
       if (user) {
         token.id = String(user.id);

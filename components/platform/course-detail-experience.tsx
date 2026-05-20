@@ -24,6 +24,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PriceDisplay } from "@/components/ui/price-display";
 import { Progress } from "@/components/ui/progress";
 import { SafeImage } from "@/components/ui/safe-image";
+import { isFreePrice } from "@/lib/currency";
 import { courseImageForCategory, normalizeCourseImage, titleFromCourseSlug } from "@/lib/course-media";
 import { videoSourceForUrl } from "@/lib/video-sources";
 import { type PlatformCourseDraft, usePlatformStore } from "@/hooks/use-platform-store";
@@ -241,6 +242,7 @@ export function CourseDetailExperience({
     ? course.outcomes
     : ["Build practical skills", "Complete guided labs", "Earn certificate-ready proof"];
   const tools = course?.tools?.length ? course.tools : ["Video lessons", "Practice tasks", "Certificate"];
+  const freeCourse = isFreePrice(course.price);
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6">
@@ -258,6 +260,7 @@ export function CourseDetailExperience({
               <div className="flex flex-wrap gap-2">
                 <Badge>{course.category}</Badge>
                 <Badge>{course.level}</Badge>
+                {freeCourse ? <Badge className="border-[hsl(var(--primary))] text-[hsl(var(--primary))]">Free</Badge> : null}
                 {course.status ? <Badge>{course.status}</Badge> : null}
               </div>
               <h1 className="mt-4 text-4xl font-semibold tracking-tight">{course.title}</h1>
@@ -392,7 +395,7 @@ export function CourseDetailExperience({
               <Button asChild className="w-full">
                 <Link href={enrolled ? `/dashboard/learning/${course.slug}` : `/courses/${course.slug}/enroll`}>
                   <PlayCircle className="size-4" />
-                  {enrolled ? "Continue learning" : "Enroll now"}
+                  {enrolled ? "Continue learning" : freeCourse ? "Enroll free" : "Enroll now"}
                 </Link>
               </Button>
               <Button asChild className="w-full" variant="outline">

@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { convertMoney, formatConvertedAmount, parseMoney } from "@/lib/currency";
+import { convertMoney, formatConvertedAmount, isFreePrice, parseMoney } from "@/lib/currency";
 import { titleFromCourseSlug } from "@/lib/course-media";
 import { useI18n } from "@/hooks/use-i18n";
 import { usePlatformStore } from "@/hooks/use-platform-store";
@@ -67,7 +67,9 @@ export function CourseEnrollmentPanel({ slug, course }: { slug: string; course?:
   const subtotal = parsedPrice ? convertMoney(parsedPrice.amount, parsedPrice.currency, "USD", preferences.usdToFrw) : 0;
   const discount = coupon.trim().toUpperCase() === "LEARN10" ? subtotal * 0.1 : 0;
   const total = subtotal - discount;
+  const freeCourse = isFreePrice(resolvedCourse?.price ?? "$0");
   const displayMoney = (amount: number) => formatConvertedAmount(amount, "USD", preferences.currency, preferences.usdToFrw);
+  const displayCourseMoney = (amount: number) => (amount <= 0 ? "Free" : displayMoney(amount));
 
   async function completeEnrollment() {
     if (!resolvedCourse || submitting) return;
@@ -114,6 +116,7 @@ export function CourseEnrollmentPanel({ slug, course }: { slug: string; course?:
           <div className="flex flex-wrap gap-2">
             <Badge>{resolvedCourse.level}</Badge>
             <Badge>{resolvedCourse.certificate}</Badge>
+            {freeCourse ? <Badge className="border-[hsl(var(--primary))] text-[hsl(var(--primary))]">Free</Badge> : null}
           </div>
           <CardTitle className="pt-3">{resolvedCourse.title}</CardTitle>
         </CardHeader>
@@ -186,16 +189,16 @@ export function CourseEnrollmentPanel({ slug, course }: { slug: string; course?:
           <div className="space-y-3 text-sm">
             <div className="flex justify-between">
               <span className="text-[hsl(var(--muted-foreground))]">{t("commerce.coursePrice")}</span>
-              <span>{displayMoney(subtotal)}</span>
+              <span>{displayCourseMoney(subtotal)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-[hsl(var(--muted-foreground))]">{t("commerce.discount")}</span>
-              <span>{displayMoney(discount)}</span>
+              <span>{discount <= 0 ? displayMoney(0) : displayMoney(discount)}</span>
             </div>
             <div className="border-t border-[hsl(var(--border))] pt-3 text-base font-semibold">
               <div className="flex justify-between">
                 <span>{t("commerce.total")}</span>
-                <span>{displayMoney(total)}</span>
+                <span>{displayCourseMoney(total)}</span>
               </div>
             </div>
           </div>
@@ -208,7 +211,7 @@ export function CourseEnrollmentPanel({ slug, course }: { slug: string; course?:
           </div>
           <Button className="w-full" disabled={complete || alreadyEnrolled || submitting} onClick={completeEnrollment}>
             {submitting ? <Loader2 className="size-4 animate-spin" /> : <CreditCard className="size-4" />}
-            {submitting ? "Saving enrollment" : "Complete enrollment"}
+            {submitting ? "Saving enrollment" : freeCourse ? "Start free course" : "Complete enrollment"}
           </Button>
         </CardContent>
       </Card>

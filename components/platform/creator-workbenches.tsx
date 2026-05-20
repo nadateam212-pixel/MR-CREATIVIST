@@ -63,6 +63,7 @@ function splitLines(value: string) {
 
 function price(value: string) {
   const normalized = value.trim().replace(/^\$/, "");
+  if (/^free$/i.test(normalized)) return "$0";
   return `$${normalized || "0"}`;
 }
 

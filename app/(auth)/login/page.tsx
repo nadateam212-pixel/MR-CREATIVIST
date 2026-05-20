@@ -65,7 +65,7 @@ export default async function LoginPage({
             <LoginForm callbackUrl={callbackUrl} />
             <p className="mt-6 text-center text-sm text-slate-300">
               New here?{" "}
-              <Link href="/register" className="font-bold text-cyan-200 hover:text-white">
+              <Link href={callbackUrl ? `/register?callbackUrl=${encodeURIComponent(callbackUrl)}` : "/register"} className="font-bold text-cyan-200 hover:text-white">
                 Create your account
               </Link>
             </p>

@@ -26,7 +26,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { PriceDisplay } from "@/components/ui/price-display";
 import { SafeImage } from "@/components/ui/safe-image";
-import { convertMoney, parseMoney } from "@/lib/currency";
+import { convertMoney, isFreePrice, parseMoney } from "@/lib/currency";
 import { courseImageForCategory } from "@/lib/course-media";
 import { platformWorkflows } from "@/lib/platform-data";
 import { useI18n } from "@/hooks/use-i18n";
@@ -285,6 +285,7 @@ export function CatalogExperience({
             ? filteredCourses.map((course) => {
                 const enrolled = enrolledCourseSlugs.includes(course.slug);
                 const courseHref = `/courses/${course.slug}`;
+                const freeCourse = isFreePrice(course.price);
 
                 return (
                   <Card key={course.slug} className="overflow-hidden">
@@ -302,6 +303,7 @@ export function CatalogExperience({
                       <div className="flex flex-wrap gap-2">
                         <Badge>{course.level}</Badge>
                         <Badge>{course.category}</Badge>
+                        {freeCourse ? <Badge className="border-[hsl(var(--primary))] text-[hsl(var(--primary))]">Free</Badge> : null}
                       </div>
                       <CardTitle className="leading-tight">
                         <Link href={courseHref}>{course.title}</Link>
@@ -341,7 +343,13 @@ export function CatalogExperience({
                           </Button>
                           <Button size="sm" disabled={pendingAction === course.slug} onClick={() => handleEnroll(course)}>
                             {enrolled ? <CheckCircle2 className="size-4" /> : <BookOpen className="size-4" />}
-                            {pendingAction === course.slug ? t("commerce.saving") : enrolled ? t("commerce.enrolled") : t("commerce.enroll")}
+                            {pendingAction === course.slug
+                              ? t("commerce.saving")
+                              : enrolled
+                                ? t("commerce.enrolled")
+                                : freeCourse
+                                  ? "Enroll free"
+                                  : t("commerce.enroll")}
                           </Button>
                         </div>
                       </div>

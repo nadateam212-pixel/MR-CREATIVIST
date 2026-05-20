@@ -83,7 +83,7 @@ export function PublicAppShell({
   const [activityOpen, setActivityOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:bg-[#030712] dark:text-slate-100">
+    <div className="public-theme-shell min-h-screen bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:bg-[#030712] dark:text-slate-100">
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 border-r border-[hsl(var(--border))] bg-[hsl(var(--card))] lg:block dark:border-white/10 dark:bg-[#050914]">
         <div className="flex h-full flex-col">
           <Link href="/" className="flex items-center gap-3 px-5 py-7" aria-label={`${brand.name} home`}>

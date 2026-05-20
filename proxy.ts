@@ -27,7 +27,7 @@ export async function proxy(request: NextRequest) {
 
   if (isProtectedRoute && !isLoggedIn) {
     const loginUrl = new URL("/login", nextUrl);
-    loginUrl.searchParams.set("callbackUrl", nextUrl.pathname);
+    loginUrl.searchParams.set("callbackUrl", `${nextUrl.pathname}${nextUrl.search}`);
     return NextResponse.redirect(loginUrl);
   }
 

@@ -17,25 +17,25 @@ const opportunities = [
 export default function CareerOpportunitiesPage() {
   return (
     <div>
-      <section className="bg-slate-950 text-white">
+      <section className="border-b border-[hsl(var(--border))] bg-[hsl(var(--muted))]/35 text-[hsl(var(--foreground))] dark:border-white/10 dark:bg-slate-950 dark:text-white">
         <div className="mx-auto grid max-w-7xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[1fr_0.9fr] lg:items-center">
           <div>
             <p className="text-sm font-black uppercase tracking-[0.2em] text-cyan-300">CAREER & OPPORTUNITIES</p>
             <h1 className="mt-3 text-4xl font-black uppercase tracking-tight sm:text-6xl">
               Build your career through learning, selling and creative digital work.
             </h1>
-            <p className="mt-5 text-lg leading-8 text-slate-300">
+            <p className="mt-5 text-lg leading-8 text-[hsl(var(--muted-foreground))] dark:text-slate-300">
               MR Creativist helps instructors, sellers, consultants, affiliates and multimedia creators turn skills into
               visibility, income and long-term opportunity.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Button asChild className="bg-white text-slate-950 hover:bg-slate-200" size="lg">
+              <Button asChild size="lg">
                 <Link href="/register">
                   START YOUR PATH
                   <ArrowRight className="size-4" />
                 </Link>
               </Button>
-              <Button asChild variant="outline" className="border-white text-white hover:bg-white/10" size="lg">
+              <Button asChild variant="outline" className="dark:border-white dark:text-white dark:hover:bg-white/10" size="lg">
                 <Link href="/courses">BROWSE COURSES</Link>
               </Button>
             </div>

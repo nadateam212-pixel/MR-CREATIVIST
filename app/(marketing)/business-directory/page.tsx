@@ -1,9 +1,16 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { ShopDirectory, type PublicShopProfile } from "@/components/platform/job-shop-workbenches";
 import { Button } from "@/components/ui/button";
 import { getShopProfiles } from "@/lib/platform-db";
+
+export const metadata: Metadata = {
+  title: "Business Directory",
+  description:
+    "Discover MR Creativist businesses in Rwanda, Africa, Canada and globally for AI, multimedia, marketplace, digital products, consulting and creative services."
+};
 
 const exampleBusinesses: PublicShopProfile[] = [
   {

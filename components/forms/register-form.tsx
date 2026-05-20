@@ -16,7 +16,7 @@ const initialState: FormState = {
   message: ""
 };
 
-export function RegisterForm() {
+export function RegisterForm({ callbackUrl = "" }: { callbackUrl?: string }) {
   const [state, formAction] = useActionState(registerAction, initialState);
   const {
     register,
@@ -38,13 +38,14 @@ export function RegisterForm() {
 
   return (
     <div className="space-y-5">
-      <GoogleAuthButton label="Register with Google" />
+      <GoogleAuthButton label="Register with Google" callbackUrl={callbackUrl} />
       <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-[0.16em] text-slate-400">
         <span className="h-px flex-1 bg-white/10" />
         Email and password
         <span className="h-px flex-1 bg-white/10" />
       </div>
       <form action={formAction} className="space-y-4">
+        <input type="hidden" name="callbackUrl" value={callbackUrl} />
         <div className="space-y-2">
           <Label htmlFor="name">Name</Label>
           <Input id="name" type="text" autoComplete="name" {...register("name")} />

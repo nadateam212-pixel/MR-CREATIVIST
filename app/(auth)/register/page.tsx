@@ -9,7 +9,20 @@ export const metadata: Metadata = {
   title: "Register"
 };
 
-export default function RegisterPage() {
+function cleanCallback(value: string | string[] | undefined) {
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (!raw?.startsWith("/") || raw.startsWith("//") || raw.includes("://")) return "";
+  return raw;
+}
+
+export default async function RegisterPage({
+  searchParams
+}: {
+  searchParams: Promise<{ callbackUrl?: string | string[] }>;
+}) {
+  const params = await searchParams;
+  const callbackUrl = cleanCallback(params.callbackUrl);
+
   return (
     <main className="min-h-screen bg-slate-950 text-white">
       <div className="mx-auto grid min-h-screen w-full max-w-7xl px-4 py-8 sm:px-6 lg:grid-cols-[0.92fr_1.08fr] lg:items-center lg:gap-10">
@@ -49,10 +62,10 @@ export default function RegisterPage() {
               <h2 className="text-2xl font-black tracking-tight">Create account</h2>
               <p className="mt-2 text-sm text-slate-300">Start as a learner, client, seller, freelancer, consultant or instructor.</p>
             </div>
-            <RegisterForm />
+            <RegisterForm callbackUrl={callbackUrl} />
             <p className="mt-6 text-center text-sm text-slate-300">
               Already have an account?{" "}
-              <Link href="/login" className="font-bold text-cyan-200 hover:text-white">
+              <Link href={callbackUrl ? `/login?callbackUrl=${encodeURIComponent(callbackUrl)}` : "/login"} className="font-bold text-cyan-200 hover:text-white">
                 Sign in
               </Link>
             </p>
