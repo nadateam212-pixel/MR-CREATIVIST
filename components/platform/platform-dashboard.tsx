@@ -396,11 +396,26 @@ function isMoneyValue(value: string) {
   return value.trim().startsWith("$") || /\b(FRW|RWF|USD)\b/i.test(value);
 }
 
+async function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T) {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<T>((resolve) => {
+    timeout = setTimeout(() => resolve(fallback), ms);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
 export async function PlatformDashboard({ role }: { role: DashboardRole }) {
   const session = await auth();
   const resolvedRole = resolveRole(role, session?.user?.role);
   const config = dashboardConfig[resolvedRole];
-  const live = session?.user ? await getRoleDashboardData(resolvedRole, session.user).catch(() => null) : null;
+  const live = session?.user
+    ? await withTimeout(getRoleDashboardData(resolvedRole, session.user).catch(() => null), 4500, null)
+    : null;
   const liveMetrics = (live?.metrics ?? {}) as Record<string, { value?: string; trend?: string }>;
   const metrics = config.metrics.map((metric) => mergeMetric(metric, liveMetrics[metric.label]));
 

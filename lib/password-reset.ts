@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import connectMongoDB from "@/lib/mongodb";
 import { sendEmail } from "@/lib/email";
 import { brand } from "@/lib/brand";
+import { getSiteUrl } from "@/lib/site-url";
 import PasswordResetToken from "@/models/PasswordResetToken";
 import User from "@/models/User";
 
@@ -21,10 +22,7 @@ function hashToken(token: string) {
 }
 
 function appBaseUrl() {
-  const explicit = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL;
-  if (explicit) return explicit.replace(/\/$/, "");
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-  return "https://mrcreativist.vercel.app";
+  return getSiteUrl();
 }
 
 function resetEmailBody(name: string, resetUrl: string) {
