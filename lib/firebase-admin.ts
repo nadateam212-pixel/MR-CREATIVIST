@@ -1,15 +1,16 @@
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getMessaging } from "firebase-admin/messaging";
+import { env } from "@/lib/env";
 
 function serviceAccountFromEnv() {
-  const json = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  const json = env("FIREBASE_SERVICE_ACCOUNT_JSON");
   if (json) {
     return JSON.parse(json);
   }
 
-  const projectId = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
+  const projectId = env("FIREBASE_PROJECT_ID") || env("NEXT_PUBLIC_FIREBASE_PROJECT_ID");
+  const clientEmail = env("FIREBASE_CLIENT_EMAIL");
+  const privateKey = env("FIREBASE_PRIVATE_KEY").replace(/\\n/g, "\n");
 
   if (!projectId || !clientEmail || !privateKey) return null;
 

@@ -2,6 +2,7 @@ import "server-only";
 import { google } from "@ai-sdk/google";
 import { generateObject } from "ai";
 import { z } from "zod";
+import { env } from "@/lib/env";
 
 const recommendationSchema = z.object({
   recommendations: z.array(
@@ -25,12 +26,12 @@ const quizGenerationSchema = z.object({
   questions: z.array(quizQuestionSchema).min(3).max(12)
 });
 
-export const geminiModel = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
-export const hasGeminiKey = Boolean(process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY);
+export const geminiModel = env("GEMINI_MODEL", "gemini-2.5-flash-lite");
+export const hasGeminiKey = Boolean(env("GOOGLE_GENERATIVE_AI_API_KEY") || env("GEMINI_API_KEY"));
 
 function gemini(model = geminiModel) {
-  if (process.env.GEMINI_API_KEY && !process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
-    process.env.GOOGLE_GENERATIVE_AI_API_KEY = process.env.GEMINI_API_KEY;
+  if (env("GEMINI_API_KEY") && !env("GOOGLE_GENERATIVE_AI_API_KEY")) {
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY = env("GEMINI_API_KEY");
   }
 
   return google(model);

@@ -1,6 +1,7 @@
 import { Resend } from "resend";
 import nodemailer from "nodemailer";
 import { brand } from "@/lib/brand";
+import { env, envBoolean, envNumber } from "@/lib/env";
 
 type EmailInput = {
   to: string;
@@ -17,20 +18,19 @@ export type EmailDeliveryResult = {
 
 function getFromAddress() {
   return (
-    process.env.EMAIL_FROM ||
-    process.env.RESEND_FROM_EMAIL ||
-    process.env.SMTP_FROM_EMAIL ||
+    env("EMAIL_FROM") ||
+    env("RESEND_FROM_EMAIL") ||
+    env("SMTP_FROM_EMAIL") ||
     `${brand.name} <onboarding@resend.dev>`
   );
 }
 
 function getSmtpPort() {
-  const port = Number(process.env.SMTP_PORT || 587);
-  return Number.isFinite(port) ? port : 587;
+  return envNumber("SMTP_PORT", 587);
 }
 
 function isSmtpConfigured() {
-  return Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASSWORD);
+  return Boolean(env("SMTP_HOST") && env("SMTP_USER") && env("SMTP_PASSWORD"));
 }
 
 function getEmailSetupMessage() {
@@ -39,7 +39,7 @@ function getEmailSetupMessage() {
 
 async function sendWithResend({ to, subject, text, html }: EmailInput): Promise<EmailDeliveryResult> {
   try {
-    const resend = new Resend(process.env.RESEND_API_KEY);
+    const resend = new Resend(env("RESEND_API_KEY"));
     const response = await resend.emails.send({
       from: getFromAddress(),
       to,
@@ -71,12 +71,12 @@ async function sendWithSmtp({ to, subject, text, html }: EmailInput): Promise<Em
   try {
     const port = getSmtpPort();
     const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
+      host: env("SMTP_HOST"),
       port,
-      secure: process.env.SMTP_SECURE === "true" || port === 465,
+      secure: envBoolean("SMTP_SECURE", false) || port === 465,
       auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASSWORD
+        user: env("SMTP_USER"),
+        pass: env("SMTP_PASSWORD")
       }
     });
 
@@ -101,22 +101,22 @@ async function sendWithSmtp({ to, subject, text, html }: EmailInput): Promise<Em
 
 export function getEmailDeliveryStatus() {
   return {
-    canSend: Boolean(process.env.RESEND_API_KEY || isSmtpConfigured()),
+    canSend: Boolean(env("RESEND_API_KEY") || isSmtpConfigured()),
     providers: {
-      resend: Boolean(process.env.RESEND_API_KEY),
+      resend: Boolean(env("RESEND_API_KEY")),
       smtp: isSmtpConfigured(),
       console: process.env.NODE_ENV !== "production"
     },
     from: getFromAddress(),
     message:
-      process.env.RESEND_API_KEY || isSmtpConfigured()
+      env("RESEND_API_KEY") || isSmtpConfigured()
         ? "Email delivery is configured."
         : getEmailSetupMessage()
   };
 }
 
 export async function sendEmail(input: EmailInput): Promise<EmailDeliveryResult> {
-  if (process.env.RESEND_API_KEY) {
+  if (env("RESEND_API_KEY")) {
     const resendResult = await sendWithResend(input);
     if (resendResult.ok || !isSmtpConfigured()) return resendResult;
   }

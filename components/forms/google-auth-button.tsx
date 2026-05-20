@@ -91,7 +91,8 @@ export function GoogleAuthButton({
       const result = await signIn("firebase-google", {
         idToken,
         redirect: false,
-        callbackUrl: safeCallbackUrl || "/dashboard"
+        callbackUrl: safeCallbackUrl || "/dashboard",
+        redirectTo: safeCallbackUrl || "/dashboard"
       });
 
       if (result?.error) {
@@ -99,8 +100,8 @@ export function GoogleAuthButton({
       }
 
       toast.success("Signed in with Google.");
-      router.push(toCurrentOriginPath(result?.url));
       router.refresh();
+      window.location.assign(toCurrentOriginPath(result?.url));
     } catch (error) {
       const message = getGoogleErrorMessage(error);
       setErrorMessage(message);

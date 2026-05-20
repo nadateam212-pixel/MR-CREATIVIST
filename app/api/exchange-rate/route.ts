@@ -1,6 +1,7 @@
 import { USD_TO_FRW_RATE } from "@/lib/currency";
+import { env, envNumber } from "@/lib/env";
 
-const exchangeUrl = process.env.EXCHANGE_RATE_API_URL || "https://open.er-api.com/v6/latest/USD";
+const exchangeUrl = env("EXCHANGE_RATE_API_URL", "https://open.er-api.com/v6/latest/USD");
 
 let cachedRate: {
   usdToFrw: number;
@@ -24,7 +25,7 @@ function fallbackRate() {
 }
 
 export async function GET() {
-  const cacheMs = Math.max(60, Number(process.env.EXCHANGE_RATE_CACHE_SECONDS) || 3600) * 1000;
+  const cacheMs = Math.max(60, envNumber("EXCHANGE_RATE_CACHE_SECONDS", 3600)) * 1000;
 
   if (cachedRate && Date.now() - cachedRate.fetchedAt < cacheMs) {
     return Response.json({

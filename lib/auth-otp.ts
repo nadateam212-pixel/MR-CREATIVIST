@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { env } from "@/lib/env";
 import connectMongoDB from "@/lib/mongodb";
 import { sendEmail } from "@/lib/email";
 import AuthOtp from "@/models/AuthOtp";
@@ -13,7 +14,7 @@ function normalizeEmail(email: string) {
 }
 
 function otpSecret() {
-  return process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "mr-creativist-local-otp-secret";
+  return env("AUTH_SECRET") || env("NEXTAUTH_SECRET") || "mr-creativist-local-otp-secret";
 }
 
 function hashOtp(email: string, purpose: AuthOtpPurpose, code: string) {

@@ -5,17 +5,18 @@ import { google } from "@ai-sdk/google";
 import { generateImage, generateObject, generateText } from "ai";
 import { z } from "zod";
 import { withAIMemoryPrompt } from "@/lib/ai-memory";
+import { env } from "@/lib/env";
 
-const model = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
-const imageModel = process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image";
-const imagenModel = process.env.GEMINI_IMAGEN_MODEL || "imagen-4.0-generate-001";
+const model = env("GEMINI_MODEL", "gemini-2.5-flash-lite");
+const imageModel = env("GEMINI_IMAGE_MODEL", "gemini-2.5-flash-image");
+const imagenModel = env("GEMINI_IMAGEN_MODEL", "imagen-4.0-generate-001");
 
 function ensureGeminiKey() {
-  if (process.env.GEMINI_API_KEY && !process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
-    process.env.GOOGLE_GENERATIVE_AI_API_KEY = process.env.GEMINI_API_KEY;
+  if (env("GEMINI_API_KEY") && !env("GOOGLE_GENERATIVE_AI_API_KEY")) {
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY = env("GEMINI_API_KEY");
   }
 
-  return Boolean(process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY);
+  return Boolean(env("GOOGLE_GENERATIVE_AI_API_KEY") || env("GEMINI_API_KEY"));
 }
 
 function gemini(selectedModel = model) {
@@ -29,7 +30,7 @@ function missingGeminiText() {
 
 function configuredGeminiKey() {
   ensureGeminiKey();
-  return process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY || "";
+  return env("GOOGLE_GENERATIVE_AI_API_KEY") || env("GEMINI_API_KEY");
 }
 
 function parseImageSize(size: "1024x1024" | "1792x1024" | "1024x1792") {

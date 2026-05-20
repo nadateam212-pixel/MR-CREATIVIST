@@ -1,25 +1,22 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useState } from "react";
+import { signIn } from "next-auth/react";
+import { Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { registerAction, type FormState } from "@/app/(auth)/actions";
 import { registerSchema, type RegisterInput } from "@/lib/validations";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { GoogleAuthButton } from "@/components/forms/google-auth-button";
-import { SubmitButton } from "@/components/forms/submit-button";
-
-const initialState: FormState = {
-  ok: false,
-  message: ""
-};
 
 export function RegisterForm({ callbackUrl = "" }: { callbackUrl?: string }) {
-  const [state, formAction] = useActionState(registerAction, initialState);
+  const [pending, setPending] = useState(false);
   const {
     register,
+    handleSubmit,
     formState: { errors }
   } = useForm<RegisterInput>({
     resolver: zodResolver(registerSchema),
@@ -30,11 +27,66 @@ export function RegisterForm({ callbackUrl = "" }: { callbackUrl?: string }) {
     }
   });
 
-  useEffect(() => {
-    if (state.message && !state.ok) {
-      toast.error(state.message);
+  const redirectTo =
+    callbackUrl.startsWith("/") && !callbackUrl.startsWith("//") && !callbackUrl.includes("://")
+      ? callbackUrl
+      : "/dashboard";
+
+  function toCurrentOriginPath(value?: string | null) {
+    if (!value) return redirectTo;
+
+    try {
+      const url = new URL(value, window.location.origin);
+      if (url.origin !== window.location.origin && !["localhost", "127.0.0.1", "::1"].includes(url.hostname)) {
+        return redirectTo;
+      }
+
+      return `${url.pathname}${url.search}${url.hash}` || redirectTo;
+    } catch {
+      return redirectTo;
     }
-  }, [state]);
+  }
+
+  async function onSubmit(input: RegisterInput) {
+    setPending(true);
+
+    try {
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: input.name,
+          email: input.email.toLowerCase().trim(),
+          password: input.password
+        })
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Account could not be created.");
+      }
+
+      const result = await signIn("credentials", {
+        email: input.email.toLowerCase().trim(),
+        password: input.password,
+        redirect: false,
+        redirectTo
+      });
+
+      if (!result?.ok || result.error) {
+        toast.success("Account created. Sign in with your password to continue.");
+        window.location.assign(`/login?callbackUrl=${encodeURIComponent(redirectTo)}`);
+        return;
+      }
+
+      toast.success("Account ready. Opening your dashboard...");
+      window.location.assign(toCurrentOriginPath(result.url));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Registration could not finish.");
+    } finally {
+      setPending(false);
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -44,7 +96,7 @@ export function RegisterForm({ callbackUrl = "" }: { callbackUrl?: string }) {
         Email and password
         <span className="h-px flex-1 bg-white/10" />
       </div>
-      <form action={formAction} className="space-y-4">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <input type="hidden" name="callbackUrl" value={callbackUrl} />
         <div className="space-y-2">
           <Label htmlFor="name">Name</Label>
@@ -61,7 +113,10 @@ export function RegisterForm({ callbackUrl = "" }: { callbackUrl?: string }) {
           <Input id="password" type="password" autoComplete="new-password" {...register("password")} />
           {errors.password ? <p className="text-sm text-[hsl(var(--destructive))]">{errors.password.message}</p> : null}
         </div>
-        <SubmitButton>Create account</SubmitButton>
+        <Button type="submit" className="w-full" disabled={pending}>
+          {pending ? <Loader2 className="size-4 animate-spin" /> : null}
+          Create account
+        </Button>
       </form>
     </div>
   );

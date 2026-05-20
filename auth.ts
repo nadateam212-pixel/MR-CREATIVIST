@@ -5,6 +5,7 @@ import connectMongoDB from "@/lib/mongodb";
 import { normalizeRoles } from "@/lib/account-roles";
 import { verifyAuthOtp, type AuthOtpPurpose } from "@/lib/auth-otp";
 import { firebaseConfig } from "@/lib/firebase-config";
+import { env } from "@/lib/env";
 import { getSiteUrl } from "@/lib/site-url";
 import User from "@/models/User";
 import type { PlatformRole } from "@/types";
@@ -14,7 +15,7 @@ const authBaseUrl = getSiteUrl();
 if (process.env.NODE_ENV === "production") {
   process.env.AUTH_URL = authBaseUrl;
   process.env.NEXTAUTH_URL = authBaseUrl;
-  process.env.AUTH_TRUST_HOST ??= "true";
+  process.env.AUTH_TRUST_HOST = "true";
 }
 
 type FirebaseLookupUser = {
@@ -63,7 +64,7 @@ function serializeUser(user: {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+  secret: env("AUTH_SECRET") || env("NEXTAUTH_SECRET"),
   trustHost: true,
   session: {
     strategy: "jwt"

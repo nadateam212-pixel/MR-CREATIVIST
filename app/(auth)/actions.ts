@@ -52,7 +52,8 @@ export async function loginAction(_state: FormState, formData: FormData): Promis
     await signIn("credentials", {
       email: normalizedEmail,
       password: parsed.data.password,
-      redirect: false
+      redirect: false,
+      redirectTo: callbackUrl || "/dashboard"
     });
   } catch (error) {
     if (error instanceof AuthError) {
@@ -121,7 +122,8 @@ export async function registerAction(_state: FormState, formData: FormData): Pro
         await signIn("credentials", {
           email: normalizedEmail,
           password: parsed.data.password,
-          redirect: false
+          redirect: false,
+          redirectTo
         });
         redirect(
           otp.delivery.ok
@@ -152,7 +154,8 @@ export async function registerAction(_state: FormState, formData: FormData): Pro
   await signIn("credentials", {
     email: user.email,
     password: parsed.data.password,
-    redirect: false
+    redirect: false,
+    redirectTo
   });
 
   redirect(

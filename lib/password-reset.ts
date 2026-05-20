@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import connectMongoDB from "@/lib/mongodb";
 import { sendEmail } from "@/lib/email";
 import { brand } from "@/lib/brand";
+import { env } from "@/lib/env";
 import { getSiteUrl } from "@/lib/site-url";
 import PasswordResetToken from "@/models/PasswordResetToken";
 import User from "@/models/User";
@@ -14,7 +15,7 @@ function normalizeEmail(email: string) {
 }
 
 function resetSecret() {
-  return process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "mr-creativist-local-reset-secret";
+  return env("AUTH_SECRET") || env("NEXTAUTH_SECRET") || "mr-creativist-local-reset-secret";
 }
 
 function hashToken(token: string) {

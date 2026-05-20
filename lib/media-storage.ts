@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { ApiError } from "@/lib/api";
+import { env } from "@/lib/env";
 
 type UploadOwner = {
   ownerType?: string;
@@ -24,10 +25,6 @@ type HostedAsset = {
   status?: string;
   metadata: Record<string, unknown>;
 };
-
-function env(name: string) {
-  return process.env[name]?.trim();
-}
 
 function cloudinaryConfig() {
   const url = env("CLOUDINARY_URL");

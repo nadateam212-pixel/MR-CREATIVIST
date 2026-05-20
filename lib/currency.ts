@@ -1,10 +1,12 @@
+import { envNumber } from "@/lib/env";
+
 export type SupportedCurrency = "USD" | "FRW";
 
 const fallbackUsdToFrw = 1463;
 
 export const USD_TO_FRW_RATE =
-  Number(process.env.NEXT_PUBLIC_USD_TO_FRW_RATE) > 0
-    ? Number(process.env.NEXT_PUBLIC_USD_TO_FRW_RATE)
+  envNumber("NEXT_PUBLIC_USD_TO_FRW_RATE", fallbackUsdToFrw) > 0
+    ? envNumber("NEXT_PUBLIC_USD_TO_FRW_RATE", fallbackUsdToFrw)
     : fallbackUsdToFrw;
 
 export function defaultCurrencyForVisitor(): SupportedCurrency {

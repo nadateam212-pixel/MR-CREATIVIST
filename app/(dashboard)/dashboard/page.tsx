@@ -5,6 +5,9 @@ export const metadata: Metadata = {
   title: "User Dashboard"
 };
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default function DashboardPage() {
   return <PlatformDashboard role="user" />;
 }

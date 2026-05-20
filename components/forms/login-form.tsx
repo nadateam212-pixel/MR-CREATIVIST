@@ -1,26 +1,23 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
+import { signIn } from "next-auth/react";
+import { Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { loginAction, type FormState } from "@/app/(auth)/actions";
 import { loginSchema, type LoginInput } from "@/lib/validations";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { GoogleAuthButton } from "@/components/forms/google-auth-button";
-import { SubmitButton } from "@/components/forms/submit-button";
-
-const initialState: FormState = {
-  ok: false,
-  message: ""
-};
 
 export function LoginForm({ callbackUrl = "" }: { callbackUrl?: string }) {
-  const [state, formAction] = useActionState(loginAction, initialState);
+  const [pending, setPending] = useState(false);
   const {
     register,
+    handleSubmit,
     formState: { errors }
   } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
@@ -30,11 +27,50 @@ export function LoginForm({ callbackUrl = "" }: { callbackUrl?: string }) {
     }
   });
 
-  useEffect(() => {
-    if (state.message && !state.ok) {
-      toast.error(state.message);
+  const redirectTo =
+    callbackUrl.startsWith("/") && !callbackUrl.startsWith("//") && !callbackUrl.includes("://")
+      ? callbackUrl
+      : "/dashboard";
+
+  function toCurrentOriginPath(value?: string | null) {
+    if (!value) return redirectTo;
+
+    try {
+      const url = new URL(value, window.location.origin);
+      if (url.origin !== window.location.origin && !["localhost", "127.0.0.1", "::1"].includes(url.hostname)) {
+        return redirectTo;
+      }
+
+      return `${url.pathname}${url.search}${url.hash}` || redirectTo;
+    } catch {
+      return redirectTo;
     }
-  }, [state]);
+  }
+
+  async function onSubmit(input: LoginInput) {
+    setPending(true);
+
+    try {
+      const result = await signIn("credentials", {
+        email: input.email.toLowerCase().trim(),
+        password: input.password,
+        redirect: false,
+        redirectTo
+      });
+
+      if (!result?.ok || result.error) {
+        toast.error("Email or password is incorrect.");
+        return;
+      }
+
+      toast.success("Signed in. Opening your dashboard...");
+      window.location.assign(toCurrentOriginPath(result.url));
+    } catch {
+      toast.error("Sign in could not finish. Check your connection and try again.");
+    } finally {
+      setPending(false);
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -44,7 +80,7 @@ export function LoginForm({ callbackUrl = "" }: { callbackUrl?: string }) {
         Email and password
         <span className="h-px flex-1 bg-white/10" />
       </div>
-      <form action={formAction} className="space-y-4">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <input type="hidden" name="callbackUrl" value={callbackUrl} />
         <div className="space-y-2">
           <Label htmlFor="email">Email</Label>
@@ -61,7 +97,10 @@ export function LoginForm({ callbackUrl = "" }: { callbackUrl?: string }) {
           <Input id="password" type="password" autoComplete="current-password" {...register("password")} />
           {errors.password ? <p className="text-sm text-[hsl(var(--destructive))]">{errors.password.message}</p> : null}
         </div>
-        <SubmitButton>Sign in with password</SubmitButton>
+        <Button type="submit" className="w-full" disabled={pending}>
+          {pending ? <Loader2 className="size-4 animate-spin" /> : null}
+          Sign in with password
+        </Button>
       </form>
     </div>
   );

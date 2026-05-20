@@ -2,13 +2,14 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { auth } from "@/auth";
 import { apiError, apiOk, ApiError } from "@/lib/api";
+import { envNumber } from "@/lib/env";
 import { kindFromMime, mediaProvidersStatus, uploadHostedMedia } from "@/lib/media-storage";
 import connectMongoDB, { friendlyMongoError, isMongoConnectionError } from "@/lib/mongodb";
 import { normalizedExternalVideoUrl } from "@/lib/video-sources";
 import UploadAsset from "@/models/UploadAsset";
 
 const LOCAL_FALLBACK_MAX_BYTES = 10 * 1024 * 1024;
-const MAX_HOSTED_UPLOAD_BYTES = Number(process.env.MAX_HOSTED_UPLOAD_MB ?? 500) * 1024 * 1024;
+const MAX_HOSTED_UPLOAD_BYTES = envNumber("MAX_HOSTED_UPLOAD_MB", 500) * 1024 * 1024;
 const allowedMimeTypes = new Set([
   "application/pdf",
   "image/jpeg",

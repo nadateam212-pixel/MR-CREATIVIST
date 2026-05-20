@@ -1,3 +1,5 @@
+import { env } from "@/lib/env";
+
 const defaultFirebaseConfig = {
   apiKey: "AIzaSyC7gUWXOZuaX2FilDOvU039AjSAuQFcKic",
   authDomain: "mrcreativist.firebaseapp.com",
@@ -11,12 +13,8 @@ const defaultFirebaseConfig = {
 const defaultVapidKey =
   "BG2HcUVQTNw5SCDzLzayQcVVtjlgOUY-jhHZ9XD83Ln6FrklH6n-UMK43DcA-iKpaBhvekfla6njEK6jsD8-UEA";
 
-function cleanEnvValue(value: string | undefined) {
-  return value?.trim().replace(/^["']|["']$/g, "") ?? "";
-}
-
 function readFirebaseEnv(name: string, fallback: string) {
-  const value = cleanEnvValue(process.env[name]);
+  const value = env(name);
 
   if (!value || value === "undefined" || value === "null" || value.includes("...")) {
     return fallback;

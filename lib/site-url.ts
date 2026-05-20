@@ -1,8 +1,10 @@
+import { env } from "@/lib/env";
+
 const productionUrl = "https://mrcreativist.vercel.app";
 
 function normalizeUrl(value?: string | null) {
   if (!value) return "";
-  const trimmed = value.trim().replace(/\/+$/, "");
+  const trimmed = value.trim().replace(/^["']|["']$/g, "").replace(/\/+$/, "");
   if (!trimmed) return "";
 
   try {
@@ -23,14 +25,14 @@ function isLocalUrl(value: string) {
 }
 
 export function getSiteUrl() {
-  const vercelProductionUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
-    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+  const vercelProductionUrl = env("VERCEL_PROJECT_PRODUCTION_URL")
+    ? `https://${env("VERCEL_PROJECT_PRODUCTION_URL")}`
     : "";
-  const vercelDeploymentUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "";
+  const vercelDeploymentUrl = env("VERCEL_URL") ? `https://${env("VERCEL_URL")}` : "";
   const candidates = [
-    process.env.NEXT_PUBLIC_APP_URL,
-    process.env.AUTH_URL,
-    process.env.NEXTAUTH_URL,
+    env("NEXT_PUBLIC_APP_URL"),
+    env("AUTH_URL"),
+    env("NEXTAUTH_URL"),
     vercelProductionUrl,
     vercelDeploymentUrl,
     productionUrl
@@ -57,4 +59,3 @@ export function sameOriginRedirectPath(value?: string | null, fallback = "/dashb
   if (!trimmed.startsWith("/") || trimmed.startsWith("//") || trimmed.includes("://")) return fallback;
   return trimmed;
 }
-

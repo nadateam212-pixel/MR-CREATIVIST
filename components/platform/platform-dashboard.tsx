@@ -410,7 +410,7 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T) {
 }
 
 export async function PlatformDashboard({ role }: { role: DashboardRole }) {
-  const session = await auth();
+  const session = await auth().catch(() => null);
   const resolvedRole = resolveRole(role, session?.user?.role);
   const config = dashboardConfig[resolvedRole];
   const live = session?.user

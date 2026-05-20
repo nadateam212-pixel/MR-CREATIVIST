@@ -1,25 +1,37 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
+import { env } from "@/lib/env";
+
+function isPathUnder(pathname: string, base: string) {
+  return pathname === base || pathname.startsWith(`${base}/`);
+}
 
 export async function proxy(request: NextRequest) {
   const { nextUrl } = request;
-  const token = await getToken({ req: request, secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET });
+  const secret = env("AUTH_SECRET") || env("NEXTAUTH_SECRET");
+  const secureCookie =
+    process.env.NODE_ENV === "production" ||
+    nextUrl.protocol === "https:" ||
+    request.headers.get("x-forwarded-proto") === "https";
+  const token =
+    (await getToken({ req: request, secret, secureCookie })) ||
+    (await getToken({ req: request, secret, secureCookie: !secureCookie }));
   const isLoggedIn = Boolean(token);
   const role = String((token as { role?: unknown } | null)?.role ?? "").toLowerCase();
-  const isAuthRoute = nextUrl.pathname.startsWith("/login") || nextUrl.pathname.startsWith("/register");
+  const isAuthRoute = isPathUnder(nextUrl.pathname, "/login") || isPathUnder(nextUrl.pathname, "/register");
   const isProtectedRoute =
-    nextUrl.pathname.startsWith("/dashboard") ||
-    nextUrl.pathname.startsWith("/instructor") ||
-    nextUrl.pathname.startsWith("/consultant") ||
-    nextUrl.pathname.startsWith("/freelancer") ||
-    nextUrl.pathname.startsWith("/seller") ||
-    nextUrl.pathname.startsWith("/profile") ||
-    nextUrl.pathname.startsWith("/messages") ||
-    nextUrl.pathname.startsWith("/notifications") ||
-    nextUrl.pathname.startsWith("/settings") ||
-    nextUrl.pathname.startsWith("/admin") ||
-    nextUrl.pathname.startsWith("/api/posts");
+    isPathUnder(nextUrl.pathname, "/dashboard") ||
+    isPathUnder(nextUrl.pathname, "/instructor") ||
+    isPathUnder(nextUrl.pathname, "/consultant") ||
+    isPathUnder(nextUrl.pathname, "/freelancer") ||
+    isPathUnder(nextUrl.pathname, "/seller") ||
+    isPathUnder(nextUrl.pathname, "/profile") ||
+    isPathUnder(nextUrl.pathname, "/messages") ||
+    isPathUnder(nextUrl.pathname, "/notifications") ||
+    isPathUnder(nextUrl.pathname, "/settings") ||
+    isPathUnder(nextUrl.pathname, "/admin") ||
+    isPathUnder(nextUrl.pathname, "/api/posts");
 
   if (isAuthRoute && isLoggedIn) {
     return NextResponse.redirect(new URL(role === "admin" ? "/admin/dashboard" : "/dashboard", nextUrl));

@@ -18,8 +18,42 @@ export async function POST(request: Request) {
 
     await connectMongoDB();
 
-    if (await User.exists({ email: normalizedEmail })) {
-      throw new ApiError("An account already exists for this email.", 409);
+    const existingUser = await User.findOne({ email: normalizedEmail }).select("+passwordHash name email role emailVerifiedAt").lean();
+
+    if (existingUser) {
+      const validPassword = existingUser.passwordHash
+        ? await bcrypt.compare(body.password, existingUser.passwordHash)
+        : false;
+
+      if (!validPassword) {
+        throw new ApiError("An account already exists for this email. Sign in instead.", 409);
+      }
+
+      const otp = !existingUser.emailVerifiedAt
+        ? await createAndSendAuthOtp(existingUser.email, "register", {
+            userId: String(existingUser._id),
+            name: existingUser.name
+          })
+        : null;
+
+      return apiOk({
+        existing: true,
+        requiresOtp: Boolean(otp?.delivery.ok),
+        verifyUrl: otp?.delivery.ok
+          ? `/verify-otp?email=${encodeURIComponent(existingUser.email)}&mode=register`
+          : null,
+        emailDelivery: otp?.delivery ?? {
+          ok: true,
+          provider: "none",
+          message: "Existing account can continue with password sign-in."
+        },
+        user: {
+          id: String(existingUser._id),
+          name: existingUser.name,
+          email: existingUser.email,
+          role: existingUser.role
+        }
+      });
     }
 
     const user = await User.create({
