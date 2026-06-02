@@ -75,10 +75,10 @@ export function LoginForm({ callbackUrl = "" }: { callbackUrl?: string }) {
   return (
     <div className="space-y-5">
       <GoogleAuthButton callbackUrl={callbackUrl} />
-      <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-[0.16em] text-slate-400">
-        <span className="h-px flex-1 bg-white/10" />
+      <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-[0.16em] text-[hsl(var(--muted-foreground))]">
+        <span className="h-px flex-1 bg-[hsl(var(--border))]" />
         Email and password
-        <span className="h-px flex-1 bg-white/10" />
+        <span className="h-px flex-1 bg-[hsl(var(--border))]" />
       </div>
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <input type="hidden" name="callbackUrl" value={callbackUrl} />
@@ -90,7 +90,7 @@ export function LoginForm({ callbackUrl = "" }: { callbackUrl?: string }) {
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-3">
             <Label htmlFor="password">Password</Label>
-            <Link href="/forgot-password" className="text-xs font-bold text-cyan-200 hover:text-white">
+            <Link href="/forgot-password" className="text-xs font-bold text-[hsl(var(--primary))] hover:text-[hsl(var(--foreground))]">
               Forgot password?
             </Link>
           </div>

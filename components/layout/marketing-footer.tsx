@@ -67,7 +67,7 @@ export function MarketingFooter() {
   const { t } = useI18n();
 
   return (
-    <footer className="border-t border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] dark:border-white/10 dark:bg-slate-950 dark:text-white">
+    <footer className="border-t border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))]">
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 lg:grid-cols-[1.35fr_1.65fr]">
         <div>
           <div className="flex items-center gap-3">
@@ -82,24 +82,24 @@ export function MarketingFooter() {
             </span>
             <div>
               <p className="text-2xl font-black tracking-tight">{brand.shortName}</p>
-              <p className="text-xs font-bold uppercase tracking-[0.24em] text-cyan-300">{t("footer.tagline")}</p>
+              <p className="text-xs font-bold uppercase tracking-[0.24em] text-[hsl(var(--muted-foreground))]">{t("footer.tagline")}</p>
             </div>
           </div>
-          <p className="mt-5 max-w-xl text-sm leading-7 text-[hsl(var(--muted-foreground))] dark:text-slate-300">{t("footer.description")}</p>
+          <p className="mt-5 max-w-xl text-sm leading-7 text-[hsl(var(--muted-foreground))]">{t("footer.description")}</p>
 
-          <div className="mt-6 grid gap-3 text-sm text-[hsl(var(--muted-foreground))] dark:text-slate-300">
+          <div className="mt-6 grid gap-3 text-sm text-[hsl(var(--muted-foreground))]">
             <p className="flex items-center gap-3">
-              <MapPin className="size-4 text-cyan-300" />
+              <MapPin className="size-4 text-[hsl(var(--primary))]" />
               <span>{brand.address}</span>
             </p>
             <p className="flex items-start gap-3">
-              <Phone className="mt-1 size-4 text-cyan-300" />
+              <Phone className="mt-1 size-4 text-[hsl(var(--primary))]" />
               <span className="grid gap-1">
                 {brand.phones.map((phone) => (
                   <a
                     key={phone}
                     href={`tel:${phone.replaceAll(" ", "")}`}
-                    className="hover:text-[hsl(var(--foreground))] dark:hover:text-white"
+                    className="hover:text-[hsl(var(--foreground))]"
                   >
                     {phone}
                   </a>
@@ -107,8 +107,8 @@ export function MarketingFooter() {
               </span>
             </p>
             <p className="flex items-center gap-3">
-              <Mail className="size-4 text-cyan-300" />
-              <a href={`mailto:${brand.email}`} className="hover:text-[hsl(var(--foreground))] dark:hover:text-white">
+              <Mail className="size-4 text-[hsl(var(--primary))]" />
+              <a href={`mailto:${brand.email}`} className="hover:text-[hsl(var(--foreground))]">
                 {brand.email}
               </a>
             </p>
@@ -118,7 +118,7 @@ export function MarketingFooter() {
         <div className="grid gap-8 sm:grid-cols-2 xl:grid-cols-4">
           {footerSections.map((section) => (
             <div key={section.titleKey}>
-              <p className="mb-4 text-sm font-black uppercase tracking-[0.18em] text-[hsl(var(--foreground))] dark:text-white">
+              <p className="mb-4 text-sm font-black uppercase tracking-[0.18em] text-[hsl(var(--foreground))]">
                 {t(section.titleKey)}
               </p>
               <div className="grid gap-3">
@@ -126,7 +126,7 @@ export function MarketingFooter() {
                   <Link
                     key={`${section.titleKey}-${link.labelKey}-${link.href}`}
                     href={link.href}
-                    className="text-sm font-semibold text-[hsl(var(--muted-foreground))] hover:text-cyan-500 dark:text-slate-400 dark:hover:text-cyan-300"
+                    className="text-sm font-semibold text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--primary))]"
                   >
                     {t(link.labelKey)}
                   </Link>
@@ -137,7 +137,7 @@ export function MarketingFooter() {
         </div>
       </div>
 
-      <div className="border-t border-[hsl(var(--border))] dark:border-white/10">
+      <div className="border-t border-[hsl(var(--border))]">
         <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-6 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center gap-3 sm:gap-5">
             <div className="flex flex-wrap gap-2">
@@ -147,13 +147,13 @@ export function MarketingFooter() {
                   href={href}
                   target="_blank"
                   rel="noreferrer"
-                  className="rounded-full border border-[hsl(var(--border))] px-4 py-2 text-xs font-black uppercase tracking-wide text-[hsl(var(--muted-foreground))] hover:border-cyan-400 hover:text-cyan-500 dark:border-white/10 dark:text-slate-300 dark:hover:border-cyan-300 dark:hover:text-cyan-300"
+                  className="rounded-full border border-[hsl(var(--border))] px-4 py-2 text-xs font-black uppercase tracking-wide text-[hsl(var(--muted-foreground))] hover:border-[hsl(var(--primary))] hover:text-[hsl(var(--primary))]"
                 >
                   {item}
                 </a>
               ))}
             </div>
-            <div className="hidden border-l border-[hsl(var(--border))] pl-5 sm:block dark:border-white/10">
+            <div className="hidden border-l border-[hsl(var(--border))] pl-5 sm:block">
               <LanguageCurrencySettings compact />
             </div>
           </div>
@@ -167,15 +167,15 @@ export function MarketingFooter() {
                 asChild
                 variant="outline"
                 size="icon"
-                className="border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] dark:border-white/15 dark:bg-white/10 dark:text-white dark:hover:bg-white/15"
+                className="border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))]"
               >
                 <Link href="/profile" aria-label={t("auth.profile")}>
                   <User className="size-4" />
                 </Link>
               </Button>
-              <ModeToggle className="border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] dark:border-white/15 dark:bg-white/10 dark:text-white dark:hover:bg-white/15" />
+              <ModeToggle className="border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))]" />
             </div>
-            <p className="flex items-center gap-2 text-xs font-semibold tracking-wide text-slate-500">
+            <p className="flex items-center gap-2 text-xs font-semibold tracking-wide text-[hsl(var(--muted-foreground))]">
               <Send className="size-3.5" />
               {t("footer.copyright")}
             </p>

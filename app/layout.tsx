@@ -4,11 +4,28 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Toaster } from "@/components/ui/toaster";
 import { Providers } from "@/components/providers";
 import { ThemeProvider } from "@/components/theme-provider";
+import { darkThemeIds, defaultTheme, themeIds, themeStorageKey } from "@/lib/themes";
 import { seoKeywords, organizationJsonLd, websiteJsonLd } from "@/lib/seo";
 import { getSiteUrl } from "@/lib/site-url";
 import "./globals.css";
 
 const siteUrl = getSiteUrl();
+const themeInitScript = `
+(() => {
+  try {
+    const themeIds = ${JSON.stringify(themeIds)};
+    const darkThemeIds = ${JSON.stringify(darkThemeIds)};
+    const storedTheme = window.localStorage.getItem(${JSON.stringify(themeStorageKey)});
+    const themeId = themeIds.includes(storedTheme) ? storedTheme : ${JSON.stringify(defaultTheme.id)};
+    const root = document.documentElement;
+    const isDark = darkThemeIds.includes(themeId);
+    root.dataset.theme = themeId;
+    root.classList.toggle("dark", isDark);
+    root.style.colorScheme = isDark ? "dark" : "light";
+  } catch {
+  }
+})();
+`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -82,7 +99,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en" data-scroll-behavior="smooth" suppressHydrationWarning>
       <body className="font-sans antialiased">
-        <ThemeProvider attribute="class" defaultTheme="light" disableTransitionOnChange>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        <ThemeProvider>
           <Providers>{children}</Providers>
           <Toaster />
         </ThemeProvider>

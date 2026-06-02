@@ -287,16 +287,16 @@ export function AIToolsGalleryPro() {
   }
 
   return (
-    <div className="min-h-screen bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:bg-slate-950 dark:text-white">
+    <div className="min-h-screen bg-[hsl(var(--background))] text-[hsl(var(--foreground))]">
       <div className="mx-auto grid max-w-7xl px-4 py-6 sm:px-6 lg:grid-cols-[18rem_1fr]">
-        <aside className="border-b border-[hsl(var(--border))] bg-[hsl(var(--background))] pb-5 lg:sticky lg:top-20 lg:h-[calc(100vh-5rem)] lg:border-b-0 lg:border-r lg:pr-4 dark:border-white/10 dark:bg-slate-950">
+        <aside className="border-b border-[hsl(var(--border))] bg-[hsl(var(--background))] pb-5 lg:sticky lg:top-20 lg:h-[calc(100vh-5rem)] lg:border-b-0 lg:border-r lg:pr-4">
           <div className="flex items-center gap-3 px-1">
-            <div className="flex size-10 items-center justify-center rounded-md bg-cyan-500/15 text-cyan-300">
+            <div className="flex size-10 items-center justify-center rounded-md bg-[hsl(var(--primary))]/15 text-[hsl(var(--primary))]">
               <Sparkles className="size-5" />
             </div>
             <div>
               <p className="text-lg font-black">MrCreativist.AI Studio</p>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">{t("ai.freeTier")}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[hsl(var(--muted-foreground))]">{t("ai.freeTier")}</p>
             </div>
           </div>
 
@@ -317,8 +317,8 @@ export function AIToolsGalleryPro() {
                   className={cn(
                     "grid grid-cols-[2rem_1fr] gap-3 rounded-md border p-3 text-left transition-colors",
                     isSelected
-                      ? "border-cyan-400 bg-cyan-400/12 text-cyan-950 dark:text-white"
-                      : "border-transparent text-[hsl(var(--foreground))]/75 hover:border-[hsl(var(--border))] hover:bg-[hsl(var(--muted))]/45 hover:text-[hsl(var(--foreground))] dark:text-slate-300 dark:hover:border-white/10 dark:hover:bg-white/[0.05] dark:hover:text-white"
+                      ? "border-[hsl(var(--primary))] bg-[hsl(var(--primary))]/12 text-[hsl(var(--foreground))]"
+                      : "border-transparent text-[hsl(var(--muted-foreground))] hover:border-[hsl(var(--border))] hover:bg-[hsl(var(--muted))]/45 hover:text-[hsl(var(--foreground))]"
                   )}
                 >
                   <span className={cn("flex size-8 items-center justify-center rounded-md text-white", `bg-gradient-to-r ${tool.color}`)}>
@@ -326,7 +326,7 @@ export function AIToolsGalleryPro() {
                   </span>
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-bold">{tool.name}</span>
-                    <span className="mt-1 block truncate text-xs text-[hsl(var(--muted-foreground))] dark:text-slate-400">{tool.description}</span>
+                    <span className="mt-1 block truncate text-xs text-[hsl(var(--muted-foreground))]">{tool.description}</span>
                   </span>
                 </button>
               );
@@ -337,21 +337,24 @@ export function AIToolsGalleryPro() {
         <main className="min-w-0 py-6 lg:py-0 lg:pl-8">
           <section className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-md border border-cyan-400/25 bg-cyan-400/10 px-3 py-2 text-xs font-bold uppercase tracking-[0.16em] text-cyan-200">
-                <Sparkles className="size-4" />
+              <div className="inline-flex items-center gap-2 rounded-md border border-[hsl(var(--primary))]/25 bg-[hsl(var(--primary))]/10 px-3 py-2 text-xs font-bold uppercase tracking-[0.16em] text-[hsl(var(--foreground))]">
+                <Sparkles className="size-4 text-[hsl(var(--primary))]" />
                 {t("ai.poweredBy")}
               </div>
               <h1 className="mt-5 text-4xl font-black tracking-tight sm:text-6xl">{t("ai.title")}</h1>
-              <p className="mt-4 max-w-3xl text-base leading-7 text-[hsl(var(--muted-foreground))] dark:text-slate-300">
+              <p className="mt-4 max-w-3xl text-base leading-7 text-[hsl(var(--muted-foreground))]">
                 {t("ai.subtitle")}
               </p>
             </div>
-            <div className="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-4 py-3 text-sm text-[hsl(var(--muted-foreground))] dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300">
-              <span className="font-semibold text-[hsl(var(--foreground))] dark:text-white">{filteredTools.length}</span> {t("ai.toolsReady").toLowerCase()}
+            <div className="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-4 py-3 text-sm text-[hsl(var(--muted-foreground))]">
+              <span className="font-semibold text-[hsl(var(--foreground))]">{filteredTools.length}</span> {t("ai.toolsReady").toLowerCase()}
             </div>
           </section>
 
-          <Card className="mt-8 border-cyan-500/30 bg-[hsl(var(--card))] shadow-xl shadow-cyan-500/10 dark:bg-slate-900/72">
+          <Card
+            className="mt-8 border-[hsl(var(--primary))]/30 bg-[hsl(var(--card))] shadow-xl"
+            style={{ boxShadow: "0 22px 70px hsl(var(--primary) / 0.1)" }}
+          >
             <CardHeader>
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-3">
@@ -359,11 +362,11 @@ export function AIToolsGalleryPro() {
                     <SelectedIcon className="size-6" />
                   </div>
                   <div>
-                    <CardTitle className="text-2xl text-[hsl(var(--foreground))] dark:text-white">{selectedTool.name}</CardTitle>
-                    <CardDescription className="mt-1 text-[hsl(var(--muted-foreground))] dark:text-slate-300">{selectedTool.description}</CardDescription>
+                    <CardTitle className="text-2xl text-[hsl(var(--foreground))]">{selectedTool.name}</CardTitle>
+                    <CardDescription className="mt-1 text-[hsl(var(--muted-foreground))]">{selectedTool.description}</CardDescription>
                   </div>
                 </div>
-                <span className="w-fit rounded-md border border-cyan-400/25 px-3 py-2 text-xs font-bold uppercase tracking-[0.14em] text-cyan-200">
+                <span className="w-fit rounded-md border border-[hsl(var(--primary))]/25 bg-[hsl(var(--primary))]/10 px-3 py-2 text-xs font-bold uppercase tracking-[0.14em] text-[hsl(var(--foreground))]">
                   {selectedTool.category}
                 </span>
               </div>
@@ -372,7 +375,7 @@ export function AIToolsGalleryPro() {
             <CardContent className="space-y-6">
               <div className="grid gap-4">
                 {selectedTool.inputs.map((input) => (
-                  <label key={input.name} className="grid gap-2 text-sm font-semibold text-[hsl(var(--foreground))] dark:text-white">
+                  <label key={input.name} className="grid gap-2 text-sm font-semibold text-[hsl(var(--foreground))]">
                     {input.label}
                     {input.type === "textarea" ? (
                       <textarea
@@ -380,14 +383,14 @@ export function AIToolsGalleryPro() {
                         onChange={(event) => handleInputChange(input.name, event.target.value)}
                         placeholder={input.placeholder}
                         disabled={loading}
-                        className="min-h-32 w-full rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-4 py-3 text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] outline-none transition-colors focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 disabled:opacity-50 dark:border-white/10 dark:bg-slate-950/70 dark:text-white dark:placeholder:text-slate-500"
+                        className="min-h-32 w-full rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-4 py-3 text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] outline-none transition-colors focus:border-[hsl(var(--primary))] focus:ring-2 focus:ring-[hsl(var(--primary))]/20 disabled:opacity-50"
                       />
                     ) : input.type === "select" ? (
                       <select
                         value={inputs[input.name] || ""}
                         onChange={(event) => handleInputChange(input.name, event.target.value)}
                         disabled={loading}
-                        className="h-11 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-4 text-[hsl(var(--foreground))] outline-none transition-colors focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 disabled:opacity-50 dark:border-white/10 dark:bg-slate-950/70 dark:text-white"
+                        className="h-11 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-4 text-[hsl(var(--foreground))] outline-none transition-colors focus:border-[hsl(var(--primary))] focus:ring-2 focus:ring-[hsl(var(--primary))]/20 disabled:opacity-50"
                       >
                         <option value="">Select an option</option>
                         {input.options?.map((option) => (
@@ -403,7 +406,7 @@ export function AIToolsGalleryPro() {
                         onChange={(event) => handleInputChange(input.name, event.target.value)}
                         placeholder={input.placeholder}
                         disabled={loading}
-                        className="h-11 border-[hsl(var(--border))] bg-[hsl(var(--background))] text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:border-cyan-500 dark:border-white/10 dark:bg-slate-950/70 dark:text-white dark:placeholder:text-slate-500"
+                        className="h-11 border-[hsl(var(--border))] bg-[hsl(var(--background))] text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:border-[hsl(var(--primary))]"
                       />
                     )}
                   </label>
@@ -414,7 +417,7 @@ export function AIToolsGalleryPro() {
                 type="button"
                 onClick={handleGenerate}
                 disabled={loading || !Object.values(inputs).some((value) => value.trim())}
-                className="h-12 w-full bg-cyan-500 text-base font-bold text-slate-950 hover:bg-cyan-400 disabled:opacity-50"
+                className="h-12 w-full text-base font-bold disabled:opacity-50"
               >
                 {loading ? (
                   <>
@@ -430,10 +433,10 @@ export function AIToolsGalleryPro() {
               </Button>
 
               {output && Object.keys(output).length > 0 ? (
-                <div className="space-y-4 rounded-md border border-cyan-500/30 bg-[hsl(var(--background))] p-5 dark:bg-slate-950/70">
+                <div className="space-y-4 rounded-md border border-[hsl(var(--primary))]/30 bg-[hsl(var(--background))] p-5">
                   <div className="flex items-center justify-between gap-3">
-                    <h3 className="text-lg font-bold text-cyan-300">{t("ai.output")}</h3>
-                    <button type="button" onClick={() => setOutput({})} className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] dark:text-slate-400 dark:hover:text-white" aria-label="Close output">
+                    <h3 className="text-lg font-bold text-[hsl(var(--foreground))]">{t("ai.output")}</h3>
+                    <button type="button" onClick={() => setOutput({})} className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]" aria-label="Close output">
                       <X className="size-4" />
                     </button>
                   </div>
@@ -444,8 +447,8 @@ export function AIToolsGalleryPro() {
                     <div className="space-y-3">
                       {output.url ? (
                         <>
-                          <img src={output.url} alt="Generated image" className="h-auto w-full rounded-md border border-[hsl(var(--border))] dark:border-white/10" />
-                          <Button asChild className="w-full bg-cyan-600 hover:bg-cyan-700">
+                          <img src={output.url} alt="Generated image" className="h-auto w-full rounded-md border border-[hsl(var(--border))]" />
+                          <Button asChild className="w-full">
                             <a href={output.url} download>
                               <Download className="mr-2 size-4" />
                               {t("ai.download")}
@@ -454,18 +457,18 @@ export function AIToolsGalleryPro() {
                         </>
                       ) : null}
                       {output.revised_prompt ? (
-                        <p className="text-sm leading-6 text-[hsl(var(--muted-foreground))] dark:text-slate-300">
+                        <p className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">
                           <strong>{t("ai.refinedPrompt")}:</strong> {output.revised_prompt}
                         </p>
                       ) : null}
                     </div>
                   ) : selectedTool.id === "text" ? (
-                    <div className="max-h-96 overflow-y-auto whitespace-pre-wrap rounded-md bg-[hsl(var(--muted))] p-4 font-mono text-sm text-[hsl(var(--foreground))] dark:bg-slate-950 dark:text-slate-300">
+                    <div className="max-h-96 overflow-y-auto whitespace-pre-wrap rounded-md bg-[hsl(var(--muted))] p-4 font-mono text-sm text-[hsl(var(--foreground))]">
                       {String(output.output ?? "")}
                     </div>
                   ) : (
                     <div className="max-h-96 overflow-y-auto">
-                      <pre className="overflow-x-auto rounded-md bg-[hsl(var(--muted))] p-4 font-mono text-sm text-[hsl(var(--foreground))] dark:bg-slate-950 dark:text-slate-300">
+                      <pre className="overflow-x-auto rounded-md bg-[hsl(var(--muted))] p-4 font-mono text-sm text-[hsl(var(--foreground))]">
                         {JSON.stringify(output, null, 2)}
                       </pre>
                     </div>
@@ -478,7 +481,7 @@ export function AIToolsGalleryPro() {
                       void navigator.clipboard.writeText(text);
                     }}
                     variant="outline"
-                    className="w-full border-cyan-500/30 text-[hsl(var(--foreground))] hover:bg-cyan-500/10 dark:text-white"
+                    className="w-full border-[hsl(var(--primary))]/30 text-[hsl(var(--foreground))] hover:bg-[hsl(var(--primary))]/10"
                   >
                     <Copy className="mr-2 size-4" />
                     {t("ai.copy")}

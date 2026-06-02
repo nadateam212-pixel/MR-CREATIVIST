@@ -91,10 +91,10 @@ export function RegisterForm({ callbackUrl = "" }: { callbackUrl?: string }) {
   return (
     <div className="space-y-5">
       <GoogleAuthButton label="Register with Google" callbackUrl={callbackUrl} />
-      <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-[0.16em] text-slate-400">
-        <span className="h-px flex-1 bg-white/10" />
+      <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-[0.16em] text-[hsl(var(--muted-foreground))]">
+        <span className="h-px flex-1 bg-[hsl(var(--border))]" />
         Email and password
-        <span className="h-px flex-1 bg-white/10" />
+        <span className="h-px flex-1 bg-[hsl(var(--border))]" />
       </div>
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <input type="hidden" name="callbackUrl" value={callbackUrl} />

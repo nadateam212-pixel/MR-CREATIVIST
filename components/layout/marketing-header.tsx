@@ -24,7 +24,7 @@ export function MarketingHeader() {
   const { t } = useI18n();
 
   return (
-    <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/96 text-slate-950 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/96 dark:text-white">
+    <header className="sticky top-0 z-50 border-b border-[hsl(var(--border))] bg-[hsl(var(--background))]/96 text-[hsl(var(--foreground))] shadow-sm backdrop-blur-xl">
       <nav className="mx-auto max-w-7xl px-4 sm:px-6">
         <div className="flex h-20 items-center justify-between gap-5">
           <Link
@@ -32,7 +32,7 @@ export function MarketingHeader() {
             className="flex min-w-0 items-center gap-3"
             aria-label="Mr Creativist Home"
           >
-            <span className="relative flex size-16 shrink-0 overflow-hidden rounded-md bg-white p-1 shadow-sm ring-1 ring-slate-200">
+            <span className="relative flex size-16 shrink-0 overflow-hidden rounded-md bg-white p-1 shadow-sm ring-1 ring-[hsl(var(--border))]">
               <Image
                 src={brand.logo}
                 alt={brand.name}
@@ -42,7 +42,7 @@ export function MarketingHeader() {
                 priority
               />
             </span>
-            <span className="hidden whitespace-nowrap text-2xl font-black text-[#23325a] dark:text-white sm:block">
+            <span className="hidden whitespace-nowrap text-2xl font-black text-[hsl(var(--foreground))] sm:block">
               Mr Creativist
             </span>
           </Link>
@@ -60,8 +60,8 @@ export function MarketingHeader() {
                   className={cn(
                     "rounded-md px-3 py-3 text-sm font-semibold transition-colors",
                     isActive
-                      ? "bg-amber-50 text-amber-600 dark:bg-amber-400/10 dark:text-amber-300"
-                      : "text-slate-950 hover:bg-slate-100 hover:text-blue-700 dark:text-slate-100 dark:hover:bg-white/10 dark:hover:text-amber-300"
+                      ? "bg-[hsl(var(--primary))]/12 text-[hsl(var(--primary))]"
+                      : "text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]/70 hover:text-[hsl(var(--foreground))]"
                   )}
                 >
                   {t(item.key)}
@@ -74,7 +74,7 @@ export function MarketingHeader() {
             <Button
               asChild
               variant="outline"
-              className="h-10 rounded-md border-slate-300 px-4 font-black text-slate-950 dark:border-white/25 dark:text-white"
+              className="h-10 rounded-md border-[hsl(var(--border))] px-4 font-black text-[hsl(var(--foreground))]"
             >
               <Link href="/login">{t("auth.signIn")}</Link>
             </Button>
@@ -85,7 +85,7 @@ export function MarketingHeader() {
               asChild
               variant="ghost"
               size="icon"
-              className="text-slate-950 dark:text-white"
+              className="text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))]/70"
             >
               <Link href="/dashboard" aria-label={t("auth.dashboard")}>
                 <LayoutDashboard className="size-5" />
@@ -95,19 +95,19 @@ export function MarketingHeader() {
               asChild
               variant="ghost"
               size="icon"
-              className="text-slate-950 dark:text-white"
+              className="text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))]/70"
             >
               <Link href="/profile" aria-label={t("auth.profile")}>
                 <User className="size-5" />
               </Link>
             </Button>
-            <ModeToggle className="border-transparent text-slate-950 hover:bg-slate-100 dark:text-white dark:hover:bg-white/10" />
+            <ModeToggle className="border-transparent text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))]/70" />
           </div>
 
           <button
             type="button"
             onClick={() => setIsOpen((current) => !current)}
-            className="inline-flex size-10 items-center justify-center rounded-md border border-slate-300 lg:hidden dark:border-white/25"
+            className="inline-flex size-10 items-center justify-center rounded-md border border-[hsl(var(--border))] text-[hsl(var(--foreground))] lg:hidden"
             aria-label="Toggle menu"
             aria-expanded={isOpen}
           >
@@ -116,13 +116,13 @@ export function MarketingHeader() {
         </div>
 
         {isOpen ? (
-          <div className="grid gap-2 border-t border-slate-200 py-4 lg:hidden dark:border-white/10">
+          <div className="grid gap-2 border-t border-[hsl(var(--border))] py-4 lg:hidden">
             {navigation.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
                 onClick={() => setIsOpen(false)}
-                className="rounded-md px-3 py-3 text-sm font-bold hover:bg-slate-100 dark:hover:bg-white/10"
+                className="rounded-md px-3 py-3 text-sm font-bold text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]/70 hover:text-[hsl(var(--foreground))]"
               >
                 {t(item.key)}
               </Link>
@@ -144,7 +144,7 @@ export function MarketingHeader() {
                   <User className="size-5" />
                 </Link>
               </Button>
-              <ModeToggle className="border-transparent text-slate-950 hover:bg-slate-100 dark:text-white dark:hover:bg-white/10" />
+              <ModeToggle className="border-transparent text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))]/70" />
             </div>
           </div>
         ) : null}

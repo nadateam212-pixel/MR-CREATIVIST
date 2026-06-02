@@ -90,7 +90,7 @@ export default function AboutPage() {
       </section>
 
       <section className="mx-auto max-w-7xl px-4 pb-16 sm:px-6">
-        <div className="grid gap-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-8 text-[hsl(var(--foreground))] md:grid-cols-4 dark:border-white/10 dark:bg-slate-950 dark:text-white">
+        <div className="grid gap-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-8 text-[hsl(var(--foreground))] md:grid-cols-4">
           {[
             ["5+", "YEARS OF DIGITAL WORK"],
             ["50K+", "ACTIVE LEARNERS"],
@@ -99,7 +99,7 @@ export default function AboutPage() {
           ].map(([value, label]) => (
             <div key={label}>
               <p className="text-4xl font-black">{value}</p>
-              <p className="mt-2 text-xs font-black uppercase tracking-[0.18em] text-[hsl(var(--muted-foreground))] dark:text-slate-400">{label}</p>
+              <p className="mt-2 text-xs font-black uppercase tracking-[0.18em] text-[hsl(var(--muted-foreground))]">{label}</p>
             </div>
           ))}
         </div>

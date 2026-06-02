@@ -146,15 +146,45 @@ function NavGroup({ title, items }: { title: string; items: NavItem[] }) {
   );
 }
 
+function MobileBottomNav({ items }: { items: NavItem[] }) {
+  const pathname = usePathname();
+
+  return (
+    <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-[hsl(var(--border))] bg-[hsl(var(--card))]/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-2xl shadow-black/10 backdrop-blur-xl lg:hidden">
+      {items.slice(0, 5).map((item) => {
+        const exactOnly = ["/dashboard", "/seller", "/instructor", "/consultant", "/freelancer"].includes(item.href);
+        const active = pathname === item.href || (!exactOnly && item.href !== "/" && pathname.startsWith(`${item.href}/`));
+        const Icon = item.icon;
+
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={
+              active
+                ? "flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-md bg-[hsl(var(--primary))]/10 px-1 text-[11px] font-black text-[hsl(var(--primary))]"
+                : "flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-md px-1 text-[11px] font-black text-[hsl(var(--muted-foreground))] transition-colors hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]"
+            }
+          >
+            {Icon ? <Icon className="size-5 shrink-0" /> : null}
+            <span className="max-w-full truncate">{item.label.split(" ")[0]}</span>
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
 export function DashboardShell({ children, user }: { children: React.ReactNode; user: Session["user"] }) {
   const pathname = usePathname();
   const workspaceGroup = getWorkspaceGroup(pathname);
   const accountGroup = navGroups.find((group) => group.key === "account") ?? navGroups[0];
   const sidebarGroups = workspaceGroup.key === "account" ? [workspaceGroup] : [workspaceGroup, accountGroup];
   const mobileNavItems = sidebarGroups.flatMap((group) => group.items);
+  const bottomNavItems = workspaceGroup.items.slice(0, 5);
 
   return (
-    <div className="min-h-screen bg-[hsl(var(--muted))]/25">
+    <div className="min-h-screen bg-[hsl(var(--muted))]/25 pb-24 lg:pb-0">
       <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-[hsl(var(--border))] bg-[hsl(var(--card))] lg:block">
         <div className="flex h-full flex-col">
           <div className="border-b border-[hsl(var(--border))] px-5 py-5">
@@ -215,6 +245,7 @@ export function DashboardShell({ children, user }: { children: React.ReactNode; 
         </div>
         <main className="p-4 sm:p-6 xl:p-8">{children}</main>
       </div>
+      <MobileBottomNav items={bottomNavItems} />
     </div>
   );
 }

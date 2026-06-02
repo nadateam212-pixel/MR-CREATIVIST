@@ -60,6 +60,14 @@ const activityItems = [
   "MrCreativist.AI generation completed"
 ];
 
+const mobileNavItems = [
+  tools[0],
+  tools[1],
+  tools[3],
+  tools[7],
+  tools[8]
+];
+
 function initials(value?: string | null) {
   return (value ?? "MC")
     .split(" ")
@@ -67,6 +75,36 @@ function initials(value?: string | null) {
     .join("")
     .slice(0, 2)
     .toUpperCase();
+}
+
+function MobileBottomNav() {
+  const pathname = usePathname();
+  const { t } = useI18n();
+
+  return (
+    <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-[hsl(var(--border))] bg-[hsl(var(--card))]/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-2xl shadow-black/10 backdrop-blur-xl lg:hidden">
+      {mobileNavItems.map((item) => {
+        const Icon = item.icon;
+        const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
+
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={cn(
+              "flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-md px-1 text-[11px] font-black transition-colors",
+              active
+                ? "bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))]"
+                : "text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]"
+            )}
+          >
+            <Icon className="size-5 shrink-0" />
+            <span className="max-w-full truncate">{t(item.labelKey, item.fallback).split(" ")[0]}</span>
+          </Link>
+        );
+      })}
+    </nav>
+  );
 }
 
 export function PublicAppShell({
@@ -83,16 +121,19 @@ export function PublicAppShell({
   const [activityOpen, setActivityOpen] = useState(false);
 
   return (
-    <div className="public-theme-shell min-h-screen bg-[hsl(var(--background))] text-[hsl(var(--foreground))] dark:bg-[#030712] dark:text-slate-100">
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 border-r border-[hsl(var(--border))] bg-[hsl(var(--card))] lg:block dark:border-white/10 dark:bg-[#050914]">
+    <div className="public-theme-shell min-h-screen bg-[hsl(var(--background))] pb-20 text-[hsl(var(--foreground))] lg:pb-0">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 border-r border-[hsl(var(--border))] bg-[hsl(var(--card))] lg:block">
         <div className="flex h-full flex-col">
           <Link href="/" className="flex items-center gap-3 px-5 py-7" aria-label={`${brand.name} home`}>
-            <span className="relative flex size-16 shrink-0 overflow-hidden rounded-md bg-white p-1 shadow-lg shadow-cyan-500/10">
+            <span
+              className="relative flex size-16 shrink-0 overflow-hidden rounded-md bg-white p-1 shadow-lg"
+              style={{ boxShadow: "0 16px 45px hsl(var(--primary) / 0.1)" }}
+            >
               <Image src={brand.logo} alt={brand.name} fill sizes="64px" className="object-contain p-1" priority />
             </span>
             <span className="min-w-0">
               <span className="block truncate text-lg font-black uppercase tracking-wide">MR CREATIVIST</span>
-              <span className="mt-1 block text-[0.65rem] font-bold uppercase tracking-[0.22em] text-[hsl(var(--primary))] dark:text-cyan-300">Create. Learn. Sell.</span>
+              <span className="mt-1 block text-[0.65rem] font-bold uppercase tracking-[0.22em] text-[hsl(var(--muted-foreground))]">Create. Learn. Sell.</span>
             </span>
           </Link>
 
@@ -106,11 +147,12 @@ export function PublicAppShell({
                   <Link
                     key={item.href}
                     href={item.href}
+                    style={active ? { background: "var(--gradient-primary)", boxShadow: "0 14px 32px hsl(var(--primary) / 0.22)" } : undefined}
                     className={cn(
                       "flex h-11 items-center gap-3 rounded-md px-3 text-sm font-semibold transition-colors",
                       active
-                        ? "bg-gradient-to-r from-violet-600 to-blue-600 text-white shadow-lg shadow-blue-600/20"
-                        : "text-[hsl(var(--foreground))]/80 hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))] dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
+                        ? "text-white"
+                        : "text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]"
                     )}
                   >
                     <Icon className="size-5" />
@@ -120,7 +162,7 @@ export function PublicAppShell({
               })}
             </div>
 
-            <div className="mt-5 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--muted))]/40 p-3 dark:border-white/10 dark:bg-white/[0.04]">
+            <div className="mt-5 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--muted))]/40 p-3">
               <p className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-[hsl(var(--muted-foreground))]">
                 {t("settings.languageCurrency")}
               </p>
@@ -128,11 +170,11 @@ export function PublicAppShell({
             </div>
           </nav>
 
-          <div className="border-t border-[hsl(var(--border))] p-4 dark:border-white/10">
+          <div className="border-t border-[hsl(var(--border))] p-4">
             <Button
               asChild
               variant="outline"
-              className="w-full border-blue-500/35 bg-blue-500/10 text-[hsl(var(--foreground))] hover:bg-blue-500/20 dark:text-white"
+              className="w-full border-[hsl(var(--primary))]/35 bg-[hsl(var(--primary))]/10 text-[hsl(var(--foreground))] hover:bg-[hsl(var(--primary))]/20"
             >
               <Link href="/profile">
                 <Sparkles className="size-4" />
@@ -144,18 +186,18 @@ export function PublicAppShell({
       </aside>
 
       <div className="lg:pl-64">
-        <header className="sticky top-0 z-30 border-b border-[hsl(var(--border))] bg-[hsl(var(--background))]/90 px-4 py-3 backdrop-blur-xl sm:px-6 dark:border-white/10 dark:bg-[#030712]/90">
+        <header className="sticky top-0 z-30 border-b border-[hsl(var(--border))] bg-[hsl(var(--background))]/90 px-4 py-3 backdrop-blur-xl sm:px-6">
           <div className="mx-auto flex max-w-7xl items-center gap-3">
             <Link href="/" className="relative flex size-11 shrink-0 overflow-hidden rounded-md bg-white p-1 lg:hidden">
               <Image src={brand.logo} alt={brand.name} fill sizes="44px" className="object-contain p-1" />
             </Link>
 
             <form action="/search" className="relative min-w-0 flex-1">
-              <Search className="absolute left-4 top-1/2 size-5 -translate-y-1/2 text-slate-500" />
+              <Search className="absolute left-4 top-1/2 size-5 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" />
               <input
                 name="q"
                 placeholder={t("common.searchPlatform")}
-                className="h-11 w-full rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] pl-12 pr-4 text-sm text-[hsl(var(--foreground))] outline-none placeholder:text-[hsl(var(--muted-foreground))] focus:border-cyan-400 dark:border-white/10 dark:bg-white/[0.04] dark:text-white dark:placeholder:text-slate-500"
+                className="h-11 w-full rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] pl-12 pr-4 text-sm text-[hsl(var(--foreground))] outline-none placeholder:text-[hsl(var(--muted-foreground))] focus:border-[hsl(var(--primary))]"
               />
             </form>
 
@@ -164,7 +206,7 @@ export function PublicAppShell({
                 asChild
                 size="icon"
                 variant="outline"
-                className="relative border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] dark:border-white/10 dark:bg-white/[0.04] dark:text-white dark:hover:bg-white/10"
+                className="relative border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))]"
               >
                 <Link href="/marketplace/cart" aria-label="Shopping cart">
                   <ShoppingCart className="size-4" />
@@ -179,7 +221,7 @@ export function PublicAppShell({
                 asChild
                 size="icon"
                 variant="outline"
-                className="hidden border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] sm:inline-flex dark:border-white/10 dark:bg-white/[0.04] dark:text-white dark:hover:bg-white/10"
+                className="hidden border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] sm:inline-flex"
               >
                 <Link href="/messages" aria-label="Messages">
                   <MessageSquare className="size-4" />
@@ -189,35 +231,35 @@ export function PublicAppShell({
                 asChild
                 size="icon"
                 variant="outline"
-                className="border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] dark:border-white/10 dark:bg-white/[0.04] dark:text-white dark:hover:bg-white/10"
+                className="border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))]"
               >
                 <Link href="/notifications" aria-label="Notifications">
                   <Bell className="size-4" />
                 </Link>
               </Button>
-              <Button asChild size="icon" variant="outline" className="border-[hsl(var(--primary))]/30 bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/15 dark:border-cyan-400/30 dark:bg-cyan-400/10 dark:text-cyan-100 dark:hover:bg-cyan-400/20">
+              <Button asChild size="icon" variant="outline" className="border-[hsl(var(--primary))]/30 bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/15">
                 <Link href="/ai-tools" aria-label="AI generation">
                   <Bot className="size-4" />
                 </Link>
               </Button>
-              <ModeToggle className="hidden border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] sm:inline-flex dark:border-white/10 dark:bg-white/[0.04] dark:text-white dark:hover:bg-white/10" />
+              <ModeToggle className="hidden border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] sm:inline-flex" />
 
               {user ? (
                 <div className="relative">
                   <button
                     type="button"
                     onClick={() => setProfileOpen((current) => !current)}
-                    className="flex h-11 items-center gap-2 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-2 text-left hover:bg-[hsl(var(--muted))] dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/10"
+                    className="flex h-11 items-center gap-2 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-2 text-left hover:bg-[hsl(var(--muted))]"
                   >
-                    <span className="relative flex size-8 items-center justify-center overflow-hidden rounded-full bg-cyan-400 text-xs font-black text-slate-950">
+                    <span className="relative flex size-8 items-center justify-center overflow-hidden rounded-full bg-[hsl(var(--primary))] text-xs font-black text-[hsl(var(--primary-foreground))]">
                       {user.image ? <Image src={user.image} alt={user.name ?? "Profile"} fill sizes="32px" className="object-cover" /> : initials(user.name)}
                     </span>
                     <span className="hidden max-w-28 truncate text-sm font-semibold sm:block">{user.name ?? "Profile"}</span>
-                    <ChevronDown className="hidden size-4 text-slate-400 sm:block" />
+                    <ChevronDown className="hidden size-4 text-[hsl(var(--muted-foreground))] sm:block" />
                   </button>
 
                   {profileOpen ? (
-                    <div className="absolute right-0 mt-2 w-56 overflow-hidden rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-2 shadow-2xl shadow-black/15 dark:border-white/10 dark:bg-slate-950 dark:shadow-black/40">
+                    <div className="absolute right-0 mt-2 w-56 overflow-hidden rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-2 shadow-2xl shadow-black/15">
                       {[
                         { href: "/dashboard", label: "Go dashboard", icon: LayoutDashboard },
                         { href: "/profile", label: "Profile", icon: User },
@@ -228,19 +270,19 @@ export function PublicAppShell({
                         <Link
                           key={item.href}
                           href={item.href}
-                          className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-[hsl(var(--foreground))]/80 hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))] dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
+                          className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]"
                         >
                           <item.icon className="size-4" />
                           {item.label}
                         </Link>
                       ))}
                       {user.role === "admin" ? (
-                        <Link href="/admin/dashboard" className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-cyan-700 hover:bg-[hsl(var(--muted))] dark:text-cyan-200 dark:hover:bg-white/10">
+                        <Link href="/admin/dashboard" className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-[hsl(var(--primary))] hover:bg-[hsl(var(--muted))]">
                           <LayoutDashboard className="size-4" />
                           Admin
                         </Link>
                       ) : null}
-                      <form action={logoutAction} className="mt-1 border-t border-[hsl(var(--border))] pt-1 dark:border-white/10">
+                      <form action={logoutAction} className="mt-1 border-t border-[hsl(var(--border))] pt-1">
                         <button type="submit" className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-red-300 hover:bg-red-500/10">
                           <LogOut className="size-4" />
                           Logout
@@ -250,7 +292,7 @@ export function PublicAppShell({
                   ) : null}
                 </div>
               ) : (
-                <Button asChild className="bg-cyan-400 text-slate-950 hover:bg-cyan-300">
+                <Button asChild>
                   <Link href="/login">Sign in</Link>
                 </Button>
               )}
@@ -258,13 +300,13 @@ export function PublicAppShell({
           </div>
         </header>
 
-        <div className="border-b border-[hsl(var(--border))] px-4 py-2 lg:hidden dark:border-white/10">
+        <div className="border-b border-[hsl(var(--border))] px-4 py-2 lg:hidden">
           <div className="flex gap-2 overflow-x-auto pb-1">
             {tools.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className="shrink-0 rounded-md border border-[hsl(var(--border))] px-3 py-2 text-xs font-bold text-[hsl(var(--foreground))] dark:border-white/10 dark:text-slate-200"
+                className="shrink-0 rounded-md border border-[hsl(var(--border))] px-3 py-2 text-xs font-bold text-[hsl(var(--foreground))]"
               >
                 {t(item.labelKey, item.fallback)}
               </Link>
@@ -276,22 +318,24 @@ export function PublicAppShell({
         <MarketingFooter />
       </div>
 
-      <div className="fixed bottom-5 right-5 z-50">
+      <MobileBottomNav />
+
+      <div className="fixed bottom-24 right-5 z-50 lg:bottom-5">
         {activityOpen ? (
-          <div className="mb-3 w-80 max-w-[calc(100vw-2.5rem)] rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 text-[hsl(var(--foreground))] shadow-2xl shadow-black/15 dark:border-white/10 dark:bg-slate-950 dark:text-white dark:shadow-black/40">
+          <div className="mb-3 w-80 max-w-[calc(100vw-2.5rem)] rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 text-[hsl(var(--foreground))] shadow-2xl shadow-black/15">
             <div className="mb-3 flex items-center justify-between">
               <p className="font-black uppercase tracking-wide">{t("common.liveActivity")}</p>
-              <Badge className="border-cyan-400 text-cyan-700 dark:text-cyan-300">{t("common.recent")}</Badge>
+              <Badge className="border-[hsl(var(--primary))] text-[hsl(var(--primary))]">{t("common.recent")}</Badge>
             </div>
             <div className="grid gap-2">
               {activityItems.map((item, index) => (
                 <div
                   key={item}
-                  className="flex gap-3 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--muted))]/35 p-3 text-sm text-[hsl(var(--foreground))]/80 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300"
+                  className="flex gap-3 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--muted))]/35 p-3 text-sm text-[hsl(var(--muted-foreground))]"
                 >
-                  <Clock3 className="mt-0.5 size-4 shrink-0 text-cyan-300" />
+                  <Clock3 className="mt-0.5 size-4 shrink-0 text-[hsl(var(--primary))]" />
                   <span>{item}</span>
-                  <span className="ml-auto shrink-0 text-xs text-slate-500">{index + 2}m</span>
+                  <span className="ml-auto shrink-0 text-xs text-[hsl(var(--muted-foreground))]">{index + 2}m</span>
                 </div>
               ))}
             </div>
@@ -300,7 +344,8 @@ export function PublicAppShell({
         <button
           type="button"
           onClick={() => setActivityOpen((current) => !current)}
-          className="flex size-14 items-center justify-center rounded-full bg-gradient-to-r from-violet-600 to-cyan-400 text-white shadow-xl shadow-cyan-500/25"
+          className="flex size-14 items-center justify-center rounded-full text-white"
+          style={{ background: "var(--gradient-primary)", boxShadow: "0 22px 55px hsl(var(--primary) / 0.25)" }}
           aria-label="Live activity"
         >
           <Sparkles className="size-6" />

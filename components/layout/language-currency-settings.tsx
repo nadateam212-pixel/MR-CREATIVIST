@@ -61,7 +61,7 @@ export function LanguageCurrencySettings({ compact = false, dark = false }: { co
         </div>
       </div>
       {!compact ? (
-        <p className={cn("text-[0.68rem] font-medium", dark ? "text-slate-400" : "text-[hsl(var(--muted-foreground))]")}>
+        <p className={cn("text-[0.68rem] font-medium", dark ? "text-white/70" : "text-[hsl(var(--muted-foreground))]")}>
           1 USD = {formatMoney(settings.usdToFrw, "FRW")} - {settings.rateFallback ? t("settings.rateFallback") : t("settings.rateLive")}
         </p>
       ) : null}

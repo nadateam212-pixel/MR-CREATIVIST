@@ -446,18 +446,18 @@ export function FreelancerStudio({ initialFreelancers = [] }: { initialFreelance
 
   return (
     <div className="bg-[hsl(var(--background))]">
-      <section className="border-b border-[hsl(var(--border))] bg-[hsl(var(--muted))]/35 text-[hsl(var(--foreground))] dark:border-white/10 dark:bg-slate-950 dark:text-white">
+      <section className="border-b border-[hsl(var(--border))] bg-[hsl(var(--muted))]/35 text-[hsl(var(--foreground))]">
         <div className="mx-auto grid max-w-7xl gap-6 px-4 py-10 sm:px-6 xl:grid-cols-[1.05fr_0.95fr] xl:items-stretch">
           <div className="flex flex-col justify-between gap-8">
             <div>
-              <Badge className="border-cyan-300/50 bg-cyan-300/10 text-cyan-100">
+              <Badge className="border-[hsl(var(--primary))]/50 bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))]">
                 FREELANCER STUDIO
               </Badge>
               <h1 className="mt-4 max-w-4xl text-4xl font-black uppercase tracking-tight sm:text-5xl">
                 HIRE, MANAGE AND PAY VERIFIED FREELANCERS FROM BRIEF TO FINAL
                 DELIVERY.
               </h1>
-              <p className="mt-5 max-w-3xl text-sm font-semibold uppercase leading-7 text-[hsl(var(--muted-foreground))] sm:text-base dark:text-slate-300">
+              <p className="mt-5 max-w-3xl text-sm font-semibold uppercase leading-7 text-[hsl(var(--muted-foreground))] sm:text-base">
                 Mr Creativist FREELANCER STUDIO RUNS THE COMPLETE WORKFLOW:
                 BRIEF, AI MATCHING, PROPOSAL, CONTRACT, ESCROW, MILESTONES,
                 DELIVERY, REVIEW, INVOICE AND PAYOUT.
@@ -479,9 +479,9 @@ export function FreelancerStudio({ initialFreelancers = [] }: { initialFreelance
               ].map((item) => (
                 <div
                   key={item.label}
-                  className="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 dark:border-white/10 dark:bg-white/5"
+                  className="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4"
                 >
-                  <p className="text-xs font-black uppercase tracking-[0.16em] text-[hsl(var(--primary))] dark:text-cyan-200">
+                  <p className="text-xs font-black uppercase tracking-[0.16em] text-[hsl(var(--primary))]">
                     {item.label}
                   </p>
                   <p className="mt-2 text-2xl font-black">{item.value}</p>
@@ -737,7 +737,7 @@ export function FreelancerStudio({ initialFreelancers = [] }: { initialFreelance
                             skills.map((skill) => (
                               <Badge
                                 key={`${freelancer.id}-${skill}`}
-                                className="border-emerald-300/60 text-emerald-700 dark:text-emerald-300"
+                                className="border-[hsl(var(--primary))]/45 text-[hsl(var(--primary))]"
                               >
                                 {skill}
                               </Badge>
@@ -893,7 +893,7 @@ export function FreelancerStudio({ initialFreelancers = [] }: { initialFreelance
                         isActive
                           ? "border-[hsl(var(--primary))] bg-[hsl(var(--primary))]/10"
                           : isDone
-                            ? "border-emerald-300/60 bg-emerald-50 text-emerald-900 dark:bg-emerald-400/10 dark:text-emerald-200"
+                            ? "border-[hsl(var(--primary))]/45 bg-[hsl(var(--primary))]/10 text-[hsl(var(--foreground))]"
                             : "border-[hsl(var(--border))] bg-[hsl(var(--background))]"
                       ].join(" ")}
                     >
@@ -1077,7 +1077,7 @@ export function FreelancerStudio({ initialFreelancers = [] }: { initialFreelance
         </div>
       </section>
 
-      <section className="border-t border-[hsl(var(--border))] bg-[hsl(var(--muted))]/35 text-[hsl(var(--foreground))] dark:bg-slate-950 dark:text-white">
+      <section className="border-t border-[hsl(var(--border))] bg-[hsl(var(--muted))]/35 text-[hsl(var(--foreground))]">
         <div className="mx-auto grid max-w-7xl gap-4 px-4 py-8 sm:px-6 md:grid-cols-4">
           {[
             {
@@ -1103,11 +1103,11 @@ export function FreelancerStudio({ initialFreelancers = [] }: { initialFreelance
           ].map((item) => (
             <div
               key={item.title}
-              className="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5 dark:border-white/10 dark:bg-transparent"
+              className="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5"
             >
-              <item.icon className="mb-4 size-6 text-cyan-300" />
+              <item.icon className="mb-4 size-6 text-[hsl(var(--primary))]" />
               <p className="font-black uppercase">{item.title}</p>
-              <p className="mt-2 text-sm font-semibold uppercase leading-6 text-[hsl(var(--muted-foreground))] dark:text-slate-300">
+              <p className="mt-2 text-sm font-semibold uppercase leading-6 text-[hsl(var(--muted-foreground))]">
                 {item.body}
               </p>
             </div>

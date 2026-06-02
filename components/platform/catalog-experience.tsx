@@ -174,7 +174,7 @@ export function CatalogExperience({
   }
 
   return (
-    <div className="bg-[hsl(var(--background))]">
+    <div className="bg-[hsl(var(--background))] text-[hsl(var(--foreground))]">
       <section className="border-b border-[hsl(var(--border))] bg-[hsl(var(--muted))]/35">
         <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
           <div>

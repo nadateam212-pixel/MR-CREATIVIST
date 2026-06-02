@@ -113,11 +113,17 @@ export function GoogleAuthButton({
 
   return (
     <div className="space-y-2">
-      <Button type="button" variant="outline" className="w-full border-white/20 bg-white/10 text-white hover:bg-white/15" onClick={() => void continueWithGoogle()} disabled={loading}>
+      <Button
+        type="button"
+        variant="outline"
+        className="w-full border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))]"
+        onClick={() => void continueWithGoogle()}
+        disabled={loading}
+      >
         {loading ? <Loader2 className="size-4 animate-spin" /> : <span className="grid size-5 place-items-center rounded-full bg-white text-sm font-black text-slate-900">G</span>}
         {label}
       </Button>
-      {errorMessage ? <p className="rounded-md border border-amber-400/30 bg-amber-400/10 p-3 text-xs leading-5 text-amber-100">{errorMessage}</p> : null}
+      {errorMessage ? <p className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs leading-5 text-amber-600">{errorMessage}</p> : null}
     </div>
   );
 }

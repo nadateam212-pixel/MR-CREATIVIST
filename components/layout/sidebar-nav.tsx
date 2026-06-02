@@ -20,7 +20,7 @@ export function SidebarNav({ items, mobile = false }: { items: NavItem[]; mobile
             key={item.href}
             href={item.href}
             className={cn(
-              "inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              "inline-flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
               active
                 ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]"
                 : "text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]"

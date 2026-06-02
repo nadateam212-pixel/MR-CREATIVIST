@@ -33,14 +33,14 @@ export function ForgotPasswordForm() {
       </form>
 
       {state.message ? (
-        <p className={`rounded-md border p-3 text-sm ${state.ok ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-100" : "border-amber-400/30 bg-amber-400/10 text-amber-100"}`}>
+        <p className={`rounded-md border p-3 text-sm ${state.ok ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600" : "border-amber-500/30 bg-amber-500/10 text-amber-600"}`}>
           {state.message}
         </p>
       ) : null}
 
-      <p className="text-center text-sm text-slate-300">
+      <p className="text-center text-sm text-[hsl(var(--muted-foreground))]">
         Remembered it?{" "}
-        <Link href="/login" className="font-bold text-cyan-200 hover:text-white">
+        <Link href="/login" className="font-bold text-[hsl(var(--primary))] hover:text-[hsl(var(--foreground))]">
           Sign in with password
         </Link>
       </p>

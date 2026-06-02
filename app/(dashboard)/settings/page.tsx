@@ -5,6 +5,7 @@ import { ProfileSettingsForm, type EditableProfile } from "@/components/account/
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { LanguageCurrencySettings } from "@/components/layout/language-currency-settings";
 import { ModeToggle } from "@/components/mode-toggle";
+import { ThemePicker } from "@/components/theme-picker";
 import connectMongoDB from "@/lib/mongodb";
 import User from "@/models/User";
 
@@ -79,10 +80,11 @@ export default async function SettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Appearance</CardTitle>
-          <CardDescription>Switch between light, dark, and system mode.</CardDescription>
+          <CardDescription>Choose from 12 themes or use the theme icon to move to the next one.</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <ModeToggle />
+          <ThemePicker />
         </CardContent>
       </Card>
 

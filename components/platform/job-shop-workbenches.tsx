@@ -141,11 +141,11 @@ export function JobsDirectory({ jobs }: { jobs: PublicJobPost[] }) {
 
   return (
     <div className="space-y-8">
-      <section className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5 text-[hsl(var(--foreground))] dark:border-white/10 dark:bg-slate-950 dark:text-white">
+      <section className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5 text-[hsl(var(--foreground))]">
         <div>
-          <p className="text-sm font-black uppercase tracking-[0.18em] text-cyan-300">Jobs</p>
+          <p className="text-sm font-black uppercase tracking-[0.18em] text-[hsl(var(--primary))]">Jobs</p>
           <h1 className="mt-3 text-4xl font-black tracking-tight sm:text-6xl">Find creative, AI, media and digital work</h1>
-          <p className="mt-4 max-w-3xl text-sm leading-6 text-[hsl(var(--muted-foreground))] dark:text-slate-300">
+          <p className="mt-4 max-w-3xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
             Explore published opportunities from MR Creativist partners, platform sellers, creators and companies.
           </p>
         </div>
@@ -185,7 +185,7 @@ export function JobsDirectory({ jobs }: { jobs: PublicJobPost[] }) {
                       <Badge>{job.category}</Badge>
                       <Badge>{job.employmentType}</Badge>
                       <Badge>{job.workplaceType}</Badge>
-                      {job.isFeatured ? <Badge className="border-cyan-400 text-cyan-500">Featured</Badge> : null}
+                      {job.isFeatured ? <Badge className="border-[hsl(var(--primary))]/50 text-[hsl(var(--primary))]">Featured</Badge> : null}
                     </div>
                     <CardTitle className="mt-4 leading-tight">{job.title}</CardTitle>
                     <p className="mt-2 text-sm font-semibold text-[hsl(var(--muted-foreground))]">{job.companyName}</p>
@@ -338,15 +338,15 @@ export function ShopDirectory({ shops, showHeader = true }: { shops: PublicShopP
   return (
     <div className="space-y-8">
       {showHeader ? (
-        <section className="grid gap-5 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5 text-[hsl(var(--foreground))] dark:border-white/10 dark:bg-slate-950 dark:text-white lg:grid-cols-[1fr_auto] lg:items-end">
+        <section className="grid gap-5 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5 text-[hsl(var(--foreground))] lg:grid-cols-[1fr_auto] lg:items-end">
           <div>
-            <p className="text-sm font-black uppercase tracking-[0.18em] text-cyan-300">Business Directory</p>
+            <p className="text-sm font-black uppercase tracking-[0.18em] text-[hsl(var(--primary))]">Business Directory</p>
             <h1 className="mt-3 text-4xl font-black tracking-tight sm:text-6xl">Discover verified businesses, products and services</h1>
-            <p className="mt-4 max-w-3xl text-sm leading-6 text-[hsl(var(--muted-foreground))] dark:text-slate-300">
+            <p className="mt-4 max-w-3xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
               Sellers can publish complete business profiles with logos, contact details, working hours, products, services and direct messaging.
             </p>
           </div>
-          <Button asChild className="bg-cyan-400 text-slate-950 hover:bg-cyan-300">
+          <Button asChild>
             <Link href="/seller/shop">
               <Store className="size-4" />
               List your business
@@ -370,13 +370,13 @@ export function ShopDirectory({ shops, showHeader = true }: { shops: PublicShopP
                   <img src={shop.logo || "/icons/logo.png"} alt={`${shop.name} logo`} className="size-14 rounded-md bg-white object-contain p-1" />
                   <div className="min-w-0">
                     <p className="truncate text-lg font-black">{shop.name}</p>
-                    <p className="truncate text-xs font-bold uppercase tracking-[0.14em] text-cyan-200">{shop.category}</p>
+                    <p className="truncate text-xs font-bold uppercase tracking-[0.14em] text-white/80">{shop.category}</p>
                   </div>
                 </div>
               </div>
               <CardContent className="space-y-5 p-5">
                 <div className="flex flex-wrap gap-2">
-                  {shop.isFeatured ? <Badge className="border-cyan-400 text-cyan-500">Featured</Badge> : null}
+                  {shop.isFeatured ? <Badge className="border-[hsl(var(--primary))]/50 text-[hsl(var(--primary))]">Featured</Badge> : null}
                   <Badge>
                     <Star className="mr-1 size-3 fill-current" />
                     {(shop.rating ?? 0).toFixed(1)}
