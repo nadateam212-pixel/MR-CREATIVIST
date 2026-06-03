@@ -46,7 +46,9 @@ export async function POST(request: Request) {
       ...body,
       slug,
       ownerId: session.user.id,
-      ownerName: session.user.name ?? session.user.email
+      ownerName: session.user.name ?? session.user.email,
+      status: session.user.role === "admin" ? body.status : body.status === "draft" ? "draft" : "submitted",
+      isVerified: session.user.role === "admin" ? body.isVerified : false
     });
 
     return jsonOk(normalizeShopProfile(shop), 201);

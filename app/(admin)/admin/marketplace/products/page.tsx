@@ -27,13 +27,25 @@ export default async function AdminProductsPage() {
     subtitle: `${product.category ?? "Marketplace"} - ${product.seller ?? "Seller"} - ${product.price}`,
     kind: product.type ?? "product",
     status: product.status ?? "draft",
+    isVerified: Boolean(product.isVerified),
     href: product.slug ? `/marketplace/product/${product.slug}` : "/marketplace",
     apiPath: `/api/products/${product.id ?? product.slug}`,
     updateMethod: "PUT",
+    statusActions: [
+      { label: "Approve", status: "approved" },
+      { label: "Publish", status: "published" },
+      { label: "Request changes", status: "changes_requested" },
+      { label: "Verify badge", patch: { isVerified: true } }
+    ],
     editFields: [
       { key: "name", label: "Product name", value: product.name },
       { key: "category", label: "Category", value: product.category ?? "" },
-      { key: "status", label: "Status", value: product.status ?? "draft", options: ["draft", "published", "archived"] }
+      {
+        key: "status",
+        label: "Status",
+        value: product.status ?? "draft",
+        options: ["draft", "submitted", "changes_requested", "approved", "published", "archived"]
+      }
     ]
   }));
 

@@ -12,7 +12,7 @@
   --primary: 221 83% 45%;
   --primary-foreground: 0 0% 100%;
   --secondary: 173 80% 40%;
-  --secondary-foreground: 0 0% 100%;
+  --secondary-foreground: 179 84% 10%;
   --accent: 262 83% 58%;
   --success: 142 71% 45%;
   --warning: 38 92% 50%;
@@ -101,7 +101,7 @@
   --primary: 221 83% 45%;
   --primary-foreground: 0 0% 100%;
   --secondary: 189 94% 43%;
-  --secondary-foreground: 0 0% 100%;
+  --secondary-foreground: 222 47% 11%;
   --accent: 173 80% 40%;
   --success: 142 71% 45%;
   --warning: 38 92% 50%;
@@ -211,7 +211,7 @@
   --primary: 262 83% 48%;
   --primary-foreground: 0 0% 100%;
   --secondary: 173 80% 40%;
-  --secondary-foreground: 0 0% 100%;
+  --secondary-foreground: 179 84% 10%;
   --accent: 330 81% 60%;
   --success: 142 76% 36%;
   --warning: 38 92% 50%;
@@ -317,23 +317,23 @@
 }
 
 [data-theme="kigaliNight"] {
-  --gradient-primary: linear-gradient(135deg, #38bdf8 0%, #9333ea 58%, #f97316 100%);
+  --gradient-primary: linear-gradient(135deg, #0369a1 0%, #7e22ce 58%, #c2410c 100%);
   --gradient-hero: linear-gradient(120deg, #02044a 0%, #071e63 42%, #3b0764 100%);
 }
 
 [data-theme="rwandaSunrise"] {
-  --gradient-primary: linear-gradient(135deg, #0a2c6d 0%, #2563eb 44%, #f97316 100%);
-  --gradient-hero: linear-gradient(120deg, #0a2c6d 0%, #2563eb 36%, #f97316 74%, #facc15 100%);
+  --gradient-primary: linear-gradient(135deg, #0a2c6d 0%, #1d4ed8 44%, #c2410c 100%);
+  --gradient-hero: linear-gradient(120deg, #0a2c6d 0%, #1d4ed8 36%, #c2410c 74%, #a16207 100%);
 }
 
 [data-theme="lakeKivuBlue"] {
-  --gradient-primary: linear-gradient(135deg, #2563eb 0%, #0ea5e9 50%, #14b8a6 100%);
-  --gradient-hero: linear-gradient(120deg, #0a2c6d 0%, #2563eb 38%, #06b6d4 100%);
+  --gradient-primary: linear-gradient(135deg, #1d4ed8 0%, #0369a1 50%, #0f766e 100%);
+  --gradient-hero: linear-gradient(120deg, #0a2c6d 0%, #1d4ed8 38%, #0e7490 100%);
 }
 
 [data-theme="volcanoGreen"] {
-  --gradient-primary: linear-gradient(135deg, #047857 0%, #16a34a 52%, #84cc16 100%);
-  --gradient-hero: linear-gradient(120deg, #064e3b 0%, #15803d 48%, #a3e635 100%);
+  --gradient-primary: linear-gradient(135deg, #065f46 0%, #15803d 52%, #3f6212 100%);
+  --gradient-hero: linear-gradient(120deg, #064e3b 0%, #15803d 48%, #4d7c0f 100%);
 }
 
 [data-theme="savannaGold"] {
@@ -352,13 +352,13 @@
 }
 
 [data-theme="lavenderMist"] {
-  --gradient-primary: linear-gradient(135deg, #7c3aed 0%, #ec4899 100%);
-  --gradient-hero: linear-gradient(120deg, #4338ca 0%, #7c3aed 45%, #ec4899 100%);
+  --gradient-primary: linear-gradient(135deg, #6d28d9 0%, #be185d 100%);
+  --gradient-hero: linear-gradient(120deg, #4338ca 0%, #6d28d9 45%, #be185d 100%);
 }
 
 [data-theme="auroraGlass"] {
-  --gradient-primary: linear-gradient(135deg, #0e7490 0%, #14b8a6 44%, #8b5cf6 100%);
-  --gradient-hero: linear-gradient(120deg, #0f766e 0%, #06b6d4 46%, #8b5cf6 100%);
+  --gradient-primary: linear-gradient(135deg, #0f766e 0%, #0e7490 44%, #6d28d9 100%);
+  --gradient-hero: linear-gradient(120deg, #0f766e 0%, #0e7490 46%, #6d28d9 100%);
 }
 
 [data-theme="graphiteRose"] {

@@ -4,15 +4,41 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Archive, BriefcaseBusiness, Edit3, Eye, ImagePlus, Save, Send, Share2, Trash2, Upload } from "lucide-react";
+import { BriefcaseBusiness, Edit3, Eye, ImagePlus, Save, Send, Share2, Trash2, Upload } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { PriceDisplay } from "@/components/ui/price-display";
-import { type PlatformGigDraft, usePlatformStore } from "@/hooks/use-platform-store";
 
 const defaultGigImage = "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&w=1200&q=85";
+
+type StudioGig = {
+  id?: string;
+  title: string;
+  slug: string;
+  category: string;
+  packageName: string;
+  description: string;
+  price: string;
+  currency?: "USD" | "FRW" | string;
+  deliveryDays: number;
+  revisions: number;
+  ownerId?: string;
+  ownerName?: string;
+  ownerAddress?: string;
+  ownerCity?: string;
+  ownerCountry?: string;
+  image: string;
+  tags: string[];
+  deliverables: string[];
+  rating: number;
+  orders: number;
+  status: "draft" | "submitted" | "changes_requested" | "approved" | "published" | "archived";
+  isVerified?: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
 
 function splitLines(value: string) {
   return value
@@ -26,11 +52,15 @@ function price(value: string) {
   return `$${normalized || "0"}`;
 }
 
+function numericPrice(value: string) {
+  return Number(value.replace(/[^\d.]/g, "")) || 0;
+}
+
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
-function gigScore(gig: PlatformGigDraft) {
+function gigScore(gig: StudioGig) {
   const tagScore = Math.min(30, gig.tags.length * 6);
   const deliveryScore = gig.deliveryDays <= 3 ? 25 : gig.deliveryDays <= 7 ? 18 : 10;
   const revisionScore = Math.min(20, gig.revisions * 5);
@@ -43,20 +73,19 @@ export function FreelancerGigManager({
   freelancerId,
   freelancerName = "MR Creativist Freelancer",
   defaultCity = "Kigali",
-  defaultCountry = "Rwanda"
+  defaultCountry = "Rwanda",
+  initialGigs = []
 }: {
   freelancerId?: string;
   freelancerName?: string;
   defaultCity?: string;
   defaultCountry?: string;
+  initialGigs?: StudioGig[];
 }) {
-  const createGig = usePlatformStore((state) => state.createGig);
-  const updateGig = usePlatformStore((state) => state.updateGig);
-  const updateGigStatus = usePlatformStore((state) => state.updateGigStatus);
-  const deleteGig = usePlatformStore((state) => state.deleteGig);
-  const createdGigs = usePlatformStore((state) => state.createdGigs);
+  const [gigs, setGigs] = useState(initialGigs);
   const [editingSlug, setEditingSlug] = useState("");
   const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState("");
   const [form, setForm] = useState({
     title: "AI course launch landing page",
     category: "AI Automation",
@@ -74,13 +103,14 @@ export function FreelancerGigManager({
     deliverables: "Landing page copy\nOffer structure\nCTA blocks\nLaunch checklist"
   });
 
-  const selectedGig = createdGigs.find((gig) => gig.slug === editingSlug);
-  const publishedCount = createdGigs.filter((gig) => gig.status === "published").length;
-  const averageScore = createdGigs.length
-    ? Math.round(createdGigs.reduce((total, gig) => total + gigScore(gig), 0) / createdGigs.length)
+  const selectedGig = gigs.find((gig) => gig.slug === editingSlug);
+  const publicCount = gigs.filter((gig) => gig.status === "published").length;
+  const reviewCount = gigs.filter((gig) => ["submitted", "approved", "changes_requested"].includes(gig.status)).length;
+  const averageScore = gigs.length
+    ? Math.round(gigs.reduce((total, gig) => total + gigScore(gig), 0) / gigs.length)
     : 0;
 
-  const previewGig = useMemo<PlatformGigDraft>(
+  const previewGig = useMemo<StudioGig>(
     () => ({
       title: form.title,
       slug: editingSlug || "preview",
@@ -90,7 +120,6 @@ export function FreelancerGigManager({
       price: price(form.price),
       deliveryDays: Number(form.deliveryDays) || 1,
       revisions: Number(form.revisions) || 0,
-      freelancer: freelancerName,
       ownerId: freelancerId,
       ownerName: freelancerName,
       ownerAddress: form.ownerAddress,
@@ -102,6 +131,7 @@ export function FreelancerGigManager({
       rating: selectedGig?.rating ?? 5,
       orders: selectedGig?.orders ?? 0,
       status: selectedGig?.status ?? "draft",
+      isVerified: selectedGig?.isVerified,
       createdAt: selectedGig?.createdAt ?? new Date().toISOString(),
       updatedAt: selectedGig?.updatedAt ?? new Date().toISOString()
     }),
@@ -132,14 +162,14 @@ export function FreelancerGigManager({
     });
   }
 
-  function selectGig(gig: PlatformGigDraft) {
+  function selectGig(gig: StudioGig) {
     setEditingSlug(gig.slug);
     setForm({
       title: gig.title,
       category: gig.category,
       packageName: gig.packageName,
       description: gig.description,
-      price: gig.price.replace(/^\$/, ""),
+      price: String(gig.price).replace(/[^\d.]/g, ""),
       deliveryDays: String(gig.deliveryDays),
       revisions: String(gig.revisions),
       image: gig.image,
@@ -152,17 +182,16 @@ export function FreelancerGigManager({
     setMessage(`Editing ${gig.title}.`);
   }
 
-  function save(status: "draft" | "published") {
+  async function save(status: "draft" | "submitted") {
     const payload = {
       title: form.title.trim() || "Freelancer service",
       category: form.category.trim() || "Creative service",
       packageName: form.packageName.trim() || "Standard package",
       description: form.description.trim(),
-      price: price(form.price),
+      price: numericPrice(form.price),
+      currency: "USD",
       deliveryDays: Number(form.deliveryDays) || 1,
       revisions: Number(form.revisions) || 0,
-      freelancer: freelancerName,
-      ownerId: freelancerId,
       ownerName: freelancerName,
       ownerAddress: form.ownerAddress,
       ownerCity: form.ownerCity,
@@ -173,16 +202,71 @@ export function FreelancerGigManager({
       status
     };
 
-    if (editingSlug) {
-      updateGig(editingSlug, payload);
-      updateGigStatus(editingSlug, status);
-      setMessage(status === "published" ? "Gig updated and visible on the public freelancer page." : "Gig draft updated.");
-      return;
-    }
+    setBusy(status);
+    setMessage(status === "submitted" ? "Submitting gig for admin review..." : "Saving gig draft...");
 
-    const slug = createGig(payload);
-    setEditingSlug(slug);
-    setMessage(status === "published" ? "Gig published to the public freelancer page." : "Gig saved as draft.");
+    try {
+      const response = await fetch(editingSlug ? `/api/gigs/${editingSlug}` : "/api/gigs", {
+        method: editingSlug ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const saved = await response.json();
+
+      if (!response.ok) throw new Error(saved.error ?? "Gig save failed.");
+
+      setGigs((current) => {
+        const exists = current.some((gig) => gig.slug === saved.slug);
+        return exists ? current.map((gig) => (gig.slug === saved.slug ? saved : gig)) : [saved, ...current];
+      });
+      setEditingSlug(saved.slug);
+      setMessage(status === "submitted" ? "Gig submitted. Admin can approve, verify, and publish it." : "Gig draft saved.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Gig save failed.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function archiveGig(gig: StudioGig) {
+    if (!window.confirm(`Archive ${gig.title}?`)) return;
+
+    setBusy(`archive:${gig.slug}`);
+    try {
+      const response = await fetch(`/api/gigs/${gig.slug}`, { method: "DELETE" });
+      const payload = await response.json();
+
+      if (!response.ok) throw new Error(payload.error ?? "Gig archive failed.");
+
+      const item = payload.item ?? { ...gig, status: "archived" };
+      setGigs((current) => current.map((row) => (row.slug === gig.slug ? item : row)));
+      setMessage("Gig archived.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Gig archive failed.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function submitExistingGig(gig: StudioGig) {
+    setBusy(`submit:${gig.slug}`);
+    try {
+      const response = await fetch(`/api/gigs/${gig.slug}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "submitted" })
+      });
+      const payload = await response.json();
+
+      if (!response.ok) throw new Error(payload.error ?? "Gig submit failed.");
+
+      setGigs((current) => current.map((row) => (row.slug === gig.slug ? payload : row)));
+      setMessage("Gig submitted for admin review.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Gig submit failed.");
+    } finally {
+      setBusy("");
+    }
   }
 
   function handleImageUpload(file?: File) {
@@ -195,7 +279,7 @@ export function FreelancerGigManager({
     reader.readAsDataURL(file);
   }
 
-  function shareGig(gig: PlatformGigDraft) {
+  function shareGig(gig: StudioGig) {
     const path = `${window.location.origin}/freelancers#${gig.slug}`;
     void navigator.clipboard?.writeText(path);
     setMessage("Public gig link copied.");
@@ -205,8 +289,9 @@ export function FreelancerGigManager({
     <div className="mx-auto w-full max-w-7xl space-y-6">
       <section className="grid gap-4 md:grid-cols-3">
         {[
-          { label: "Total gigs", value: createdGigs.length },
-          { label: "Published", value: publishedCount },
+          { label: "Total gigs", value: gigs.length },
+          { label: "Public", value: publicCount },
+          { label: "Review", value: reviewCount },
           { label: "Quality score", value: `${averageScore}%` }
         ].map((item) => (
           <Card key={item.label}>
@@ -327,11 +412,11 @@ export function FreelancerGigManager({
               </div>
             </div>
             <div className="grid gap-2">
-              <Button onClick={() => save("published")}>
+              <Button onClick={() => void save("submitted")} disabled={busy === "submitted"}>
                 <Send className="size-4" />
-                Publish to freelancer page
+                Submit for review
               </Button>
-              <Button variant="outline" onClick={() => save("draft")}>
+              <Button variant="outline" onClick={() => void save("draft")} disabled={busy === "draft"}>
                 <Save className="size-4" />
                 Save draft
               </Button>
@@ -362,8 +447,8 @@ export function FreelancerGigManager({
               </tr>
             </thead>
             <tbody className="divide-y divide-[hsl(var(--border))]">
-              {createdGigs.length ? (
-                createdGigs.map((gig) => (
+              {gigs.length ? (
+                gigs.map((gig) => (
                   <tr key={gig.slug}>
                     <td className="p-4">
                       <div className="flex items-center gap-3">
@@ -384,10 +469,17 @@ export function FreelancerGigManager({
                           <Edit3 className="size-4" />
                           Edit
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => updateGigStatus(gig.slug, gig.status === "published" ? "draft" : "published")}>
-                          {gig.status === "published" ? <Archive className="size-4" /> : <Send className="size-4" />}
-                          {gig.status === "published" ? "Pause" : "Publish"}
-                        </Button>
+                        {gig.status === "published" ? null : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => void submitExistingGig(gig)}
+                            disabled={busy === `submit:${gig.slug}`}
+                          >
+                            <Send className="size-4" />
+                            Submit
+                          </Button>
+                        )}
                         <Button size="sm" variant="outline" onClick={() => shareGig(gig)}>
                           <Share2 className="size-4" />
                           Share
@@ -398,9 +490,9 @@ export function FreelancerGigManager({
                             Public
                           </Link>
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => deleteGig(gig.slug)}>
+                        <Button size="sm" variant="outline" onClick={() => void archiveGig(gig)} disabled={busy === `archive:${gig.slug}`}>
                           <Trash2 className="size-4" />
-                          Delete
+                          Archive
                         </Button>
                       </div>
                     </td>
@@ -409,7 +501,7 @@ export function FreelancerGigManager({
               ) : (
                 <tr>
                   <td className="p-6 text-center text-[hsl(var(--muted-foreground))]" colSpan={6}>
-                    No gigs yet. Create your first package and publish it to the public freelancer page.
+                    No gigs yet. Create your first package and submit it for admin review.
                   </td>
                 </tr>
               )}

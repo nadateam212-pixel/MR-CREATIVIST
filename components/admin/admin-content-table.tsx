@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Archive, CheckCircle2, Edit3, ExternalLink, Share2, Trash2, X } from "lucide-react";
+import { Archive, BadgeCheck, CheckCircle2, Edit3, ExternalLink, Search, Share2, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,8 @@ export type AdminContentRow = {
   apiPath?: string;
   updateMethod?: "PATCH" | "PUT";
   editFields?: AdminContentField[];
+  isVerified?: boolean;
+  statusActions?: { label: string; status?: string; patch?: Record<string, unknown> }[];
 };
 
 function statusTone(status: string) {
@@ -60,8 +62,22 @@ export function AdminContentTable({
   const [editingId, setEditingId] = useState("");
   const [editForm, setEditForm] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState("");
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const editingRow = rows.find((row) => row.id === editingId);
+  const statuses = useMemo(() => Array.from(new Set(rows.map((row) => row.status))).sort(), [rows]);
+  const visibleRows = useMemo(
+    () =>
+      rows.filter((row) => {
+        const haystack = `${row.title} ${row.subtitle ?? ""} ${row.kind ?? ""} ${row.status}`.toLowerCase();
+        const matchesSearch = !query.trim() || haystack.includes(query.trim().toLowerCase());
+        const matchesStatus = statusFilter === "all" || row.status === statusFilter;
+
+        return matchesSearch && matchesStatus;
+      }),
+    [query, rows, statusFilter]
+  );
 
   function startEdit(row: AdminContentRow) {
     const fields = row.editFields?.length
@@ -75,10 +91,16 @@ export function AdminContentTable({
     setEditForm(Object.fromEntries(fields.map((field) => [field.key, field.value ?? ""])));
   }
 
-  function updateLocalRow(row: AdminContentRow, patch: Record<string, string>) {
-    const nextTitle = patch.title ?? patch.name ?? row.title;
-    const nextSubtitle = patch.category ?? patch.role ?? row.subtitle;
-    const nextStatus = patch.status ?? row.status;
+  function updateLocalRow(row: AdminContentRow, patch: Record<string, unknown>) {
+    const nextTitle = String(patch.title ?? patch.name ?? row.title);
+    const nextSubtitle = patch.category || patch.role ? String(patch.category ?? patch.role) : row.subtitle;
+    const nextStatus = patch.status ? String(patch.status) : row.status;
+    const nextVerified =
+      typeof patch.isVerified === "string"
+        ? patch.isVerified === "true"
+        : typeof patch.isVerified === "boolean"
+          ? patch.isVerified
+          : row.isVerified;
 
     setRows((current) =>
       current.map((item) =>
@@ -88,7 +110,11 @@ export function AdminContentTable({
               title: nextTitle,
               subtitle: nextSubtitle,
               status: nextStatus,
-              editFields: item.editFields?.map((field) => ({ ...field, value: patch[field.key] ?? field.value }))
+              isVerified: nextVerified,
+              editFields: item.editFields?.map((field) => ({
+                ...field,
+                value: patch[field.key] === undefined ? field.value : String(patch[field.key])
+              }))
             }
           : item
       )
@@ -127,25 +153,34 @@ export function AdminContentTable({
     }
   }
 
-  async function updateStatus(row: AdminContentRow, status: string) {
+  async function runAction(row: AdminContentRow, action: { label: string; status?: string; patch?: Record<string, unknown> }) {
     if (!row.apiPath) return;
+
+    const status = action.status ?? row.status;
+    const body: Record<string, unknown> = {
+      ...(action.status ? { status: action.status } : {}),
+      ...(action.patch ?? {})
+    };
 
     setBusy(`${row.id}:${status}`);
     try {
       const response = await fetch(row.apiPath, {
         method: row.updateMethod ?? "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status })
+        body: JSON.stringify(body)
       });
       const payload = await response.json();
 
-      if (!response.ok) throw new Error(payload.error ?? "Status update failed.");
+      if (!response.ok) throw new Error(payload.error ?? "Action failed.");
 
-      const item = payload.item ?? payload;
-      updateLocalRow(row, { status: item.status ?? status });
-      toast.success(`${normalizeStatus(status)} saved.`);
+      const item = (payload.item ?? payload) as { status?: string; isVerified?: boolean };
+      updateLocalRow(row, {
+        status: item.status ?? action.status ?? row.status,
+        isVerified: item.isVerified ?? body.isVerified
+      });
+      toast.success(`${action.label} saved.`);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Status update failed.");
+      toast.error(error instanceof Error ? error.message : "Action failed.");
     } finally {
       setBusy("");
     }
@@ -161,7 +196,7 @@ export function AdminContentTable({
 
       if (!response.ok) throw new Error(payload.error ?? "Archive failed.");
 
-      const item = payload.item ?? {};
+      const item = (payload.item ?? {}) as { status?: string; isVerified?: boolean };
       updateLocalRow(row, { status: item.status ?? "archived" });
       toast.success("Record archived successfully.");
     } catch (error) {
@@ -225,7 +260,33 @@ export function AdminContentTable({
 
       <Card className="overflow-hidden">
         <CardHeader>
-          <CardTitle>{title}</CardTitle>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <CardTitle>{title}</CardTitle>
+            <div className="grid gap-2 sm:grid-cols-[minmax(0,20rem)_12rem]">
+              <label className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" />
+                <Input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  className="pl-9"
+                  placeholder="Search records"
+                />
+              </label>
+              <select
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value)}
+                className="h-10 rounded-md border border-[hsl(var(--border))] bg-transparent px-3 text-sm"
+                aria-label="Filter by status"
+              >
+                <option value="all">All statuses</option>
+                {statuses.map((status) => (
+                  <option key={status} value={status}>
+                    {normalizeStatus(status)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="overflow-x-auto p-0">
           <table className="w-full min-w-[64rem] text-left text-sm">
@@ -238,8 +299,8 @@ export function AdminContentTable({
               </tr>
             </thead>
             <tbody className="divide-y divide-[hsl(var(--border))]">
-              {rows.length ? (
-                rows.map((row) => (
+              {visibleRows.length ? (
+                visibleRows.map((row) => (
                   <tr key={row.id}>
                     <td className="p-4">
                       <p className="font-semibold">{row.title}</p>
@@ -249,7 +310,15 @@ export function AdminContentTable({
                       <Badge>{row.kind ?? "record"}</Badge>
                     </td>
                     <td className="p-4">
-                      <Badge className={statusTone(row.status)}>{normalizeStatus(row.status)}</Badge>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge className={statusTone(row.status)}>{normalizeStatus(row.status)}</Badge>
+                        {row.isVerified ? (
+                          <Badge className="border-sky-500/35 text-sky-500">
+                            <BadgeCheck className="size-3" />
+                            verified
+                          </Badge>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="p-4">
                       <div className="flex flex-wrap justify-end gap-2">
@@ -267,12 +336,20 @@ export function AdminContentTable({
                             Edit
                           </Button>
                         ) : null}
-                        {row.apiPath && row.status !== "published" ? (
-                          <Button size="sm" variant="outline" onClick={() => void updateStatus(row, "published")} disabled={busy === `${row.id}:published`}>
-                            <CheckCircle2 className="size-4" />
-                            Publish
-                          </Button>
-                        ) : null}
+                        {(row.statusActions ?? (row.status !== "published" ? [{ label: "Publish", status: "published" }] : [])).map((action) => (
+                          row.apiPath ? (
+                            <Button
+                              key={`${action.label}:${action.status ?? JSON.stringify(action.patch ?? {})}`}
+                              size="sm"
+                              variant="outline"
+                              onClick={() => void runAction(row, action)}
+                              disabled={busy === `${row.id}:${action.status ?? row.status}` || (Boolean(action.status) && row.status === action.status)}
+                            >
+                              {action.patch?.isVerified ? <BadgeCheck className="size-4" /> : <CheckCircle2 className="size-4" />}
+                              {action.label}
+                            </Button>
+                          ) : null
+                        ))}
                         <Button size="sm" variant="outline" onClick={() => shareRow(row)}>
                           <Share2 className="size-4" />
                           Share
@@ -280,7 +357,7 @@ export function AdminContentTable({
                         {row.apiPath ? (
                           <Button size="sm" variant="outline" onClick={() => void archiveRow(row)} disabled={busy === `${row.id}:archive`}>
                             {row.status === "archived" ? <Archive className="size-4" /> : <Trash2 className="size-4" />}
-                            Archive
+                            {row.status === "archived" ? "Archived" : "Delete"}
                           </Button>
                         ) : null}
                       </div>

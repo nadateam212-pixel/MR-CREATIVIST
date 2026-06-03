@@ -19,8 +19,14 @@ const ProductSchema = new mongoose.Schema(
     delivery: { type: String, required: true },
     tools: [{ type: String, maxlength: 120 }],
     tags: [{ type: String, lowercase: true, trim: true }],
-    status: { type: String, enum: ["draft", "published", "archived"], default: "draft", index: true },
-    isFeatured: { type: Boolean, default: false }
+    status: {
+      type: String,
+      enum: ["draft", "submitted", "changes_requested", "approved", "published", "archived"],
+      default: "draft",
+      index: true
+    },
+    isFeatured: { type: Boolean, default: false },
+    isVerified: { type: Boolean, default: false }
   },
   { timestamps: true }
 );

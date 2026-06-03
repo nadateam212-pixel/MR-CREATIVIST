@@ -14,7 +14,7 @@ export default async function AdminUsersPage() {
 
   const [users, applications] = await Promise.all([
     User.find({})
-      .select("name email role validatedRoles accountStatus createdAt")
+      .select("name email role validatedRoles accountStatus isVerified createdAt")
       .sort({ createdAt: -1 })
       .limit(100)
       .lean(),
@@ -28,7 +28,8 @@ export default async function AdminUsersPage() {
           ...user,
           id: String(user._id),
           validatedRoles: user.validatedRoles ?? ["client"],
-          accountStatus: user.accountStatus ?? "active"
+          accountStatus: user.accountStatus ?? "active",
+          isVerified: Boolean(user.isVerified)
         }))
       )}
       initialApplications={clean(

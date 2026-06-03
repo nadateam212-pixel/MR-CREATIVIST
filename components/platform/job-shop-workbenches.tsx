@@ -5,6 +5,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import {
+  BadgeCheck,
   BriefcaseBusiness,
   CalendarDays,
   CheckCircle2,
@@ -92,6 +93,7 @@ export type PublicShopProfile = {
   rating?: number;
   status?: string;
   isFeatured?: boolean;
+  isVerified?: boolean;
 };
 
 function splitList(value: string) {
@@ -116,12 +118,6 @@ function money(min = 0, max = 0, currency = "USD", targetCurrency: SupportedCurr
   return "Salary available on request";
 }
 
-function offerPrice(price = 0, currency = "USD", targetCurrency: SupportedCurrency = "USD", usdToFrw?: number) {
-  if (!price) return "Custom quote";
-
-  return formatConvertedAmount(price, supportedCurrency(currency), targetCurrency, usdToFrw);
-}
-
 function statusTone(status?: string) {
   if (status === "published") return "border-[hsl(var(--primary))]/35 text-[hsl(var(--primary))]";
   if (status === "closed" || status === "archived") return "border-red-500/35 text-red-500";
@@ -141,14 +137,12 @@ export function JobsDirectory({ jobs }: { jobs: PublicJobPost[] }) {
 
   return (
     <div className="space-y-8">
-      <section className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5 text-[hsl(var(--foreground))]">
+      <section className="flex flex-col gap-3 text-[hsl(var(--foreground))] sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-sm font-black uppercase tracking-[0.18em] text-[hsl(var(--primary))]">Jobs</p>
-          <h1 className="mt-3 text-4xl font-black tracking-tight sm:text-6xl">Find creative, AI, media and digital work</h1>
-          <p className="mt-4 max-w-3xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-            Explore published opportunities from MR Creativist partners, platform sellers, creators and companies.
-          </p>
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-[hsl(var(--primary))]">Jobs</p>
+          <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">Open work</h1>
         </div>
+        <Badge>{filtered.length} live</Badge>
       </section>
 
       <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
@@ -179,7 +173,7 @@ export function JobsDirectory({ jobs }: { jobs: PublicJobPost[] }) {
           filtered.map((job) => (
             <Card key={job.slug} className="overflow-hidden">
               <CardHeader>
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="grid gap-4 sm:grid-cols-[1fr_12rem] sm:items-start">
                   <div>
                     <div className="flex flex-wrap gap-2">
                       <Badge>{job.category}</Badge>
@@ -191,9 +185,13 @@ export function JobsDirectory({ jobs }: { jobs: PublicJobPost[] }) {
                     <p className="mt-2 text-sm font-semibold text-[hsl(var(--muted-foreground))]">{job.companyName}</p>
                   </div>
                   {job.companyLogo ? (
-                    <img src={job.companyLogo} alt={`${job.companyName} logo`} className="size-12 shrink-0 rounded-md bg-white object-contain p-1" />
+                    <div className="h-28 overflow-hidden rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--muted))] sm:h-32">
+                      <img src={job.companyLogo} alt={`${job.companyName} logo`} className="h-full w-full object-cover" />
+                    </div>
                   ) : (
-                    <BriefcaseBusiness className="size-7 shrink-0 text-[hsl(var(--primary))]" />
+                    <div className="flex h-28 items-center justify-center rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--muted))] sm:h-32">
+                      <BriefcaseBusiness className="size-10 text-[hsl(var(--primary))]" />
+                    </div>
                   )}
                 </div>
               </CardHeader>
@@ -329,7 +327,6 @@ export function JobsDirectory({ jobs }: { jobs: PublicJobPost[] }) {
 
 export function ShopDirectory({ shops, showHeader = true }: { shops: PublicShopProfile[]; showHeader?: boolean }) {
   const [query, setQuery] = useState("");
-  const preferences = useUserPreferences();
   const filtered = shops.filter((shop) => {
     const target = `${shop.name} ${shop.category} ${shop.city} ${shop.country} ${(shop.tags ?? []).join(" ")}`.toLowerCase();
     return target.includes(query.toLowerCase());
@@ -338,13 +335,10 @@ export function ShopDirectory({ shops, showHeader = true }: { shops: PublicShopP
   return (
     <div className="space-y-8">
       {showHeader ? (
-        <section className="grid gap-5 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5 text-[hsl(var(--foreground))] lg:grid-cols-[1fr_auto] lg:items-end">
+        <section className="flex flex-col gap-3 text-[hsl(var(--foreground))] sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-sm font-black uppercase tracking-[0.18em] text-[hsl(var(--primary))]">Business Directory</p>
-            <h1 className="mt-3 text-4xl font-black tracking-tight sm:text-6xl">Discover verified businesses, products and services</h1>
-            <p className="mt-4 max-w-3xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-              Sellers can publish complete business profiles with logos, contact details, working hours, products, services and direct messaging.
-            </p>
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-[hsl(var(--primary))]">Businesses</p>
+            <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">Listed businesses</h1>
           </div>
           <Button asChild>
             <Link href="/seller/shop">
@@ -369,7 +363,10 @@ export function ShopDirectory({ shops, showHeader = true }: { shops: PublicShopP
                 <div className="absolute inset-x-0 bottom-0 flex items-end gap-3 bg-gradient-to-t from-slate-950 p-4 text-white">
                   <img src={shop.logo || "/icons/logo.png"} alt={`${shop.name} logo`} className="size-14 rounded-md bg-white object-contain p-1" />
                   <div className="min-w-0">
-                    <p className="truncate text-lg font-black">{shop.name}</p>
+                    <p className="flex min-w-0 items-center gap-2 text-lg font-black">
+                      <span className="truncate">{shop.name}</span>
+                      {shop.isVerified ? <BadgeCheck className="size-4 shrink-0 text-sky-300" aria-label="Verified business" /> : null}
+                    </p>
                     <p className="truncate text-xs font-bold uppercase tracking-[0.14em] text-white/80">{shop.category}</p>
                   </div>
                 </div>
@@ -377,6 +374,12 @@ export function ShopDirectory({ shops, showHeader = true }: { shops: PublicShopP
               <CardContent className="space-y-5 p-5">
                 <div className="flex flex-wrap gap-2">
                   {shop.isFeatured ? <Badge className="border-[hsl(var(--primary))]/50 text-[hsl(var(--primary))]">Featured</Badge> : null}
+                  {shop.isVerified ? (
+                    <Badge className="border-sky-500/45 text-sky-500">
+                      <BadgeCheck className="mr-1 size-3" />
+                      Verified
+                    </Badge>
+                  ) : null}
                   <Badge>
                     <Star className="mr-1 size-3 fill-current" />
                     {(shop.rating ?? 0).toFixed(1)}
@@ -408,23 +411,7 @@ export function ShopDirectory({ shops, showHeader = true }: { shops: PublicShopP
                     </a>
                   ) : null}
                 </div>
-                <div className="grid gap-2">
-                  {(shop.productsOrServices ?? []).slice(0, 3).map((offer) => (
-                    <div key={`${shop.slug}-${offer.name}`} className="grid grid-cols-[3.25rem_1fr] gap-3 rounded-md border border-[hsl(var(--border))] p-3 text-sm">
-                      <img src={offer.image || shop.logo || "/icons/logo.png"} alt="" className="size-12 rounded-md bg-white object-cover" />
-                      <div>
-                        <div className="flex items-start justify-between gap-3">
-                          <span className="font-semibold">{offer.name}</span>
-                          <Badge>{offer.type}</Badge>
-                        </div>
-                        <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
-                          {offerPrice(offer.price, offer.currency, preferences.currency, preferences.usdToFrw)}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {shop.ownerId ? (
                     <Button asChild size="sm" className="h-9 min-w-0 gap-1 px-2 text-xs font-semibold">
                       <Link href={`/messages/${shop.ownerId}`} className="whitespace-nowrap">
@@ -763,7 +750,7 @@ export function ShopBuilder({ initialShops = [], sellerName = "MR Creativist Sel
     openingHours: "Monday to Friday, 9:00 - 17:00",
     tags: "AI tools\nDesign\nDigital products\nServices",
     offers: "Brand identity kit|Service|250|USD|Logo, colors, social templates and handoff files|https://images.unsplash.com/photo-1523726491678-bf852e717f6a?auto=format&fit=crop&w=600&q=85\nAI prompt pack|Product|49|USD|Reusable prompts for content, products and workflows|https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop&w=600&q=85",
-    status: "published"
+    status: "submitted"
   };
   const [form, setForm] = useState(emptyShopForm);
   const [editingShopId, setEditingShopId] = useState<string | null>(null);
@@ -798,7 +785,7 @@ export function ShopBuilder({ initialShops = [], sellerName = "MR Creativist Sel
       openingHours: shop.openingHours ?? "",
       tags: (shop.tags ?? []).join("\n"),
       offers: offersToText(shop),
-      status: shop.status ?? "published"
+      status: shop.status ?? "submitted"
     });
     setMessage(`Editing ${shop.name}.`);
   }
@@ -863,7 +850,7 @@ export function ShopBuilder({ initialShops = [], sellerName = "MR Creativist Sel
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setMessage(editingShopId ? "Saving business..." : "Publishing business...");
+    setMessage(editingShopId ? "Saving business..." : "Submitting business for admin review...");
 
     try {
       const response = await fetch(editingShopId ? `/api/shops/${editingShopId}` : "/api/shops", {
@@ -886,7 +873,7 @@ export function ShopBuilder({ initialShops = [], sellerName = "MR Creativist Sel
           : [payload, ...current]
       );
       setEditingShopId(null);
-      const nextMessage = editingShopId ? "Business updated on the public business page." : "Business published to the public business page.";
+      const nextMessage = editingShopId ? "Business updated and returned to review." : "Business submitted. Admin can approve, verify, and publish it.";
       setMessage(nextMessage);
       toast.success(nextMessage);
     } catch (error) {
@@ -997,7 +984,7 @@ export function ShopBuilder({ initialShops = [], sellerName = "MR Creativist Sel
 
       <Card>
         <CardHeader>
-          <CardTitle>Business records</CardTitle>
+      <CardTitle>Business records</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3">
           {shops.map((shop) => (
@@ -1034,13 +1021,13 @@ export function ShopBuilder({ initialShops = [], sellerName = "MR Creativist Sel
           {shops.length === 0 ? (
             <div className="rounded-md border border-dashed border-[hsl(var(--border))] p-8 text-center">
               <Sparkles className="mx-auto mb-3 size-6 text-[hsl(var(--primary))]" />
-              <p className="text-sm text-[hsl(var(--muted-foreground))]">Create your first business listing to appear on the public businesses page.</p>
+              <p className="text-sm text-[hsl(var(--muted-foreground))]">Create your first business listing and submit it for admin review.</p>
             </div>
           ) : null}
-          {message.includes("published") ? (
+          {message.includes("submitted") ? (
             <div className="rounded-md border border-[hsl(var(--primary))]/30 p-4 text-sm text-[hsl(var(--primary))]">
               <CheckCircle2 className="mr-2 inline size-4" />
-              Public business page is ready.
+              Business is waiting for admin review.
             </div>
           ) : null}
         </CardContent>

@@ -22,11 +22,17 @@ export async function GET(_: Request, context: { params: Promise<{ courseId: str
 export async function PUT(request: Request, context: { params: Promise<{ courseId: string }> }) {
   try {
     await requireMongo();
-    await requireRole(request, ["admin", "instructor"]);
+    const session = await requireRole(request, ["admin", "instructor"]);
 
     const { courseId } = await context.params;
     const existing = await Course.findOne(mongoIdOrSlug(courseId));
     if (!existing) return jsonOk({ error: "Course not found." }, 404);
+    const isAdmin = session.user.role === "admin";
+    const ownsCourse = existing.instructorId && String(existing.instructorId) === String(session.user.id);
+
+    if (!isAdmin && !ownsCourse) {
+      return jsonOk({ error: "You can only manage courses created by your Studio account." }, 403);
+    }
 
     const body = courseSchema.partial().parse(await readJson(request));
     const patch = { ...body };
@@ -45,14 +51,23 @@ export async function PUT(request: Request, context: { params: Promise<{ courseI
 export async function DELETE(request: Request, context: { params: Promise<{ courseId: string }> }) {
   try {
     await requireMongo();
-    await requireRole(request, ["admin", "instructor"]);
+    const session = await requireRole(request, ["admin", "instructor"]);
 
     const { courseId } = await context.params;
-    const course = await Course.findOneAndUpdate(mongoIdOrSlug(courseId), { status: "archived" }, { returnDocument: "after" });
+    const existing = await Course.findOne(mongoIdOrSlug(courseId));
 
-    if (!course) {
+    if (!existing) {
       return jsonOk({ error: "Course not found." }, 404);
     }
+
+    const isAdmin = session.user.role === "admin";
+    const ownsCourse = existing.instructorId && String(existing.instructorId) === String(session.user.id);
+
+    if (!isAdmin && !ownsCourse) {
+      return jsonOk({ error: "You can only archive courses created by your Studio account." }, 403);
+    }
+
+    const course = await Course.findByIdAndUpdate(existing._id, { status: "archived" }, { returnDocument: "after" });
 
     return jsonOk({ ok: true, item: normalizeCourse(course) });
   } catch (error) {

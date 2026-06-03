@@ -388,7 +388,7 @@ function mergeMetric(metric: MetricConfig, live?: { value?: string; trend?: stri
 
 function resolveRole(role: DashboardRole, activeRole?: string): DashboardRole {
   if (role !== "user") return role;
-  if (activeRole === "client" || activeRole === "student") return activeRole;
+  void activeRole;
   return "user";
 }
 
@@ -409,6 +409,140 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T) {
   }
 }
 
+function NormalDashboard({ metrics }: { metrics: MetricConfig[] }) {
+  const progressBars = [
+    { label: "Learning", value: 62 },
+    { label: "Orders", value: 48 },
+    { label: "Downloads", value: 70 },
+    { label: "Certificates", value: 28 }
+  ];
+
+  return (
+    <div className="mx-auto w-full max-w-7xl space-y-6">
+      <section className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5 shadow-sm sm:p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <Badge className="border-[hsl(var(--primary))]/35 text-[hsl(var(--primary))]">Account</Badge>
+            <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">Dashboard</h1>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild>
+              <Link href="/dashboard/my-courses">My courses</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/dashboard/orders">Orders</Link>
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {metrics.map((metric) => {
+          const Icon = metric.icon;
+
+          return (
+            <Card key={metric.label}>
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-sm font-semibold text-[hsl(var(--muted-foreground))]">{metric.label}</p>
+                  <Icon className="size-5 text-[hsl(var(--primary))]" />
+                </div>
+                {isMoneyValue(metric.value) ? (
+                  <PriceDisplay price={metric.value} className="mt-4 text-2xl tracking-tight" />
+                ) : (
+                  <p className="mt-4 text-2xl font-black tracking-tight">{metric.value}</p>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
+      </section>
+
+      <section className="grid gap-5 xl:grid-cols-[1fr_22rem]">
+        <Card>
+          <CardHeader>
+            <CardTitle>Quick Tools</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {learnerTools.slice(0, 8).map((tool) => {
+              const Icon = tool.icon;
+
+              return (
+                <Button key={tool.href} asChild variant="outline" className="h-auto justify-start p-4">
+                  <Link href={tool.href}>
+                    <Icon className="size-4 text-[hsl(var(--primary))]" />
+                    {tool.label}
+                  </Link>
+                </Button>
+              );
+            })}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Activity</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4">
+            {progressBars.map((item) => (
+              <div key={item.label}>
+                <div className="mb-2 flex items-center justify-between text-sm font-semibold">
+                  <span>{item.label}</span>
+                  <span>{item.value}%</span>
+                </div>
+                <div className="h-3 overflow-hidden rounded-full bg-[hsl(var(--muted))]">
+                  <span className="block h-full rounded-full bg-[hsl(var(--primary))]" style={{ width: `${item.value}%` }} />
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid gap-5 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Account Mix</CardTitle>
+          </CardHeader>
+          <CardContent className="flex items-center gap-5">
+            <div
+              className="size-32 shrink-0 rounded-full"
+              style={{
+                background:
+                  "conic-gradient(hsl(var(--primary)) 0 45%, #22c55e 45% 68%, #f59e0b 68% 84%, #8b5cf6 84% 100%)"
+              }}
+            />
+            <div className="grid gap-2 text-sm font-semibold text-[hsl(var(--muted-foreground))]">
+              <span>Courses 45%</span>
+              <span>Downloads 23%</span>
+              <span>Orders 16%</span>
+              <span>Support 16%</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Next Steps</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-2">
+            {[
+              { label: "Continue learning", href: "/dashboard/my-courses" },
+              { label: "Open certificates", href: "/dashboard/certificates" },
+              { label: "Download files", href: "/dashboard/downloads" },
+              { label: "Update settings", href: "/settings" }
+            ].map((item) => (
+              <Button key={item.href} asChild variant="outline" className="justify-start">
+                <Link href={item.href}>{item.label}</Link>
+              </Button>
+            ))}
+          </CardContent>
+        </Card>
+      </section>
+    </div>
+  );
+}
+
 export async function PlatformDashboard({ role }: { role: DashboardRole }) {
   const session = await auth().catch(() => null);
   const resolvedRole = resolveRole(role, session?.user?.role);
@@ -418,6 +552,10 @@ export async function PlatformDashboard({ role }: { role: DashboardRole }) {
     : null;
   const liveMetrics = (live?.metrics ?? {}) as Record<string, { value?: string; trend?: string }>;
   const metrics = config.metrics.map((metric) => mergeMetric(metric, liveMetrics[metric.label]));
+
+  if (resolvedRole === "user") {
+    return <NormalDashboard metrics={metrics} />;
+  }
 
   return (
     <div className="space-y-8">

@@ -85,14 +85,11 @@ export function GlobalSearchResults({ initialQuery = "" }: { initialQuery?: stri
   }, [submittedQuery]);
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
-      <section className="grid gap-5 border-b border-[hsl(var(--border))] pb-8">
+    <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6">
+      <section className="grid gap-4 border-b border-[hsl(var(--border))] pb-5">
         <div>
-          <p className="text-sm font-black uppercase tracking-[0.18em] text-[hsl(var(--primary))]">Global search</p>
-          <h1 className="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">Search everything on MR Creativist</h1>
-          <p className="mt-4 max-w-3xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-            Courses, products, jobs, businesses, freelancers, consulting, blog posts, and AI tools are searched together.
-          </p>
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-[hsl(var(--primary))]">Search</p>
+          <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">Platform records</h1>
         </div>
         <form
           className="grid gap-3 sm:grid-cols-[1fr_auto]"

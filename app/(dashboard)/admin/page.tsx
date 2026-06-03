@@ -1,10 +1,5 @@
-import type { Metadata } from "next";
-import { PlatformDashboard } from "@/components/platform/platform-dashboard";
-
-export const metadata: Metadata = {
-  title: "Admin Dashboard"
-};
+import { redirect } from "next/navigation";
 
 export default function AdminDashboardIndexPage() {
-  return <PlatformDashboard role="admin" />;
+  redirect("/admin/dashboard");
 }

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Archive, CheckCircle2, ExternalLink, MessageSquare, Share2, ShieldOff, UserRound } from "lucide-react";
+import { Archive, BadgeCheck, CheckCircle2, ExternalLink, MessageSquare, Share2, ShieldOff, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,11 +15,13 @@ export type AdminPersonRow = {
   email?: string;
   role: string;
   title?: string;
-  status: "active" | "review" | "suspended" | "draft" | "published" | "archived";
+  status: "active" | "review" | "suspended" | "draft" | "submitted" | "changes_requested" | "approved" | "published" | "archived";
+  isVerified?: boolean;
   metric?: string;
   href?: string;
   publicHref?: string;
   archivePath?: string;
+  updatePath?: string;
 };
 
 function statusTone(status: string) {
@@ -86,6 +88,32 @@ export function AdminPeopleManager({
     }
   }
 
+  async function updateProfile(row: AdminPersonRow, patch: Record<string, unknown>, label: string) {
+    if (!row.updatePath) return;
+
+    setBusy(`${row.id}:${label}`);
+    try {
+      const response = await fetch(row.updatePath, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch)
+      });
+      const payload = await response.json();
+
+      if (!response.ok) throw new Error(payload.error ?? `${label} failed.`);
+
+      updateRow(row.id, {
+        status: payload.status ?? payload.item?.status ?? (typeof patch.status === "string" ? patch.status : row.status),
+        isVerified: Boolean(payload.isVerified ?? payload.item?.isVerified ?? patch.isVerified ?? row.isVerified)
+      });
+      toast.success(`${label} saved.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : `${label} failed.`);
+    } finally {
+      setBusy("");
+    }
+  }
+
   function sharePerson(row: AdminPersonRow) {
     const text = `${row.name} - ${row.title ?? row.role} - ${row.publicHref ?? row.href ?? ""}`;
     void navigator.clipboard?.writeText(text);
@@ -127,7 +155,15 @@ export function AdminPeopleManager({
                     <Badge>{row.role}</Badge>
                   </td>
                   <td className="p-4">
-                    <Badge className={statusTone(row.status)}>{row.status}</Badge>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge className={statusTone(row.status)}>{row.status}</Badge>
+                      {row.isVerified ? (
+                        <Badge className="border-sky-500/35 text-sky-500">
+                          <BadgeCheck className="size-3" />
+                          verified
+                        </Badge>
+                      ) : null}
+                    </div>
                   </td>
                   <td className="p-4 text-[hsl(var(--muted-foreground))]">{row.metric ?? "Ready"}</td>
                   <td className="p-4">
@@ -155,6 +191,18 @@ export function AdminPeopleManager({
                             Message
                           </Link>
                         </Button>
+                      ) : null}
+                      {row.updatePath ? (
+                        <>
+                          <Button size="sm" variant="outline" onClick={() => void updateProfile(row, { status: "published" }, "Publish")} disabled={busy === `${row.id}:Publish` || row.status === "published"}>
+                            <CheckCircle2 className="size-4" />
+                            Publish
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => void updateProfile(row, { isVerified: true }, "Verify")} disabled={busy === `${row.id}:Verify` || row.isVerified}>
+                            <BadgeCheck className="size-4" />
+                            Verify
+                          </Button>
+                        </>
                       ) : null}
                       {row.userId ? (
                         row.status === "suspended" ? (

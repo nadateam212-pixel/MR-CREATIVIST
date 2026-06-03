@@ -113,7 +113,6 @@ export function ProfileSettingsForm({ initialProfile }: { initialProfile: Editab
               )}
             </div>
             <div className="grid flex-1 gap-2">
-              <Input value={form.profileImage} onChange={(event) => setField("profileImage", event.target.value)} placeholder="Profile picture URL" />
               <label className="flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-[hsl(var(--border))] px-3 text-sm font-semibold text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]/40">
                 {uploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
                 {uploading ? "Uploading picture..." : "Upload profile picture"}

@@ -23,7 +23,13 @@ const ConsultingServiceSchema = new mongoose.Schema(
     availability: [{ day: String, slots: [String] }],
     rating: { type: Number, min: 0, max: 5, default: 0 },
     heroImage: { type: String, required: true },
-    status: { type: String, enum: ["draft", "published", "archived"], default: "published", index: true }
+    status: {
+      type: String,
+      enum: ["draft", "submitted", "changes_requested", "approved", "published", "archived"],
+      default: "draft",
+      index: true
+    },
+    isVerified: { type: Boolean, default: false }
   },
   { timestamps: true }
 );

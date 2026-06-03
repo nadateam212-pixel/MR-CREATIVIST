@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Bot, Loader2, Send, Sparkles } from "lucide-react";
+import { Bot, Loader2, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -11,10 +11,10 @@ type SupportMessage = {
 };
 
 const quickPrompts = [
-  "I need help with my account role or validation.",
-  "How do I publish my business listing?",
-  "I need help with a course, certificate, or payment.",
-  "I want to contact a freelancer or seller."
+  "Account validation",
+  "Publish business listing",
+  "Course or payment",
+  "Contact freelancer"
 ];
 
 export function SupportAgent() {
@@ -23,8 +23,7 @@ export function SupportAgent() {
   const [messages, setMessages] = useState<SupportMessage[]>([
     {
       role: "agent",
-      content:
-        "Hello. I am the MR Creativist support agent. Tell me what you need help with and I will guide you to the right page, action, or next step."
+      content: "Tell me what you need help with."
     }
   ]);
   const [draft, setDraft] = useState("");
@@ -79,7 +78,6 @@ export function SupportAgent() {
           </span>
           <div>
             <CardTitle>AI agent support</CardTitle>
-            <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Ask about accounts, courses, jobs, businesses, marketplace, payments or messages.</p>
           </div>
         </div>
       </CardHeader>
@@ -131,16 +129,11 @@ export function SupportAgent() {
             placeholder="Write your support question..."
             className="min-h-24 rounded-md border border-[hsl(var(--border))] bg-transparent p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
           />
-          <Button type="submit" disabled={loading || !draft.trim()} className="min-h-24">
+          <Button type="submit" disabled={loading || !draft.trim()} className="h-12 sm:min-h-24">
             {loading ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
             Send
           </Button>
         </form>
-
-        <p className="flex items-center gap-2 text-xs text-[hsl(var(--muted-foreground))]">
-          <Sparkles className="size-3.5 text-[hsl(var(--primary))]" />
-          Continued questions stay in the same support conversation while you remain on this page.
-        </p>
       </CardContent>
     </Card>
   );

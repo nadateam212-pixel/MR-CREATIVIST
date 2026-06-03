@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { auth } from "@/auth";
-import { InstructorCourseStudio } from "@/components/platform/creator-workbenches";
+import { EasyCoursePublisher } from "@/components/platform/easy-course-publisher";
 
 export const metadata: Metadata = {
   title: "Create Course"
@@ -9,5 +9,5 @@ export const metadata: Metadata = {
 export default async function CreateCoursePage() {
   const session = await auth();
 
-  return <InstructorCourseStudio instructorName={session?.user?.name ?? "MR Creativist Instructor"} />;
+  return <EasyCoursePublisher instructorName={session?.user?.name ?? "MR Creativist Instructor"} />;
 }

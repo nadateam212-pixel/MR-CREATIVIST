@@ -36,6 +36,10 @@ export default async function CoursePlayerPage({ params }: { params: Promise<{ c
     );
   }
 
+  if (!snapshot.enrolled && !snapshot.isCourseManager) {
+    redirect(`/courses/${course.slug ?? courseId}/enroll`);
+  }
+
   return (
     <CourseLearningWorkspace
       course={course}

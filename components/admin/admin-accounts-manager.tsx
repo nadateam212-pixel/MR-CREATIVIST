@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, CheckCircle2, ExternalLink, FileCheck2, MessageSquare, Share2, ShieldCheck, ShieldOff, Users, XCircle } from "lucide-react";
+import { ArrowRight, BadgeCheck, CheckCircle2, ExternalLink, FileCheck2, MessageSquare, Share2, ShieldCheck, ShieldOff, Users, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ type AdminUser = {
   role: PlatformRole;
   validatedRoles: PlatformRole[];
   accountStatus: "active" | "review" | "suspended";
+  isVerified?: boolean;
   createdAt?: string;
 };
 
@@ -58,6 +59,7 @@ function formatDate(value?: string) {
 function UserRoleRow({ user, onSave }: { user: AdminUser; onSave: (user: AdminUser) => void }) {
   const [activeRole, setActiveRole] = useState<PlatformRole>(user.role);
   const [accountStatus, setAccountStatus] = useState(user.accountStatus);
+  const [isVerified, setIsVerified] = useState(Boolean(user.isVerified));
   const [validatedRoles, setValidatedRoles] = useState<PlatformRole[]>(user.validatedRoles?.length ? user.validatedRoles : ["client"]);
   const [saving, setSaving] = useState(false);
 
@@ -67,13 +69,13 @@ function UserRoleRow({ user, onSave }: { user: AdminUser; onSave: (user: AdminUs
     );
   }
 
-  async function save(nextStatus = accountStatus) {
+  async function save(nextStatus = accountStatus, verifiedOverride = isVerified) {
     setSaving(true);
     try {
       const response = await fetch(`/api/admin/users/${user.id}/roles`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: activeRole, validatedRoles, accountStatus: nextStatus })
+        body: JSON.stringify({ role: activeRole, validatedRoles, accountStatus: nextStatus, isVerified: verifiedOverride })
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "User update failed.");
@@ -83,8 +85,10 @@ function UserRoleRow({ user, onSave }: { user: AdminUser; onSave: (user: AdminUs
         ...user,
         role: payload.user.role,
         validatedRoles: payload.user.validatedRoles ?? [],
-        accountStatus: payload.user.accountStatus ?? nextStatus
+        accountStatus: payload.user.accountStatus ?? nextStatus,
+        isVerified: Boolean(payload.user.isVerified)
       });
+      setIsVerified(Boolean(payload.user.isVerified));
       toast.success("User controls saved.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "User update failed.");
@@ -116,6 +120,10 @@ function UserRoleRow({ user, onSave }: { user: AdminUser; onSave: (user: AdminUs
             </option>
           ))}
         </select>
+        <label className="mt-2 inline-flex items-center gap-2 text-xs font-semibold">
+          <input type="checkbox" checked={isVerified} onChange={(event) => setIsVerified(event.target.checked)} />
+          Verified badge
+        </label>
       </td>
       <td className="p-4">
         <select
@@ -144,6 +152,10 @@ function UserRoleRow({ user, onSave }: { user: AdminUser; onSave: (user: AdminUs
         <div className="flex flex-wrap justify-end gap-2">
           <Button size="sm" onClick={() => void save()} disabled={saving || validatedRoles.length === 0}>
             Save
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => void save(accountStatus, true)} disabled={saving}>
+            <BadgeCheck className="size-4" />
+            Verify
           </Button>
           <Button asChild size="sm" variant="outline">
             <Link href={`/messages/${user.id}`}>

@@ -12,12 +12,14 @@ import {
   Boxes,
   BriefcaseBusiness,
   CalendarDays,
-  CircleDollarSign,
+  Bell,
+  ChevronDown,
   CreditCard,
   GraduationCap,
   Headphones,
   Home,
   LayoutDashboard,
+  LogOut,
   MessageSquare,
   Newspaper,
   Package,
@@ -27,65 +29,37 @@ import {
   ShoppingBag,
   Sparkles,
   Upload,
+  UserRound,
   Users,
   Wallet
 } from "lucide-react";
 import { logoutAction } from "@/app/(dashboard)/actions";
 import { Button } from "@/components/ui/button";
 import { ModeToggle } from "@/components/mode-toggle";
-import { AccountSwitcher } from "@/components/account/account-switcher";
 import { SidebarNav } from "@/components/layout/sidebar-nav";
 import type { NavItem } from "@/types";
 
-const userNavItems: NavItem[] = [
-  { href: "/dashboard", label: "User overview", icon: LayoutDashboard },
+const normalNavItems: NavItem[] = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard/my-courses", label: "My courses", icon: BookOpen },
-  { href: "/dashboard/wallet", label: "Wallet", icon: Wallet },
-  { href: "/dashboard/referrals", label: "Referrals", icon: Sparkles },
-  { href: "/dashboard/orders", label: "Orders", icon: ReceiptText },
-  { href: "/dashboard/downloads", label: "Downloads", icon: Package },
   { href: "/dashboard/certificates", label: "Certificates", icon: Award },
-  { href: "/dashboard/support", label: "Support", icon: Headphones }
+  { href: "/dashboard/downloads", label: "Downloads", icon: Package },
+  { href: "/dashboard/orders", label: "Orders", icon: ReceiptText },
+  { href: "/dashboard/wallet", label: "Wallet", icon: Wallet },
+  { href: "/profile", label: "Profile", icon: Users }
 ];
 
-const sellerNavItems: NavItem[] = [
-  { href: "/seller", label: "Seller overview", icon: ShoppingBag },
-  { href: "/seller/shop", label: "Business profile", icon: ShoppingBag },
+const studioNavItems: NavItem[] = [
+  { href: "/studio", label: "MrC. Studio", icon: Sparkles },
+  { href: "/instructor/courses/create", label: "Create course", icon: GraduationCap },
+  { href: "/instructor/courses", label: "Courses", icon: BookOpen },
   { href: "/seller/products", label: "Products", icon: Package },
   { href: "/seller/products/create", label: "Add product", icon: Boxes },
-  { href: "/seller/orders", label: "Orders", icon: ReceiptText },
-  { href: "/seller/inventory", label: "Inventory", icon: Boxes },
-  { href: "/seller/coupons", label: "Discounts", icon: CircleDollarSign },
-  { href: "/seller/reviews", label: "Reviews", icon: MessageSquare },
-  { href: "/seller/payouts", label: "Payouts", icon: Wallet }
-];
-
-const instructorNavItems: NavItem[] = [
-  { href: "/instructor", label: "Instructor overview", icon: GraduationCap },
-  { href: "/instructor/courses", label: "Courses", icon: BookOpen },
-  { href: "/instructor/courses/create", label: "Create course", icon: Sparkles },
+  { href: "/seller/shop", label: "Business", icon: ShoppingBag },
+  { href: "/freelancer/gigs", label: "Gigs", icon: BriefcaseBusiness },
+  { href: "/consultant/profile", label: "Consulting", icon: CalendarDays },
   { href: "/instructor/resources", label: "Uploads", icon: Upload },
-  { href: "/instructor/assignments", label: "Tests", icon: ShieldCheck },
-  { href: "/instructor/students", label: "Students", icon: Users },
-  { href: "/instructor/certificates", label: "Certificates", icon: Award },
   { href: "/instructor/earnings", label: "Earnings", icon: Wallet }
-];
-
-const consultantNavItems: NavItem[] = [
-  { href: "/consultant", label: "Consultant overview", icon: CalendarDays },
-  { href: "/consultant/sessions", label: "Sessions", icon: MessageSquare },
-  { href: "/consultant/schedule", label: "Schedule", icon: CalendarDays },
-  { href: "/consultant/profile", label: "Profile", icon: Users },
-  { href: "/consultant/earnings", label: "Earnings", icon: Wallet }
-];
-
-const freelancerNavItems: NavItem[] = [
-  { href: "/freelancer", label: "Freelancer overview", icon: BriefcaseBusiness },
-  { href: "/freelancer/profile", label: "Profile", icon: Users },
-  { href: "/freelancer/gigs", label: "Gigs", icon: Package },
-  { href: "/freelancer/contracts", label: "Contracts", icon: ReceiptText },
-  { href: "/freelancer/portfolio", label: "Portfolio", icon: Upload },
-  { href: "/freelancer/earnings", label: "Earnings", icon: Wallet }
 ];
 
 const adminNavItems: NavItem[] = [
@@ -112,19 +86,18 @@ const adminNavItems: NavItem[] = [
 ];
 
 const utilityNavItems: NavItem[] = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/studio", label: "MrC. Studio", icon: Sparkles },
+  { href: "/profile", label: "Profile", icon: UserRound },
   { href: "/messages", label: "Messages", icon: MessageSquare },
-  { href: "/profile", label: "Profile", icon: Users },
-  { href: "/settings", label: "Account settings", icon: Settings }
+  { href: "/notifications", label: "Notifications", icon: Bell },
+  { href: "/settings", label: "Settings", icon: Settings }
 ];
 
 const navGroups = [
-  { key: "user", title: "User dashboard", base: ["/dashboard", "/user"], items: userNavItems },
-  { key: "seller", title: "Seller dashboard", base: ["/seller"], items: sellerNavItems },
-  { key: "instructor", title: "Instructor dashboard", base: ["/instructor"], items: instructorNavItems },
-  { key: "consultant", title: "Consultant dashboard", base: ["/consultant"], items: consultantNavItems },
-  { key: "freelancer", title: "Freelancer dashboard", base: ["/freelancer"], items: freelancerNavItems },
-  { key: "admin", title: "Main admin", base: ["/admin"], items: adminNavItems },
-  { key: "account", title: "Account", base: ["/messages", "/profile", "/notifications", "/settings"], items: utilityNavItems }
+  { key: "normal", title: "Dashboard", base: ["/dashboard", "/user", "/profile"], items: normalNavItems },
+  { key: "studio", title: "MrC. Studio", base: ["/studio", "/seller", "/instructor", "/consultant", "/freelancer"], items: studioNavItems },
+  { key: "admin", title: "Admin dashboard", base: ["/admin"], items: adminNavItems }
 ];
 
 function getWorkspaceGroup(pathname: string) {
@@ -150,7 +123,10 @@ function MobileBottomNav({ items }: { items: NavItem[] }) {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-[hsl(var(--border))] bg-[hsl(var(--card))]/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-2xl shadow-black/10 backdrop-blur-xl lg:hidden">
+    <nav
+      className="fixed bottom-0 left-0 right-0 z-40 grid border-t border-[hsl(var(--border))] bg-[hsl(var(--card))]/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-2xl shadow-black/10 backdrop-blur-xl lg:hidden"
+      style={{ gridTemplateColumns: "repeat(5, minmax(0, 1fr))", width: "100vw" }}
+    >
       {items.slice(0, 5).map((item) => {
         const exactOnly = ["/dashboard", "/seller", "/instructor", "/consultant", "/freelancer"].includes(item.href);
         const active = pathname === item.href || (!exactOnly && item.href !== "/" && pathname.startsWith(`${item.href}/`));
@@ -175,12 +151,85 @@ function MobileBottomNav({ items }: { items: NavItem[] }) {
   );
 }
 
+function uniqueNavItems(items: NavItem[]) {
+  const seen = new Set<string>();
+
+  return items.filter((item) => {
+    if (seen.has(item.href)) return false;
+    seen.add(item.href);
+    return true;
+  });
+}
+
+function AccountProfileMenu({ user }: { user: Session["user"] }) {
+  const isAdmin = user.role === "admin" || user.validatedRoles?.includes("admin");
+  const initials = (user.name ?? user.email ?? "MC")
+    .split(/\s+/)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+  const menuItems = [
+    ...utilityNavItems,
+    ...(isAdmin ? [{ href: "/admin/dashboard", label: "Admin", icon: ShieldCheck }] : [])
+  ];
+
+  return (
+    <details className="group relative">
+      <summary className="flex h-10 cursor-pointer list-none items-center gap-2 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-2 text-sm font-semibold text-[hsl(var(--foreground))] transition hover:bg-[hsl(var(--muted))] [&::-webkit-details-marker]:hidden">
+        <span
+          className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-full bg-[hsl(var(--primary))]/15 text-xs font-black text-[hsl(var(--primary))]"
+          style={user.image ? { backgroundImage: `url(${user.image})`, backgroundPosition: "center", backgroundSize: "cover" } : undefined}
+          aria-hidden="true"
+        >
+          {user.image ? null : initials || <UserRound className="size-4" />}
+        </span>
+        <span className="hidden max-w-36 truncate sm:inline">{user.name ?? "Account"}</span>
+        <ChevronDown className="size-4 text-[hsl(var(--muted-foreground))] transition group-open:rotate-180" />
+      </summary>
+      <div className="absolute right-0 z-50 mt-2 w-64 overflow-hidden rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-2 shadow-xl">
+        <div className="border-b border-[hsl(var(--border))] px-3 py-3">
+          <p className="truncate text-sm font-black">{user.name ?? "MR Creativist"}</p>
+          <p className="mt-1 truncate text-xs text-[hsl(var(--muted-foreground))]">{user.email}</p>
+        </div>
+        <div className="py-2">
+          {menuItems.map((item) => {
+            const Icon = item.icon;
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold text-[hsl(var(--foreground))] transition hover:bg-[hsl(var(--muted))]"
+              >
+                {Icon ? <Icon className="size-4 text-[hsl(var(--primary))]" /> : null}
+                {item.label}
+              </Link>
+            );
+          })}
+        </div>
+        <div className="border-t border-[hsl(var(--border))] p-2">
+          <div className="mb-2 flex items-center justify-between rounded-md px-3 py-2 text-sm font-semibold">
+            <span>Theme</span>
+            <ModeToggle />
+          </div>
+          <form action={logoutAction}>
+            <Button type="submit" variant="outline" className="w-full justify-start">
+              <LogOut className="size-4" />
+              Log out
+            </Button>
+          </form>
+        </div>
+      </div>
+    </details>
+  );
+}
+
 export function DashboardShell({ children, user }: { children: React.ReactNode; user: Session["user"] }) {
   const pathname = usePathname();
   const workspaceGroup = getWorkspaceGroup(pathname);
-  const accountGroup = navGroups.find((group) => group.key === "account") ?? navGroups[0];
-  const sidebarGroups = workspaceGroup.key === "account" ? [workspaceGroup] : [workspaceGroup, accountGroup];
-  const mobileNavItems = sidebarGroups.flatMap((group) => group.items);
+  const sidebarGroups = [workspaceGroup];
+  const mobileNavItems = uniqueNavItems(sidebarGroups.flatMap((group) => group.items));
   const bottomNavItems = workspaceGroup.items.slice(0, 5);
 
   return (
@@ -196,14 +245,6 @@ export function DashboardShell({ children, user }: { children: React.ReactNode; 
                 Back to Home
               </Link>
             </Button>
-            <div className="mt-3 inline-flex rounded-md border border-[hsl(var(--border))] px-2 py-1 text-xs font-medium text-[hsl(var(--muted-foreground))]">
-              {user.role ?? "STUDENT"}
-            </div>
-            {user.validatedRoles?.length ? (
-              <p className="mt-2 text-xs text-[hsl(var(--muted-foreground))]">
-                Validated: {user.validatedRoles.join(", ")}
-              </p>
-            ) : null}
           </div>
           <div className="flex-1 overflow-y-auto px-3 pb-4">
             {sidebarGroups.map((group) => (
@@ -231,8 +272,8 @@ export function DashboardShell({ children, user }: { children: React.ReactNode; 
                 <span className="hidden sm:inline">Back to Home</span>
               </Link>
             </Button>
-            <AccountSwitcher activeRole={user.role} />
             <ModeToggle />
+            <AccountProfileMenu user={user} />
             <form action={logoutAction} className="lg:hidden">
               <Button type="submit" variant="outline" size="sm">
                 Log out

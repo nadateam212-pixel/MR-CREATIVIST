@@ -37,7 +37,10 @@ import { videoSourceForUrl } from "@/lib/video-sources";
 
 type CourseResource = {
   label: string;
+  title?: string;
+  type?: string;
   url: string;
+  downloadable?: boolean;
 };
 
 type CourseLesson = {
@@ -85,6 +88,7 @@ type CourseStructure = {
   image?: string;
   outcomes: string[];
   tools: string[];
+  resources?: CourseResource[];
   modules: CourseModule[];
   flatLessons: FlatLesson[];
   totalLessons: number;
@@ -153,17 +157,7 @@ type CommunityMessage = {
   createdAt?: string;
 };
 
-function embeddedVideoClass(provider: string) {
-  if (provider === "youtube") {
-    return "absolute inset-x-0 -top-[14%] h-[128%] w-full border-0";
-  }
-  if (provider === "vimeo") {
-    return "absolute inset-x-0 -top-[10%] h-[120%] w-full border-0";
-  }
-  if (provider === "google-drive") {
-    return "absolute inset-x-0 -top-12 h-[calc(100%+6rem)] w-full border-0";
-  }
-
+function embeddedVideoClass() {
   return "absolute inset-0 h-full w-full border-0";
 }
 
@@ -1132,7 +1126,7 @@ export function CourseLearningWorkspace({
                         allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
                         allowFullScreen
                         referrerPolicy="strict-origin-when-cross-origin"
-                        className={embeddedVideoClass(activeVideoSource.provider)}
+                        className={embeddedVideoClass()}
                       />
                     </div>
                   ) : (
@@ -1366,6 +1360,27 @@ export function CourseLearningWorkspace({
                         <Download className="mb-3 size-4 text-[hsl(var(--primary))]" />
                         {resource.label}
                       </Link>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {course.resources?.length ? (
+                <div className="mt-5 rounded-md border border-[hsl(var(--border))] p-4">
+                  <h2 className="text-sm font-semibold">Course downloads</h2>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {course.resources.map((resource) => (
+                      <a
+                        key={`${resource.label}-${resource.url}`}
+                        href={resource.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        download={resource.downloadable ? "" : undefined}
+                        className="rounded-md border border-[hsl(var(--border))] p-3 text-sm font-medium hover:bg-[hsl(var(--muted))]"
+                      >
+                        <Download className="mb-3 size-4 text-[hsl(var(--primary))]" />
+                        {resource.label}
+                      </a>
                     ))}
                   </div>
                 </div>

@@ -28,11 +28,18 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     await requireMongo();
-    await requireRole(request, ["admin", "consultant"]);
+    const session = await requireRole(request, ["admin", "consultant"]);
 
     const body = consultingServiceSchema.parse(await readJson(request));
     const slug = await uniqueSlugFor(ConsultingService, body.slug ?? slugify(body.expertName || body.title));
-    const service = await ConsultingService.create({ ...body, slug });
+    const service = await ConsultingService.create({
+      ...body,
+      slug,
+      expertId: session.user.id,
+      expertName: body.expertName || session.user.name || session.user.email,
+      status: session.user.role === "admin" ? body.status : body.status === "draft" ? "draft" : "submitted",
+      isVerified: session.user.role === "admin" ? body.isVerified : false
+    });
 
     return jsonOk(normalizeConsultingService(service), 201);
   } catch (error) {

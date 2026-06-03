@@ -35,7 +35,6 @@ import { PriceDisplay } from "@/components/ui/price-display";
 import { Progress } from "@/components/ui/progress";
 import { formatConvertedAmount } from "@/lib/currency";
 import { useI18n } from "@/hooks/use-i18n";
-import { usePlatformStore } from "@/hooks/use-platform-store";
 import { useUserPreferences } from "@/hooks/use-user-preferences";
 
 type ProjectBrief = {
@@ -67,7 +66,32 @@ type Freelancer = {
   languages: string[];
   skills: string[];
   verified: string[];
+  isVerified?: boolean;
   image: string;
+};
+
+type PublicGig = {
+  id?: string;
+  ownerId?: string;
+  ownerName?: string;
+  ownerAddress?: string;
+  ownerCity?: string;
+  ownerCountry?: string;
+  slug: string;
+  title: string;
+  category: string;
+  packageName: string;
+  description: string;
+  price: string;
+  deliveryDays: number;
+  revisions: number;
+  image: string;
+  tags: string[];
+  deliverables: string[];
+  rating: number;
+  orders: number;
+  status?: string;
+  isVerified?: boolean;
 };
 
 type StudioStage =
@@ -226,14 +250,19 @@ function scoreFreelancer(freelancer: Freelancer, project: ProjectBrief) {
   );
 }
 
-export function FreelancerStudio({ initialFreelancers = [] }: { initialFreelancers?: Freelancer[] }) {
+export function FreelancerStudio({
+  initialFreelancers = [],
+  initialGigs = []
+}: {
+  initialFreelancers?: Freelancer[];
+  initialGigs?: PublicGig[];
+}) {
   const router = useRouter();
   const { data: session } = useSession();
   const freelancers = initialFreelancers;
   const preferences = useUserPreferences();
   const { t } = useI18n();
-  const createdGigs = usePlatformStore((state) => state.createdGigs);
-  const publishedGigs = createdGigs.filter((gig) => gig.status === "published");
+  const publishedGigs = initialGigs.filter((gig) => gig.status === "published");
   const formatCurrency = (value: number) => formatConvertedAmount(value, "USD", preferences.currency, preferences.usdToFrw);
   const categories = useMemo(
     () => ["ALL", ...Array.from(new Set(freelancers.map((item) => item.specialty)))],
@@ -348,7 +377,7 @@ export function FreelancerStudio({ initialFreelancers = [] }: { initialFreelance
     resetContract();
   }
 
-  async function requestGig(gig: (typeof createdGigs)[number]) {
+  async function requestGig(gig: PublicGig) {
     if (!session?.user) {
       router.push(`/login?callbackUrl=/freelancers%23${gig.slug}`);
       return;
@@ -363,7 +392,7 @@ export function FreelancerStudio({ initialFreelancers = [] }: { initialFreelance
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ownerId: gig.ownerId,
-          ownerName: gig.ownerName ?? gig.freelancer,
+          ownerName: gig.ownerName ?? "Freelancer",
           gigSlug: gig.slug,
           gigTitle: gig.title,
           gigPrice: gig.price
@@ -446,75 +475,6 @@ export function FreelancerStudio({ initialFreelancers = [] }: { initialFreelance
 
   return (
     <div className="bg-[hsl(var(--background))]">
-      <section className="border-b border-[hsl(var(--border))] bg-[hsl(var(--muted))]/35 text-[hsl(var(--foreground))]">
-        <div className="mx-auto grid max-w-7xl gap-6 px-4 py-10 sm:px-6 xl:grid-cols-[1.05fr_0.95fr] xl:items-stretch">
-          <div className="flex flex-col justify-between gap-8">
-            <div>
-              <Badge className="border-[hsl(var(--primary))]/50 bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))]">
-                FREELANCER STUDIO
-              </Badge>
-              <h1 className="mt-4 max-w-4xl text-4xl font-black uppercase tracking-tight sm:text-5xl">
-                HIRE, MANAGE AND PAY VERIFIED FREELANCERS FROM BRIEF TO FINAL
-                DELIVERY.
-              </h1>
-              <p className="mt-5 max-w-3xl text-sm font-semibold uppercase leading-7 text-[hsl(var(--muted-foreground))] sm:text-base">
-                Mr Creativist FREELANCER STUDIO RUNS THE COMPLETE WORKFLOW:
-                BRIEF, AI MATCHING, PROPOSAL, CONTRACT, ESCROW, MILESTONES,
-                DELIVERY, REVIEW, INVOICE AND PAYOUT.
-              </p>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-4">
-              {[
-                { label: "MATCH SCORE", value: `${selectedScore}%` },
-                {
-                  label: "PROJECT BUDGET",
-                  value: formatCurrency(selectedProject.budget)
-                },
-                {
-                  label: "ESCROW STATUS",
-                  value: escrowFunded ? "FUNDED" : "READY"
-                },
-                { label: "MILESTONES", value: `${approvedMilestones}/4` }
-              ].map((item) => (
-                <div
-                  key={item.label}
-                  className="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4"
-                >
-                  <p className="text-xs font-black uppercase tracking-[0.16em] text-[hsl(var(--primary))]">
-                    {item.label}
-                  </p>
-                  <p className="mt-2 text-2xl font-black">{item.value}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="relative min-h-[24rem] overflow-hidden rounded-lg">
-            <Image
-              src="https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&w=1400&q=85"
-              alt="FREELANCER STUDIO WORKROOM"
-              fill
-              sizes="(min-width: 1280px) 45vw, 100vw"
-              className="object-cover"
-              priority
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent" />
-            <div className="absolute inset-x-4 bottom-4 rounded-md border border-white/15 bg-slate-950/85 p-4 backdrop-blur">
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-cyan-200">
-                ACTIVE BRIEF
-              </p>
-              <p className="mt-2 text-xl font-black uppercase">
-                {selectedProject.title}
-              </p>
-              <p className="mt-2 text-sm font-semibold uppercase leading-6 text-slate-300">
-                {selectedProject.outcome}
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {publishedGigs.length ? (
         <section className="border-b border-[hsl(var(--border))] bg-[hsl(var(--muted))]/30">
           <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
@@ -543,12 +503,18 @@ export function FreelancerStudio({ initialFreelancers = [] }: { initialFreelance
                       <Badge>{gig.category}</Badge>
                       <Badge>{gig.deliveryDays} days</Badge>
                       <Badge>{gig.revisions} revisions</Badge>
+                      {gig.isVerified ? (
+                        <Badge className="border-sky-500/45 text-sky-500">
+                          <BadgeCheck className="mr-1 size-3" />
+                          Verified
+                        </Badge>
+                      ) : null}
                     </div>
                     <CardTitle className="leading-tight">{gig.title}</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="rounded-md border border-[hsl(var(--border))] p-3 text-xs font-semibold uppercase tracking-[0.12em] text-[hsl(var(--muted-foreground))]">
-                      <p className="text-[hsl(var(--foreground))]">{gig.ownerName ?? gig.freelancer}</p>
+                      <p className="text-[hsl(var(--foreground))]">{gig.ownerName ?? "Freelancer"}</p>
                       <p className="mt-1">
                         {[gig.ownerAddress, gig.ownerCity, gig.ownerCountry].filter(Boolean).join(", ") || "Remote"}
                       </p>
@@ -579,8 +545,8 @@ export function FreelancerStudio({ initialFreelancers = [] }: { initialFreelance
         </section>
       ) : null}
 
-      <section className="mx-auto grid max-w-7xl gap-5 px-4 py-8 sm:px-6 xl:grid-cols-[0.9fr_1.2fr_0.9fr]">
-        <Card>
+      <section className="mx-auto grid max-w-7xl gap-5 px-4 py-5 sm:px-6 xl:grid-cols-[1.25fr_0.85fr]">
+        <Card className="order-3 xl:col-span-2">
           <CardHeader>
             <div className="flex items-center gap-3">
               <Target className="size-5 text-[hsl(var(--primary))]" />
@@ -662,14 +628,14 @@ export function FreelancerStudio({ initialFreelancers = [] }: { initialFreelance
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="order-1">
           <CardHeader>
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
                 <Sparkles className="size-5 text-[hsl(var(--primary))]" />
-                <CardTitle className="uppercase">AI MATCH BOARD</CardTitle>
+                <CardTitle className="text-lg uppercase sm:text-xl">AI MATCH BOARD</CardTitle>
               </div>
-              <Badge>{filteredMatches.length} MATCHES</Badge>
+              <Badge className="w-fit shrink-0 text-[10px]">{filteredMatches.length} MATCHES</Badge>
             </div>
           </CardHeader>
           <CardContent className="grid gap-5">
@@ -696,10 +662,12 @@ export function FreelancerStudio({ initialFreelancers = [] }: { initialFreelance
               </select>
             </div>
 
-            <div className="grid gap-3">
+            <div className="grid gap-3 md:grid-cols-2">
               {filteredMatches.map(
                 ({ freelancer, score, matchedSkills: skills }) => {
                   const isSelected = freelancer.id === selectedFreelancerId;
+                  const visibleSkills = skills.slice(0, 2);
+                  const hiddenSkillCount = Math.max(skills.length - visibleSkills.length, 0);
 
                   return (
                     <button
@@ -707,7 +675,7 @@ export function FreelancerStudio({ initialFreelancers = [] }: { initialFreelance
                       type="button"
                       onClick={() => selectFreelancer(freelancer.id)}
                       className={[
-                        "grid gap-4 rounded-md border p-4 text-left transition-colors md:grid-cols-[4.5rem_1fr_auto]",
+                        "grid min-w-0 gap-4 overflow-hidden rounded-md border p-4 text-left transition-colors sm:grid-cols-[4.5rem_1fr] xl:grid-cols-[4.5rem_1fr]",
                         isSelected
                           ? "border-[hsl(var(--primary))] bg-[hsl(var(--primary))]/10"
                           : "border-[hsl(var(--border))] hover:bg-[hsl(var(--muted))]/55"
@@ -722,40 +690,49 @@ export function FreelancerStudio({ initialFreelancers = [] }: { initialFreelance
                           className="object-cover"
                         />
                       </span>
-                      <span className="min-w-0">
+                      <span className="min-w-0 overflow-hidden">
                         <span className="flex flex-wrap items-center gap-2">
                           <span className="text-base font-black uppercase">
                             {freelancer.name}
                           </span>
+                          {freelancer.isVerified ? (
+                            <Badge className="border-sky-500/45 text-sky-500">
+                              <BadgeCheck className="mr-1 size-3" />
+                              Verified
+                            </Badge>
+                          ) : null}
                           <Badge>{freelancer.specialty}</Badge>
                         </span>
                         <span className="mt-1 block text-xs font-black uppercase tracking-[0.14em] text-[hsl(var(--muted-foreground))]">
                           {freelancer.role}
                         </span>
-                        <span className="mt-3 flex flex-wrap gap-2">
-                          {skills.length > 0 ? (
-                            skills.map((skill) => (
+                        <span className="mt-3 flex max-w-full flex-wrap gap-2 overflow-hidden">
+                          {visibleSkills.length > 0 ? (
+                            <>
+                            {visibleSkills.map((skill) => (
                               <Badge
                                 key={`${freelancer.id}-${skill}`}
-                                className="border-[hsl(var(--primary))]/45 text-[hsl(var(--primary))]"
+                                className="max-w-full truncate border-[hsl(var(--primary))]/45 text-[hsl(var(--primary))]"
                               >
                                 {skill}
                               </Badge>
-                            ))
+                            ))}
+                            {hiddenSkillCount ? <Badge>+{hiddenSkillCount}</Badge> : null}
+                            </>
                           ) : (
                             <Badge>GENERAL FIT</Badge>
                           )}
                         </span>
                       </span>
-                      <span className="grid min-w-28 gap-2 text-sm font-black uppercase">
-                        <span className="flex items-center justify-end gap-1">
+                      <span className="grid gap-1 text-sm font-black uppercase sm:col-span-2 sm:grid-cols-2 sm:gap-2">
+                        <span className="flex items-center gap-1">
                           <Star className="size-4 fill-amber-400 text-amber-400" />
                           {freelancer.rating.toFixed(1)}
                         </span>
-                        <span className="text-right text-2xl text-[hsl(var(--primary))]">
+                        <span className="text-2xl text-[hsl(var(--primary))] sm:text-right">
                           {score}%
                         </span>
-                        <span className="text-right text-xs text-[hsl(var(--muted-foreground))]">
+                        <span className="text-xs text-[hsl(var(--muted-foreground))] sm:col-span-2">
                           {formatCurrency(freelancer.rate)} / HOUR
                         </span>
                       </span>
@@ -767,7 +744,7 @@ export function FreelancerStudio({ initialFreelancers = [] }: { initialFreelance
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="order-2">
           <CardHeader>
             <div className="flex items-center gap-3">
               <FileCheck2 className="size-5 text-[hsl(var(--primary))]" />
@@ -790,8 +767,14 @@ export function FreelancerStudio({ initialFreelancers = [] }: { initialFreelance
                   />
                 </span>
                 <div>
-                  <p className="font-black uppercase">
-                    {selectedFreelancer.name}
+                  <p className="flex flex-wrap items-center gap-2 font-black uppercase">
+                    <span>{selectedFreelancer.name}</span>
+                    {selectedFreelancer.isVerified ? (
+                      <Badge className="border-sky-500/45 text-sky-500">
+                        <BadgeCheck className="mr-1 size-3" />
+                        Verified
+                      </Badge>
+                    ) : null}
                   </p>
                   <p className="text-xs font-black uppercase tracking-[0.12em] text-[hsl(var(--muted-foreground))]">
                     {selectedFreelancer.location}

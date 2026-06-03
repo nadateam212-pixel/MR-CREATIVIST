@@ -288,8 +288,8 @@ export function AIToolsGalleryPro() {
 
   return (
     <div className="min-h-screen bg-[hsl(var(--background))] text-[hsl(var(--foreground))]">
-      <div className="mx-auto grid max-w-7xl px-4 py-6 sm:px-6 lg:grid-cols-[18rem_1fr]">
-        <aside className="border-b border-[hsl(var(--border))] bg-[hsl(var(--background))] pb-5 lg:sticky lg:top-20 lg:h-[calc(100vh-5rem)] lg:border-b-0 lg:border-r lg:pr-4">
+      <div className="mx-auto grid max-w-7xl px-3 py-3 sm:px-6 lg:grid-cols-[18rem_1fr] lg:py-6">
+        <aside className="hidden border-b border-[hsl(var(--border))] bg-[hsl(var(--background))] pb-5 lg:sticky lg:top-20 lg:block lg:h-[calc(100vh-5rem)] lg:border-b-0 lg:border-r lg:pr-4">
           <div className="flex items-center gap-3 px-1">
             <div className="flex size-10 items-center justify-center rounded-md bg-[hsl(var(--primary))]/15 text-[hsl(var(--primary))]">
               <Sparkles className="size-5" />
@@ -334,8 +334,8 @@ export function AIToolsGalleryPro() {
           </div>
         </aside>
 
-        <main className="min-w-0 py-6 lg:py-0 lg:pl-8">
-          <section className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
+        <main className="min-w-0 py-0 lg:pl-8">
+          <section className="hidden gap-4 lg:grid lg:grid-cols-[1fr_auto] lg:items-end">
             <div>
               <div className="inline-flex items-center gap-2 rounded-md border border-[hsl(var(--primary))]/25 bg-[hsl(var(--primary))]/10 px-3 py-2 text-xs font-bold uppercase tracking-[0.16em] text-[hsl(var(--foreground))]">
                 <Sparkles className="size-4 text-[hsl(var(--primary))]" />
@@ -352,18 +352,18 @@ export function AIToolsGalleryPro() {
           </section>
 
           <Card
-            className="mt-8 border-[hsl(var(--primary))]/30 bg-[hsl(var(--card))] shadow-xl"
+            className="mt-0 border-[hsl(var(--primary))]/30 bg-[hsl(var(--card))] shadow-xl lg:mt-8"
             style={{ boxShadow: "0 22px 70px hsl(var(--primary) / 0.1)" }}
           >
-            <CardHeader>
+            <CardHeader className="p-4 sm:p-6">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-3">
                   <div className={cn("rounded-md p-3 text-white", `bg-gradient-to-r ${selectedTool.color}`)}>
                     <SelectedIcon className="size-6" />
                   </div>
                   <div>
-                    <CardTitle className="text-2xl text-[hsl(var(--foreground))]">{selectedTool.name}</CardTitle>
-                    <CardDescription className="mt-1 text-[hsl(var(--muted-foreground))]">{selectedTool.description}</CardDescription>
+                    <CardTitle className="text-xl text-[hsl(var(--foreground))] sm:text-2xl">{selectedTool.name}</CardTitle>
+                    <CardDescription className="mt-1 hidden text-[hsl(var(--muted-foreground))] sm:block">{selectedTool.description}</CardDescription>
                   </div>
                 </div>
                 <span className="w-fit rounded-md border border-[hsl(var(--primary))]/25 bg-[hsl(var(--primary))]/10 px-3 py-2 text-xs font-bold uppercase tracking-[0.14em] text-[hsl(var(--foreground))]">
@@ -372,7 +372,35 @@ export function AIToolsGalleryPro() {
               </div>
             </CardHeader>
 
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-4 p-4 sm:space-y-6 sm:p-6">
+              <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 lg:hidden">
+                {filteredTools.map((tool) => {
+                  const Icon = tool.icon;
+                  const isSelected = selectedTool.id === tool.id;
+
+                  return (
+                    <button
+                      key={tool.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedTool(tool);
+                        setInputs({});
+                        setOutput({});
+                      }}
+                      className={cn(
+                        "flex h-10 shrink-0 items-center gap-2 rounded-md border px-3 text-xs font-black transition-colors",
+                        isSelected
+                          ? "border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]"
+                          : "border-[hsl(var(--border))] bg-[hsl(var(--background))] text-[hsl(var(--foreground))]"
+                      )}
+                    >
+                      <Icon className="size-4" />
+                      <span className="whitespace-nowrap">{tool.name.replace(" Generator", "").replace("AI ", "")}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
               <div className="grid gap-4">
                 {selectedTool.inputs.map((input) => (
                   <label key={input.name} className="grid gap-2 text-sm font-semibold text-[hsl(var(--foreground))]">
@@ -383,7 +411,7 @@ export function AIToolsGalleryPro() {
                         onChange={(event) => handleInputChange(input.name, event.target.value)}
                         placeholder={input.placeholder}
                         disabled={loading}
-                        className="min-h-32 w-full rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-4 py-3 text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] outline-none transition-colors focus:border-[hsl(var(--primary))] focus:ring-2 focus:ring-[hsl(var(--primary))]/20 disabled:opacity-50"
+                        className="min-h-36 w-full rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-4 py-3 text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] outline-none transition-colors focus:border-[hsl(var(--primary))] focus:ring-2 focus:ring-[hsl(var(--primary))]/20 disabled:opacity-50"
                       />
                     ) : input.type === "select" ? (
                       <select

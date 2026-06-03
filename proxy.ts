@@ -22,6 +22,7 @@ export async function proxy(request: NextRequest) {
   const isAuthRoute = isPathUnder(nextUrl.pathname, "/login") || isPathUnder(nextUrl.pathname, "/register");
   const isProtectedRoute =
     isPathUnder(nextUrl.pathname, "/dashboard") ||
+    isPathUnder(nextUrl.pathname, "/studio") ||
     isPathUnder(nextUrl.pathname, "/instructor") ||
     isPathUnder(nextUrl.pathname, "/consultant") ||
     isPathUnder(nextUrl.pathname, "/freelancer") ||
@@ -41,6 +42,10 @@ export async function proxy(request: NextRequest) {
     const loginUrl = new URL("/login", nextUrl);
     loginUrl.searchParams.set("callbackUrl", `${nextUrl.pathname}${nextUrl.search}`);
     return NextResponse.redirect(loginUrl);
+  }
+
+  if (isPathUnder(nextUrl.pathname, "/admin") && role !== "admin") {
+    return NextResponse.redirect(new URL("/dashboard", nextUrl));
   }
 
   return NextResponse.next();

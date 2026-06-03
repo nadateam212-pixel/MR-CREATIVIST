@@ -37,7 +37,11 @@ export async function PATCH(request: Request, context: { params: Promise<{ shopI
     }
 
     const body = shopPatchSchema.parse(await readJson(request));
-    const patch: Record<string, unknown> = { ...body };
+    const isAdmin = session.user.role === "admin";
+    const patch: Record<string, unknown> = {
+      ...body,
+      ...(isAdmin ? {} : { status: body.status === "draft" ? "draft" : "submitted", isVerified: existing.isVerified })
+    };
 
     if (body.slug || body.name) {
       patch.slug = await uniqueSlugFor(ShopProfile, body.slug ?? slugify(body.name), existing._id);

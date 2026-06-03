@@ -6,15 +6,14 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import {
+  BadgeCheck,
   BookOpen,
   CheckCircle2,
   Clock,
   Download,
   Filter,
-  GraduationCap,
   PackageCheck,
   Search,
-  ShieldCheck,
   ShoppingCart,
   Star,
   Users,
@@ -28,7 +27,6 @@ import { PriceDisplay } from "@/components/ui/price-display";
 import { SafeImage } from "@/components/ui/safe-image";
 import { convertMoney, isFreePrice, parseMoney } from "@/lib/currency";
 import { courseImageForCategory } from "@/lib/course-media";
-import { platformWorkflows } from "@/lib/platform-data";
 import { useI18n } from "@/hooks/use-i18n";
 import { usePlatformStore } from "@/hooks/use-platform-store";
 import { useUserPreferences } from "@/hooks/use-user-preferences";
@@ -65,6 +63,7 @@ type CatalogProduct = {
   delivery: string;
   image: string;
   tools: string[];
+  isVerified?: boolean;
 };
 
 export function CatalogExperience({
@@ -124,8 +123,6 @@ export function CatalogExperience({
     return matchesQuery && matchesFilter;
   });
 
-  const workflow = platformWorkflows.find((item) => item.title === (isCourses ? "Course completion" : "Marketplace purchase"));
-
   async function handleEnroll(course: CatalogCourse) {
     if (!session?.user) {
       router.push(`/login?callbackUrl=/courses/${course.slug}/enroll`);
@@ -175,52 +172,26 @@ export function CatalogExperience({
 
   return (
     <div className="bg-[hsl(var(--background))] text-[hsl(var(--foreground))]">
-      <section className="border-b border-[hsl(var(--border))] bg-[hsl(var(--muted))]/35">
-        <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[hsl(var(--primary))]">
-              {isCourses ? t("course.catalog") : t("nav.marketplace")}
-            </p>
-            <h1 className="mt-3 max-w-4xl text-4xl font-semibold tracking-tight sm:text-6xl">
-              {isCourses ? t("course.heroTitle") : t("market.heroTitle")}
-            </h1>
-            <p className="mt-5 max-w-3xl text-lg leading-8 text-[hsl(var(--muted-foreground))]">
-              {isCourses ? t("course.heroDescription") : t("market.heroDescription")}
-            </p>
-            <div className="mt-7 flex flex-wrap gap-3">
-              <Button asChild size="lg">
-                <Link href={isCourses ? "/dashboard/my-courses" : "/marketplace/cart"}>
-                  {isCourses ? <GraduationCap className="size-5" /> : <ShoppingCart className="size-5" />}
-                  {isCourses ? t("course.myLearning") : `${t("market.cart")} ${cartCount ? `(${cartCount})` : ""}`}
-                </Link>
-              </Button>
-              <Button asChild size="lg" variant="outline">
-                <Link href={isCourses ? "/dashboard/certificates" : "/seller"}>
-                  {isCourses ? <ShieldCheck className="size-5" /> : <PackageCheck className="size-5" />}
-                  {isCourses ? t("course.certificates") : t("market.sellerTools")}
-                </Link>
-              </Button>
-            </div>
-          </div>
-
-          <div className="relative min-h-[24rem] overflow-hidden rounded-lg border border-[hsl(var(--border))]">
-            <SafeImage
-              src={
-                isCourses
-                  ? "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1200&q=85"
-                  : "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=1200&q=85"
-              }
-              alt={isCourses ? "Learners using the course platform" : "Marketplace checkout workspace"}
-              fill
-              sizes="(min-width: 1024px) 50vw, 100vw"
-              className="object-cover"
-              priority
-            />
+      <section className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:py-8">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="text-2xl font-black tracking-tight sm:text-3xl">
+            {isCourses ? t("course.catalog") : t("nav.marketplace")}
+          </h1>
+          <div className="flex gap-2">
+            <Button asChild size="sm">
+              <Link href={isCourses ? "/dashboard/my-courses" : "/marketplace/cart"}>
+                {isCourses ? <BookOpen className="size-4" /> : <ShoppingCart className="size-4" />}
+                {isCourses ? t("course.myLearning") : `${t("market.cart")} ${cartCount ? `(${cartCount})` : ""}`}
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link href={isCourses ? "/dashboard/certificates" : "/seller"}>
+                <PackageCheck className="size-4" />
+                {isCourses ? t("course.certificates") : t("market.sellerTools")}
+              </Link>
+            </Button>
           </div>
         </div>
-      </section>
-
-      <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
         <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
           <div className="relative">
             <Search className="absolute left-4 top-1/2 size-5 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" />
@@ -369,6 +340,12 @@ export function CatalogExperience({
                     <div className="flex flex-wrap gap-2">
                       <Badge>{product.type}</Badge>
                       <Badge>{product.category}</Badge>
+                      {product.isVerified ? (
+                        <Badge className="border-sky-500/45 text-sky-500">
+                          <BadgeCheck className="mr-1 size-3" />
+                          Verified
+                        </Badge>
+                      ) : null}
                     </div>
                     <CardTitle className="leading-tight">
                       <Link href={productHref}>{product.name}</Link>
@@ -389,7 +366,10 @@ export function CatalogExperience({
                         {product.delivery}
                       </span>
                     </div>
-                    <p className="text-sm font-medium text-[hsl(var(--muted-foreground))]">{product.seller}</p>
+                    <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-[hsl(var(--muted-foreground))]">
+                      <span>{product.seller}</span>
+                      {product.isVerified ? <BadgeCheck className="size-4 text-sky-500" aria-label="Verified seller" /> : null}
+                    </p>
                     <div className="flex flex-wrap gap-2">
                       {product.tools.slice(0, 3).map((tool) => (
                         <Badge key={tool}>{tool}</Badge>
@@ -420,20 +400,6 @@ export function CatalogExperience({
         </div>
       </section>
 
-      {workflow ? (
-        <section className="border-t border-[hsl(var(--border))] bg-[hsl(var(--muted))]/35">
-          <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
-            <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-6">
-              {workflow.steps.map((step, index) => (
-                <div key={step} className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4">
-                  <p className="text-xs font-semibold text-[hsl(var(--primary))]">{String(index + 1).padStart(2, "0")}</p>
-                  <p className="mt-2 font-medium">{step}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      ) : null}
     </div>
   );
 }

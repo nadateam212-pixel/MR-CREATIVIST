@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { AdminContentTable, type AdminContentRow } from "@/components/admin/admin-content-table";
 import { AdminPeopleManager, type AdminPersonRow } from "@/components/admin/admin-people-manager";
 import connectMongoDB from "@/lib/mongodb";
 import FreelancerProfile from "@/models/FreelancerProfile";
+import Gig from "@/models/Gig";
 import User from "@/models/User";
 
 export const dynamic = "force-dynamic";
@@ -28,24 +30,38 @@ type FreelancerDoc = {
   name: string;
   role: string;
   specialty: string;
-  status?: "draft" | "published" | "archived";
+  status?: "draft" | "submitted" | "changes_requested" | "approved" | "published" | "archived";
+  isVerified?: boolean;
   rating?: number;
   completedJobs?: number;
+};
+
+type GigDoc = {
+  _id: string;
+  ownerId?: string;
+  slug: string;
+  title: string;
+  category: string;
+  packageName?: string;
+  status?: "draft" | "submitted" | "changes_requested" | "approved" | "published" | "archived";
+  isVerified?: boolean;
+  ownerName?: string;
 };
 
 export default async function AdminFreelancersPage() {
   await connectMongoDB();
 
-  const [profiles, users] = clean(
+  const [profiles, users, gigs] = clean(
     await Promise.all([
       FreelancerProfile.find({}).sort({ rating: -1, completedJobs: -1, updatedAt: -1 }).limit(120).lean(),
       User.find({ $or: [{ role: "freelancer" }, { validatedRoles: "freelancer" }] })
         .select("name email role accountStatus validatedRoles")
         .sort({ createdAt: -1 })
         .limit(120)
-        .lean()
+        .lean(),
+      Gig.find({}).sort({ updatedAt: -1 }).limit(160).lean()
     ])
-  ) as [FreelancerDoc[], AdminUserDoc[]];
+  ) as [FreelancerDoc[], AdminUserDoc[], GigDoc[]];
 
   const userById = new Map(users.map((user) => [String(user._id), user]));
   const profileUserIds = new Set(profiles.map((profile) => String(profile.userId ?? "")).filter(Boolean));
@@ -61,9 +77,11 @@ export default async function AdminFreelancersPage() {
         role: "freelancer",
         title: `${profile.role} - ${profile.specialty}`,
         status: profile.status ?? "published",
+        isVerified: Boolean(profile.isVerified),
         metric: `${profile.completedJobs ?? 0} completed jobs, ${profile.rating ?? 0} rating`,
         href: profile.userId ? `/admin/users/${profile.userId}` : undefined,
         publicHref: "/freelancers",
+        updatePath: `/api/freelancers/${profile.slug ?? profile._id}`,
         archivePath: `/api/freelancers/${profile.slug ?? profile._id}`
       };
     });
@@ -83,6 +101,34 @@ export default async function AdminFreelancersPage() {
       publicHref: "/freelancers"
     }));
 
+  const gigRows: AdminContentRow[] = gigs.map((gig) => ({
+    id: `gig:${gig.slug ?? gig._id}`,
+    title: gig.title,
+    subtitle: `${gig.ownerName ?? "Freelancer"} - ${gig.packageName ?? gig.category}`,
+    kind: "Gig",
+    status: gig.status ?? "draft",
+    isVerified: Boolean(gig.isVerified),
+    href: "/freelancers",
+    apiPath: `/api/gigs/${gig.slug ?? gig._id}`,
+    updateMethod: "PUT",
+    editFields: [
+      { key: "title", label: "Title", value: gig.title },
+      { key: "category", label: "Category", value: gig.category },
+      {
+        key: "status",
+        label: "Status",
+        value: gig.status ?? "draft",
+        options: ["draft", "submitted", "changes_requested", "approved", "published", "archived"]
+      }
+    ],
+    statusActions: [
+      { label: "Approve", status: "approved" },
+      { label: "Publish", status: "published" },
+      { label: "Request changes", status: "changes_requested" },
+      { label: "Verify badge", patch: { isVerified: true } }
+    ]
+  }));
+
   return (
     <div className="mx-auto w-full max-w-7xl space-y-8">
       <div>
@@ -93,6 +139,7 @@ export default async function AdminFreelancersPage() {
         </p>
       </div>
       <AdminPeopleManager title="Freelancer records" rows={[...profileRows, ...userRows]} emptyMessage="No freelancers are registered yet." />
+      <AdminContentTable title="Gig review table" rows={gigRows} emptyMessage="No gigs have been submitted yet." />
     </div>
   );
 }

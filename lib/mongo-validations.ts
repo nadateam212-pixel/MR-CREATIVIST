@@ -18,8 +18,24 @@ function normalizeOptionalUrl(value: unknown) {
 }
 
 const optionalUrl = z.preprocess(normalizeOptionalUrl, z.url().optional());
-const assetUrl = z.url().or(z.string().regex(/^\/[^\s]*$/, "Use a valid URL or public asset path.")).or(z.literal(""));
+const dataImageUrl = z.string().regex(/^data:image\/(?:png|jpe?g|webp|gif);base64,[a-z0-9+/=]+$/i, "Use a valid uploaded image.");
+const assetUrl = z
+  .url()
+  .or(z.string().regex(/^\/[^\s]*$/, "Use a valid URL or public asset path."))
+  .or(dataImageUrl)
+  .or(z.literal(""));
 const optionalAssetUrl = assetUrl.optional().transform((value) => value || undefined);
+const reviewStatus = z.enum(["draft", "submitted", "changes_requested", "approved", "published", "archived"]);
+const courseResourceSchema = z.object({
+  title: z.string().min(1).max(180),
+  label: z.string().max(180).optional(),
+  type: z.string().min(2).max(80).default("PDF"),
+  url: assetUrl,
+  accessRule: z.enum(["enrolled", "free"]).default("enrolled"),
+  attachLevel: z.enum(["course", "lesson"]).default("course"),
+  downloadable: z.boolean().default(true),
+  description: z.string().max(800).optional()
+});
 
 export const courseSchema = z.object({
   title: z.string().min(3).max(160),
@@ -29,11 +45,19 @@ export const courseSchema = z.object({
   instructorName: z.string().min(2).max(120),
   level: z.enum(["Beginner", "Intermediate", "Advanced", "All levels", "Expert"]).default("Beginner"),
   category: z.string().min(2).max(120),
+  subcategory: z.string().max(120).optional(),
+  language: z.enum(["Kinyarwanda", "English", "French", "Other"]).default("English"),
   price: z.coerce.number().min(0),
   compareAtPrice: z.coerce.number().min(0).optional(),
   currency: z.enum(["USD", "FRW"]).default("USD"),
   image: assetUrl,
   trailerUrl: optionalUrl,
+  previewType: z.enum(["smart", "custom", "none"]).default("smart"),
+  defaultPreviewDuration: z.coerce.number().int().min(0).default(90),
+  previewApplyTo: z.enum(["first", "selected", "all"]).default("first"),
+  paywallMessage: z.string().max(400).default("This is a preview. Enroll now to continue watching the full lesson."),
+  pricingType: z.enum(["free", "paid", "subscription", "manual"]).default("paid"),
+  targetAudience: z.string().max(1200).optional(),
   duration: z.string().min(2).max(80).default("Self-paced"),
   lessonsCount: z.coerce.number().int().min(0).default(0),
   rating: z.coerce.number().min(0).max(5).default(0),
@@ -47,16 +71,32 @@ export const courseSchema = z.object({
       z.object({
         title: z.string().min(2).max(180),
         description: z.string().max(900).optional(),
+        orderIndex: z.coerce.number().int().min(0).default(0),
+        status: z.enum(["draft", "ready", "hidden"]).default("draft"),
         lessons: z
           .array(
             z.object({
               title: z.string().min(2).max(180),
               type: z.enum(["video", "article", "image", "quiz", "assignment", "download"]).default("video"),
+              sourceType: z.enum(["google-drive", "external-link", "upload", "text"]).default("google-drive"),
               durationMinutes: z.coerce.number().int().min(0).default(0),
+              durationSeconds: z.coerce.number().int().min(0).default(0),
               summary: z.string().max(1200).optional(),
               videoUrl: optionalUrl,
+              videoProvider: z.string().max(80).optional(),
               imageUrl: optionalAssetUrl,
-              resources: z.array(z.object({ label: z.string(), url: assetUrl })).default([]),
+              resources: z
+                .array(
+                  z.object({
+                    label: z.string().max(180).optional(),
+                    title: z.string().max(180).optional(),
+                    type: z.string().max(80).optional(),
+                    url: assetUrl,
+                    accessRule: z.enum(["enrolled", "free"]).default("enrolled"),
+                    downloadable: z.boolean().default(true)
+                  })
+                )
+                .default([]),
               quizQuestions: z
                 .array(
                   z.object({
@@ -68,14 +108,19 @@ export const courseSchema = z.object({
                   })
                 )
                 .default([]),
-              isPreview: z.boolean().default(false)
+              isPreview: z.boolean().default(false),
+              freePreview: z.boolean().default(false),
+              previewStartSeconds: z.coerce.number().int().min(0).default(0),
+              previewEndSeconds: z.coerce.number().int().min(0).default(90)
             })
           )
           .default([])
       })
     )
     .default([]),
-  status: z.enum(["draft", "published", "archived"]).default("published"),
+  resources: z.array(courseResourceSchema).default([]),
+  reviewNotes: z.string().max(2000).optional(),
+  status: z.enum(["draft", "submitted", "changes_requested", "approved", "published", "unlisted", "archived"]).default("draft"),
   isFeatured: z.boolean().default(false)
 });
 
@@ -96,8 +141,9 @@ export const productSchema = z.object({
   delivery: z.string().min(2).max(160),
   tools: z.array(z.string().min(2).max(120)).default([]),
   tags: z.array(z.string().min(2).max(60)).default([]),
-  status: z.enum(["draft", "published", "archived"]).default("published"),
-  isFeatured: z.boolean().default(false)
+  status: reviewStatus.default("draft"),
+  isFeatured: z.boolean().default(false),
+  isVerified: z.boolean().default(false)
 });
 
 export const jobPostSchema = z.object({
@@ -155,8 +201,9 @@ export const shopProfileSchema = z.object({
     .default([]),
   tags: z.array(z.string().min(2).max(80)).default([]),
   rating: z.coerce.number().min(0).max(5).default(0),
-  status: z.enum(["draft", "published", "archived"]).default("published"),
-  isFeatured: z.boolean().default(false)
+  status: reviewStatus.default("draft"),
+  isFeatured: z.boolean().default(false),
+  isVerified: z.boolean().default(false)
 });
 
 export const blogPostSchema = z.object({
@@ -187,7 +234,8 @@ export const consultingServiceSchema = z.object({
   availability: z.array(z.object({ day: z.string(), slots: z.array(z.string()) })).default([]),
   rating: z.coerce.number().min(0).max(5).default(0),
   heroImage: z.url(),
-  status: z.enum(["draft", "published", "archived"]).default("published")
+  status: reviewStatus.default("draft"),
+  isVerified: z.boolean().default(false)
 });
 
 export const freelancerProfileSchema = z.object({
@@ -209,7 +257,32 @@ export const freelancerProfileSchema = z.object({
   bio: z.string().max(2000).optional(),
   gigs: z.array(z.object({ title: z.string(), price: z.coerce.number().min(0), deliveryDays: z.coerce.number().int().min(1) })).default([]),
   portfolio: z.array(z.object({ title: z.string(), url: z.url(), image: z.url().optional() })).default([]),
-  status: z.enum(["draft", "published", "archived"]).default("published")
+  status: reviewStatus.default("draft"),
+  isVerified: z.boolean().default(false)
+});
+
+export const gigSchema = z.object({
+  slug: slug.optional(),
+  title: z.string().min(3).max(180),
+  category: z.string().min(2).max(120),
+  packageName: z.string().min(2).max(160),
+  description: z.string().min(20).max(5000),
+  price: z.coerce.number().min(0),
+  currency: z.enum(["USD", "FRW"]).default("USD"),
+  deliveryDays: z.coerce.number().int().min(1).default(5),
+  revisions: z.coerce.number().int().min(0).default(1),
+  ownerName: z.string().max(120).optional(),
+  ownerAddress: z.string().max(240).optional(),
+  ownerCity: z.string().max(120).optional(),
+  ownerCountry: z.string().max(120).optional(),
+  image: assetUrl,
+  tags: z.array(z.string().min(2).max(80)).default([]),
+  deliverables: z.array(z.string().min(2).max(180)).default([]),
+  rating: z.coerce.number().min(0).max(5).default(0),
+  orders: z.coerce.number().int().min(0).default(0),
+  status: reviewStatus.default("draft"),
+  isFeatured: z.boolean().default(false),
+  isVerified: z.boolean().default(false)
 });
 
 export const aiToolSchema = z.object({

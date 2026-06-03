@@ -28,11 +28,17 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     await requireMongo();
-    await requireRole(request, ["admin", "freelancer"]);
+    const session = await requireRole(request, ["admin", "freelancer"]);
 
     const body = freelancerProfileSchema.parse(await readJson(request));
     const slug = await uniqueSlugFor(FreelancerProfile, body.slug ?? slugify(body.name));
-    const profile = await FreelancerProfile.create({ ...body, slug });
+    const profile = await FreelancerProfile.create({
+      ...body,
+      slug,
+      userId: session.user.id,
+      status: session.user.role === "admin" ? body.status : body.status === "draft" ? "draft" : "submitted",
+      isVerified: session.user.role === "admin" ? body.isVerified : false
+    });
 
     return jsonOk(normalizeFreelancer(profile), 201);
   } catch (error) {

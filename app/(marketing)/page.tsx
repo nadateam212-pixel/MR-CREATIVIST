@@ -260,31 +260,31 @@ export default async function HomePage() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6">
       <section
-        className="overflow-hidden rounded-md border border-white/10 text-white shadow-xl"
-        style={{ background: "var(--gradient-hero)", boxShadow: "0 26px 76px hsl(var(--primary) / 0.25)" }}
+        className="overflow-hidden rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] shadow-lg"
+        style={{ boxShadow: "0 20px 60px hsl(var(--primary) / 0.12)" }}
       >
-        <div className="grid gap-5 p-5 md:grid-cols-[1fr_auto] md:p-6 xl:grid-cols-[1fr_30rem]">
-          <div className="flex min-h-[14rem] flex-col justify-center">
-            <div className="mb-4 flex items-center gap-4">
-              <span className="relative flex size-16 shrink-0 overflow-hidden rounded-md bg-white p-1 shadow-lg">
-                <Image src={brand.logo} alt={brand.name} fill sizes="64px" className="object-contain p-1" priority />
+        <div className="grid gap-4 p-4 md:grid-cols-[1fr_auto] md:p-5 xl:grid-cols-[1fr_24rem]">
+          <div className="flex min-h-[10rem] flex-col justify-center">
+            <div className="mb-3 flex items-center gap-3">
+              <span className="relative flex size-12 shrink-0 overflow-hidden rounded-md bg-white p-1 shadow-md sm:size-14">
+                <Image src={brand.logo} alt={brand.name} fill sizes="56px" className="object-contain p-1" priority />
               </span>
               <div>
-                <p className="text-sm font-black uppercase tracking-[0.22em] text-white/80">Welcome to</p>
+                <p className="text-xs font-black uppercase tracking-[0.2em] text-[hsl(var(--primary))]">Welcome to</p>
                 <p className="text-lg font-black uppercase tracking-wide">{brand.name}</p>
               </div>
             </div>
-            <h1 className="max-w-3xl text-4xl font-black leading-none tracking-tight sm:text-5xl xl:text-6xl">
+            <h1 className="max-w-3xl text-3xl font-black leading-tight tracking-tight sm:text-4xl xl:text-5xl">
               Learn. Work. Sell. Grow.
             </h1>
-            <div className="mt-5 flex flex-wrap gap-3">
-              <Button asChild className="border-white/30 bg-white/15 text-white hover:bg-white/25">
+            <div className="mt-4 flex flex-wrap gap-3">
+              <Button asChild>
                 <Link href="/courses">
                   Explore Platform
                   <ArrowRight className="size-4" />
                 </Link>
               </Button>
-              <Button asChild variant="outline" className="border-white/35 bg-transparent text-white hover:bg-white/15">
+              <Button asChild variant="outline">
                 <Link href="/ai-tools">
                   <Sparkles className="size-4" />
                   MrCreativist.AI
@@ -293,17 +293,17 @@ export default async function HomePage() {
             </div>
           </div>
 
-          <div className="grid content-center gap-3 sm:grid-cols-3 xl:grid-cols-1">
+          <div className="hidden content-center gap-3 sm:grid sm:grid-cols-3 xl:grid-cols-1">
             {[
               { value: averageRating.toFixed(1), label: "Average platform rating", icon: Star },
               { value: formatCompact(learnerTotal), label: "Course learners", icon: Users },
               { value: formatCompact(liveRecordCount || courseItems.length + productItems.length + freelancerItems.length + jobItems.length + shopItems.length), label: "Live public records", icon: BadgeCheck }
             ].map(({ value, label, icon: Icon }) => (
-              <div key={label} className="flex items-center gap-3 rounded-md border border-white/10 bg-white/10 p-3 backdrop-blur">
-                <Icon className="size-5 shrink-0 text-white/85" />
+              <div key={label} className="flex items-center gap-3 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--muted))]/55 p-3">
+                <Icon className="size-5 shrink-0 text-[hsl(var(--primary))]" />
                 <div>
                   <p className="text-xl font-black">{value}</p>
-                  <p className="text-xs font-semibold text-white/80">{label}</p>
+                  <p className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">{label}</p>
                 </div>
               </div>
             ))}

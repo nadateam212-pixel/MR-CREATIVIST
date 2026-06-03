@@ -3,7 +3,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-export type PublishingStatus = "draft" | "published";
+export type PublishingStatus = "draft" | "submitted" | "changes_requested" | "approved" | "published" | "archived";
 
 export type PlatformCourseDraft = {
   title: string;
@@ -44,6 +44,7 @@ export type PlatformProductDraft = {
   image: string;
   tools: string[];
   status: PublishingStatus;
+  isVerified?: boolean;
   createdAt: string;
   updatedAt: string;
 };

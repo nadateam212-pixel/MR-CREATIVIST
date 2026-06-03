@@ -32,7 +32,13 @@ const FreelancerProfileSchema = new mongoose.Schema(
     gigs: [{ title: String, price: Number, deliveryDays: Number }],
     portfolio: [{ title: String, url: String, image: String }],
     reviews: [ReviewSchema],
-    status: { type: String, enum: ["draft", "published", "archived"], default: "published", index: true }
+    status: {
+      type: String,
+      enum: ["draft", "submitted", "changes_requested", "approved", "published", "archived"],
+      default: "draft",
+      index: true
+    },
+    isVerified: { type: Boolean, default: false }
   },
   { timestamps: true }
 );

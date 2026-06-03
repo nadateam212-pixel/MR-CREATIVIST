@@ -10,17 +10,17 @@ export function PageShell({
 }: {
   eyebrow?: string;
   title: string;
-  description: string;
+  description?: string;
   children?: React.ReactNode;
 }) {
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6">
+    <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6">
       <div className="max-w-3xl">
-        {eyebrow ? <p className="text-sm font-medium text-[hsl(var(--primary))]">{eyebrow}</p> : null}
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-5xl">{title}</h1>
-        <p className="mt-4 text-lg leading-8 text-[hsl(var(--muted-foreground))]">{description}</p>
+        {eyebrow ? <p className="text-xs font-black uppercase tracking-[0.16em] text-[hsl(var(--primary))]">{eyebrow}</p> : null}
+        <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">{title}</h1>
+        {description ? <p className="mt-3 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{description}</p> : null}
       </div>
-      <div className="mt-8">{children}</div>
+      <div className="mt-5">{children}</div>
     </div>
   );
 }

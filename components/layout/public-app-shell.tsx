@@ -61,12 +61,20 @@ const activityItems = [
 ];
 
 const mobileNavItems = [
-  tools[0],
-  tools[1],
-  tools[3],
-  tools[7],
-  tools[8]
+  { href: "/", labelKey: "nav.home", fallback: "Home", icon: Home },
+  { href: "/courses", labelKey: "nav.courses", fallback: "Courses", icon: GraduationCap },
+  { href: "/marketplace", labelKey: "nav.marketplace", fallback: "Marketplace", icon: ShoppingBag },
+  { href: "/ai-tools", labelKey: "nav.aiTools", fallback: "AI Tools", icon: Bot },
+  { href: "/settings", labelKey: "nav.settings", fallback: "Settings", icon: Settings }
 ];
+
+const mobileNavLabels: Record<string, string> = {
+  "/": "Home",
+  "/courses": "Courses",
+  "/marketplace": "Market",
+  "/ai-tools": "AI",
+  "/settings": "Settings"
+};
 
 function initials(value?: string | null) {
   return (value ?? "MC")
@@ -82,7 +90,10 @@ function MobileBottomNav() {
   const { t } = useI18n();
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-[hsl(var(--border))] bg-[hsl(var(--card))]/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-2xl shadow-black/10 backdrop-blur-xl lg:hidden">
+    <nav
+      className="fixed inset-x-0 bottom-0 z-40 grid border-t border-[hsl(var(--border))] bg-[hsl(var(--card))]/95 px-1 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-2xl shadow-black/10 backdrop-blur-xl lg:hidden"
+      style={{ gridTemplateColumns: "repeat(5, minmax(0, 1fr))" }}
+    >
       {mobileNavItems.map((item) => {
         const Icon = item.icon;
         const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
@@ -92,14 +103,14 @@ function MobileBottomNav() {
             key={item.href}
             href={item.href}
             className={cn(
-              "flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-md px-1 text-[11px] font-black transition-colors",
+              "flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-md px-1 text-[10px] font-black leading-none transition-colors",
               active
                 ? "bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))]"
                 : "text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]"
             )}
           >
             <Icon className="size-5 shrink-0" />
-            <span className="max-w-full truncate">{t(item.labelKey, item.fallback).split(" ")[0]}</span>
+            <span className="max-w-full truncate">{mobileNavLabels[item.href] ?? t(item.labelKey, item.fallback).split(" ")[0]}</span>
           </Link>
         );
       })}
@@ -121,7 +132,7 @@ export function PublicAppShell({
   const [activityOpen, setActivityOpen] = useState(false);
 
   return (
-    <div className="public-theme-shell min-h-screen bg-[hsl(var(--background))] pb-20 text-[hsl(var(--foreground))] lg:pb-0">
+    <div className="public-theme-shell min-h-screen overflow-x-hidden bg-[hsl(var(--background))] pb-20 text-[hsl(var(--foreground))] lg:pb-0">
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 border-r border-[hsl(var(--border))] bg-[hsl(var(--card))] lg:block">
         <div className="flex h-full flex-col">
           <Link href="/" className="flex items-center gap-3 px-5 py-7" aria-label={`${brand.name} home`}>
@@ -147,7 +158,7 @@ export function PublicAppShell({
                   <Link
                     key={item.href}
                     href={item.href}
-                    style={active ? { background: "var(--gradient-primary)", boxShadow: "0 14px 32px hsl(var(--primary) / 0.22)" } : undefined}
+                    style={active ? { background: "var(--gradient-primary)", boxShadow: "0 14px 32px hsl(var(--primary) / 0.22)", color: "#fff" } : undefined}
                     className={cn(
                       "flex h-11 items-center gap-3 rounded-md px-3 text-sm font-semibold transition-colors",
                       active
@@ -201,7 +212,7 @@ export function PublicAppShell({
               />
             </form>
 
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex shrink-0 items-center gap-1 sm:gap-2">
               <Button
                 asChild
                 size="icon"
@@ -221,7 +232,7 @@ export function PublicAppShell({
                 asChild
                 size="icon"
                 variant="outline"
-                className="hidden border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] sm:inline-flex"
+                className="border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))]"
               >
                 <Link href="/messages" aria-label="Messages">
                   <MessageSquare className="size-4" />
@@ -235,11 +246,6 @@ export function PublicAppShell({
               >
                 <Link href="/notifications" aria-label="Notifications">
                   <Bell className="size-4" />
-                </Link>
-              </Button>
-              <Button asChild size="icon" variant="outline" className="border-[hsl(var(--primary))]/30 bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/15">
-                <Link href="/ai-tools" aria-label="AI generation">
-                  <Bot className="size-4" />
                 </Link>
               </Button>
               <ModeToggle className="hidden border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] sm:inline-flex" />
@@ -261,7 +267,8 @@ export function PublicAppShell({
                   {profileOpen ? (
                     <div className="absolute right-0 mt-2 w-56 overflow-hidden rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-2 shadow-2xl shadow-black/15">
                       {[
-                        { href: "/dashboard", label: "Go dashboard", icon: LayoutDashboard },
+                        { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+                        { href: "/studio", label: "MrC. Studio", icon: Bot },
                         { href: "/profile", label: "Profile", icon: User },
                         { href: "/messages", label: "Messages", icon: MessageSquare },
                         { href: "/notifications", label: "Notifications", icon: Bell },
@@ -276,12 +283,6 @@ export function PublicAppShell({
                           {item.label}
                         </Link>
                       ))}
-                      {user.role === "admin" ? (
-                        <Link href="/admin/dashboard" className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-[hsl(var(--primary))] hover:bg-[hsl(var(--muted))]">
-                          <LayoutDashboard className="size-4" />
-                          Admin
-                        </Link>
-                      ) : null}
                       <form action={logoutAction} className="mt-1 border-t border-[hsl(var(--border))] pt-1">
                         <button type="submit" className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-red-300 hover:bg-red-500/10">
                           <LogOut className="size-4" />
@@ -300,7 +301,7 @@ export function PublicAppShell({
           </div>
         </header>
 
-        <div className="border-b border-[hsl(var(--border))] px-4 py-2 lg:hidden">
+        <div className="hidden border-b border-[hsl(var(--border))] px-4 py-2 lg:hidden">
           <div className="flex gap-2 overflow-x-auto pb-1">
             {tools.map((item) => (
               <Link
@@ -315,12 +316,14 @@ export function PublicAppShell({
         </div>
 
         <main>{children}</main>
-        <MarketingFooter />
+        <div className="hidden lg:block">
+          <MarketingFooter />
+        </div>
       </div>
 
       <MobileBottomNav />
 
-      <div className="fixed bottom-24 right-5 z-50 lg:bottom-5">
+      <div className="fixed bottom-24 right-5 z-50 hidden lg:block lg:bottom-5">
         {activityOpen ? (
           <div className="mb-3 w-80 max-w-[calc(100vw-2.5rem)] rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 text-[hsl(var(--foreground))] shadow-2xl shadow-black/15">
             <div className="mb-3 flex items-center justify-between">

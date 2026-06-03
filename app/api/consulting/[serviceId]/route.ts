@@ -20,14 +20,20 @@ export async function GET(_: Request, context: { params: Promise<{ serviceId: st
 export async function PUT(request: Request, context: { params: Promise<{ serviceId: string }> }) {
   try {
     await requireMongo();
-    await requireRole(request, ["admin", "consultant"]);
+    const session = await requireRole(request, ["admin", "consultant"]);
 
     const { serviceId } = await context.params;
     const existing = await ConsultingService.findOne(mongoIdOrSlug(serviceId));
     if (!existing) return jsonOk({ error: "Consulting service not found." }, 404);
+    const isAdmin = session.user.role === "admin";
+    const ownsService = existing.expertId && String(existing.expertId) === String(session.user.id);
+    if (!isAdmin && !ownsService) return jsonOk({ error: "You can only manage your own consulting service." }, 403);
 
     const body = consultingServiceSchema.partial().parse(await readJson(request));
-    const patch = { ...body };
+    const patch = {
+      ...body,
+      ...(isAdmin ? {} : { status: body.status === "draft" ? "draft" : "submitted", isVerified: existing.isVerified })
+    };
     if (body.slug || body.expertName || body.title) {
       patch.slug = await uniqueSlugFor(ConsultingService, body.slug ?? slugify(body.expertName || body.title), existing._id);
     }
@@ -43,12 +49,17 @@ export async function PUT(request: Request, context: { params: Promise<{ service
 export async function DELETE(request: Request, context: { params: Promise<{ serviceId: string }> }) {
   try {
     await requireMongo();
-    await requireRole(request, ["admin", "consultant"]);
+    const session = await requireRole(request, ["admin", "consultant"]);
 
     const { serviceId } = await context.params;
-    const service = await ConsultingService.findOneAndUpdate(mongoIdOrSlug(serviceId), { status: "archived" }, { returnDocument: "after" });
+    const existing = await ConsultingService.findOne(mongoIdOrSlug(serviceId));
 
-    if (!service) return jsonOk({ error: "Consulting service not found." }, 404);
+    if (!existing) return jsonOk({ error: "Consulting service not found." }, 404);
+    const isAdmin = session.user.role === "admin";
+    const ownsService = existing.expertId && String(existing.expertId) === String(session.user.id);
+    if (!isAdmin && !ownsService) return jsonOk({ error: "You can only archive your own consulting service." }, 403);
+
+    const service = await ConsultingService.findByIdAndUpdate(existing._id, { status: "archived" }, { returnDocument: "after" });
 
     return jsonOk({ ok: true, item: normalizeConsultingService(service) });
   } catch (error) {

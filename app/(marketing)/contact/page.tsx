@@ -5,19 +5,13 @@ import { brand } from "@/lib/brand";
 
 export default function ContactPage() {
   return (
-    <div>
-      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
-        <div className="mx-auto max-w-3xl text-center">
-          <p className="text-sm font-black uppercase tracking-[0.2em] text-[hsl(var(--primary))]">CONTACT US</p>
-          <h1 className="mt-3 text-4xl font-black uppercase tracking-tight sm:text-6xl">Let&apos;s build your next digital growth system.</h1>
-          <p className="mt-5 text-lg leading-8 text-[hsl(var(--muted-foreground))]">
-            Talk to MR Creativist about e-learning, marketplace selling, AI tools, multimedia production, consulting,
-            partnerships, or platform support.
-          </p>
-        </div>
-      </section>
+    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+      <div className="mb-5">
+        <p className="text-xs font-black uppercase tracking-[0.18em] text-[hsl(var(--primary))]">Contact</p>
+        <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">Message MR Creativist</h1>
+      </div>
 
-      <section className="mx-auto grid max-w-7xl gap-6 px-4 pb-16 sm:px-6 lg:grid-cols-[0.85fr_1.15fr]">
+      <section className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
         <div className="grid gap-5">
           <Card>
             <CardHeader>

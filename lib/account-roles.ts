@@ -51,11 +51,11 @@ export const roleLabels: Record<AccountRole | "admin", string> = {
 export const roleDashboardPaths: Record<AccountRole | "admin", string> = {
   admin: "/admin/dashboard",
   client: "/dashboard",
-  student: "/dashboard/my-courses",
-  instructor: "/instructor",
-  seller: "/seller",
-  freelancer: "/freelancer",
-  consultant: "/consultant"
+  student: "/dashboard",
+  instructor: "/studio",
+  seller: "/studio",
+  freelancer: "/studio",
+  consultant: "/studio"
 };
 
 export const roleApplicationProfiles: Record<ElevatedAccountRole, RoleApplicationProfile> = {

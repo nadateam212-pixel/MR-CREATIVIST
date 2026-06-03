@@ -47,6 +47,24 @@ export function LoginForm({ callbackUrl = "" }: { callbackUrl?: string }) {
     }
   }
 
+  async function resolvePostLoginPath(defaultPath: string) {
+    try {
+      const response = await fetch("/api/account/roles", {
+        cache: "no-store",
+        headers: { Accept: "application/json" }
+      });
+
+      if (!response.ok) return defaultPath;
+
+      const payload = await response.json();
+      if (payload?.isAdmin) return payload.adminPath ?? "/admin/dashboard";
+    } catch {
+      return defaultPath;
+    }
+
+    return defaultPath;
+  }
+
   async function onSubmit(input: LoginInput) {
     setPending(true);
 
@@ -63,8 +81,9 @@ export function LoginForm({ callbackUrl = "" }: { callbackUrl?: string }) {
         return;
       }
 
+      const nextPath = await resolvePostLoginPath(toCurrentOriginPath(result.url));
       toast.success("Signed in. Opening your dashboard...");
-      window.location.assign(toCurrentOriginPath(result.url));
+      window.location.assign(nextPath);
     } catch {
       toast.error("Sign in could not finish. Check your connection and try again.");
     } finally {

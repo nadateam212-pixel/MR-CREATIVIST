@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, CheckCircle2, Languages, Search, ShieldCheck, Star, Video, X } from "lucide-react";
+import { BadgeCheck, CalendarDays, Languages, Search, Star, Video, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -19,6 +20,7 @@ type Consultant = {
   expertise: string[];
   languages?: string[];
   sessionTypes?: { label: string; durationMinutes: number; price?: number }[];
+  isVerified?: boolean;
 };
 
 export function ConsultingDirectory({ consultants }: { consultants: Consultant[] }) {
@@ -105,7 +107,15 @@ export function ConsultingDirectory({ consultants }: { consultants: Consultant[]
                       <p className="text-xs font-black uppercase tracking-[0.18em] text-[hsl(var(--primary))]">
                         {consultant.title}
                       </p>
-                      <CardTitle className="mt-2 uppercase">{consultant.name}</CardTitle>
+                      <CardTitle className="mt-2 flex flex-wrap items-center gap-2 uppercase">
+                        <span>{consultant.name}</span>
+                        {consultant.isVerified ? (
+                          <Badge className="border-sky-500/45 text-sky-500">
+                            <BadgeCheck className="mr-1 size-3" />
+                            Verified
+                          </Badge>
+                        ) : null}
+                      </CardTitle>
                     </div>
                     <span className="flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-700">
                       <Star className="size-3.5 fill-current" />
@@ -153,26 +163,6 @@ export function ConsultingDirectory({ consultants }: { consultants: Consultant[]
               </CardContent>
             </Card>
           )}
-        </div>
-      </section>
-
-      <section className="border-t border-[hsl(var(--border))] bg-[hsl(var(--muted))]/45">
-        <div className="mx-auto grid max-w-7xl gap-4 px-4 py-12 sm:px-6 md:grid-cols-3">
-          {[
-            { title: "VERIFIED EXPERTS", icon: ShieldCheck },
-            { title: "CLEAR BOOKING", icon: CalendarDays },
-            { title: "ACTION PLANS", icon: CheckCircle2 }
-          ].map((item) => (
-            <Card key={item.title}>
-              <CardContent className="p-6">
-                <item.icon className="mb-4 size-6 text-[hsl(var(--primary))]" />
-                <p className="font-black uppercase">{item.title}</p>
-                <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-                  Book, pay, meet, review, and keep progress notes in one consulting workflow.
-                </p>
-              </CardContent>
-            </Card>
-          ))}
         </div>
       </section>
 

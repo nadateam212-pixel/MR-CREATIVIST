@@ -30,6 +30,12 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
+function getSystemThemeId(): ThemeId {
+  if (typeof window === "undefined") return defaultTheme.id;
+
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
 function getInitialThemeId(): ThemeId {
   return defaultTheme.id;
 }
@@ -46,6 +52,7 @@ function applyTheme(themeId: ThemeId) {
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [themeId, setThemeIdState] = useState<ThemeId>(getInitialThemeId);
   const [ready, setReady] = useState(false);
+  const [hasStoredTheme, setHasStoredTheme] = useState(false);
 
   const theme = useMemo(() => getTheme(themeId), [themeId]);
 
@@ -55,6 +62,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     window.queueMicrotask(() => {
       if (isThemeId(stored)) {
         setThemeIdState(stored);
+        setHasStoredTheme(true);
+      } else {
+        setThemeIdState(getSystemThemeId());
+        setHasStoredTheme(false);
       }
 
       setReady(true);
@@ -65,14 +76,18 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     if (!ready) return;
 
     applyTheme(themeId);
-    window.localStorage.setItem(themeStorageKey, themeId);
-  }, [ready, themeId]);
+    if (hasStoredTheme) {
+      window.localStorage.setItem(themeStorageKey, themeId);
+    }
+  }, [hasStoredTheme, ready, themeId]);
 
   function setThemeId(nextThemeId: ThemeId) {
+    setHasStoredTheme(true);
     setThemeIdState(nextThemeId);
   }
 
   function cycleTheme() {
+    setHasStoredTheme(true);
     setThemeIdState((currentThemeId) => getNextThemeId(currentThemeId));
   }
 

@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { ShopDirectory, type PublicShopProfile } from "@/components/platform/job-shop-workbenches";
@@ -87,37 +86,18 @@ export default async function BusinessDirectoryPage() {
   const listHref = session?.user ? "/seller/shop" : "/login?callbackUrl=/seller/shop";
 
   return (
-    <div>
-      <section className="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
-        <div>
-          <p className="text-sm font-black uppercase tracking-[0.2em] text-[hsl(var(--primary))]">Business Directory</p>
-          <h1 className="mt-3 text-4xl font-black uppercase tracking-tight sm:text-6xl">
-            Discover trusted creative, media, AI and digital businesses.
-          </h1>
-          <p className="mt-5 text-lg leading-8 text-[hsl(var(--muted-foreground))]">
-            MR Creativist connects learners, buyers and companies with verified service providers, studios, consultants
-            and sellers ready to support serious growth.
-          </p>
-          <Button asChild className="mt-8" size="lg">
-            <Link href={listHref}>LIST YOUR BUSINESS</Link>
+    <div className="border-y border-[hsl(var(--border))] bg-[hsl(var(--muted))]/35">
+      <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-[hsl(var(--primary))]">Businesses</p>
+            <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">Listed businesses</h1>
+          </div>
+          <Button asChild>
+            <Link href={listHref}>List your business</Link>
           </Button>
         </div>
-        <div className="relative min-h-[22rem] overflow-hidden rounded-lg border border-[hsl(var(--border))]">
-          <Image
-            src="https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=1200&q=85"
-            alt="Business directory team"
-            fill
-            sizes="(min-width: 1024px) 50vw, 100vw"
-            className="object-cover"
-            priority
-          />
-        </div>
-      </section>
-
-      <section className="border-y border-[hsl(var(--border))] bg-[hsl(var(--muted))]/35">
-        <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
           <ShopDirectory shops={businessItems} showHeader={false} />
-        </div>
       </section>
     </div>
   );

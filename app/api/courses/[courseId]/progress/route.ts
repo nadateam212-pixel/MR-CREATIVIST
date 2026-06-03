@@ -128,7 +128,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ cou
       ? await User.findById(session.user.id).select("_id name email").lean()
       : await User.findOne({ email: learnerEmail.toLowerCase() }).select("_id name email").lean();
     const normalizedEmail = learnerEmail.toLowerCase();
-    const existingProgress = await LearningProgress.findOne({ courseId: course._id, learnerEmail: normalizedEmail }).lean();
+    const [existingProgress, existingEnrollment] = await Promise.all([
+      LearningProgress.findOne({ courseId: course._id, learnerEmail: normalizedEmail }).lean(),
+      Enrollment.findOne({ courseId: course._id, learnerEmail: normalizedEmail }).lean()
+    ]);
+    const isCourseManager =
+      ["admin", "instructor"].includes(String(session?.user?.role ?? "").toLowerCase()) ||
+      (course.instructorId && session?.user?.id && String(course.instructorId) === String(session.user.id));
+
+    if (!existingEnrollment && !isCourseManager) {
+      return jsonOk({ error: "Enroll in this course before opening the full learning workspace." }, 403);
+    }
     const completedLessonKeys = new Set(existingProgress?.completedLessonKeys ?? []);
     const existingLessonSeconds = studySecondsByLesson(existingProgress?.events ?? []);
 

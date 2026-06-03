@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { auth } from "@/auth";
 import { FreelancerStudio } from "@/components/platform/freelancer-studio";
-import { getFreelancers } from "@/lib/platform-db";
+import { getFreelancers, getGigs } from "@/lib/platform-db";
 
 export const metadata: Metadata = {
   title: "Freelancers",
@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 };
 
 export default async function FreelancersPage() {
-  const [session, freelancers] = await Promise.all([auth(), getFreelancers()]);
+  const [session, freelancers, gigs] = await Promise.all([auth(), getFreelancers(), getGigs()]);
   const currentUser = session?.user;
   const hasFreelancerAccess =
     currentUser?.role === "freelancer" || currentUser?.validatedRoles?.includes("freelancer");
@@ -40,5 +40,5 @@ export default async function FreelancersPage() {
         ]
       : freelancers;
 
-  return <FreelancerStudio initialFreelancers={freelancerItems} />;
+  return <FreelancerStudio initialFreelancers={freelancerItems} initialGigs={gigs} />;
 }

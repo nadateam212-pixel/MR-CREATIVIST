@@ -100,7 +100,7 @@ type ProductCatalogRow = {
   slug: string;
   category: string;
   price: string;
-  status?: string;
+  status?: PublishingStatus | "base";
 };
 
 type CourseCatalogRow = {
@@ -108,7 +108,7 @@ type CourseCatalogRow = {
   slug: string;
   category: string;
   price: string;
-  status?: string;
+  status?: PublishingStatus | "base";
 };
 
 export function ProductBuilder({
@@ -116,8 +116,9 @@ export function ProductBuilder({
 }: {
   sellerName?: string;
 }) {
-  const createProduct = usePlatformStore((state) => state.createProduct);
   const [lastSlug, setLastSlug] = useState<string | null>(null);
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState("");
   const [form, setForm] = useState({
     name: "Digital Creator Product",
     type: "Digital",
@@ -139,22 +140,42 @@ export function ProductBuilder({
     readFileAsDataUrl(file, (value) => update("image", value));
   }
 
-  function submit(status: PublishingStatus) {
-    const slug = createProduct({
-      name: form.name,
-      type: form.type,
-      category: form.category,
-      price: price(form.price),
-      compareAt: price(form.compareAt),
-      seller: sellerName,
-      stock: Number(form.stock) || 0,
-      delivery: form.delivery,
-      image: safeImage(form.image, productImage),
-      tools: splitLines(form.tools),
-      status
-    });
+  async function submit(status: "draft" | "submitted") {
+    setBusy(status);
+    setMessage(status === "submitted" ? "Submitting product for admin review..." : "Saving product draft...");
 
-    setLastSlug(slug);
+    try {
+      const response = await fetch("/api/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name,
+          type: form.type,
+          category: form.category,
+          price: Number(form.price) || 0,
+          compareAtPrice: Number(form.compareAt) || undefined,
+          currency: "USD",
+          sellerName,
+          stock: Number(form.stock) || 0,
+          delivery: form.delivery,
+          images: [safeImage(form.image, productImage)],
+          description: splitLines(form.tools).join(". ") || `${form.name} product from ${sellerName}.`,
+          tools: splitLines(form.tools),
+          tags: splitLines(form.tools).slice(0, 4),
+          status
+        })
+      });
+      const product = await response.json();
+
+      if (!response.ok) throw new Error(product.error ?? "Product save failed.");
+
+      setLastSlug(product.slug);
+      setMessage(status === "submitted" ? "Product submitted. Admin can approve, verify, and publish it." : "Product draft saved.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Product save failed.");
+    } finally {
+      setBusy("");
+    }
   }
 
   return (
@@ -231,13 +252,12 @@ export function ProductBuilder({
                 inputMode="numeric"
               />
             </label>
-            <label className="grid gap-2 text-sm font-medium">
-              Image URL
-              <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-                <Input
-                  value={form.image}
-                  onChange={(event) => update("image", event.target.value)}
-                />
+            <div className="grid gap-2 text-sm font-medium">
+              Product image
+              <div className="grid gap-3 rounded-md border border-[hsl(var(--border))] p-3 sm:grid-cols-[9rem_1fr] sm:items-center">
+                <div className="overflow-hidden rounded-md border border-[hsl(var(--border))]">
+                  <img src={safeImage(form.image, productImage)} alt="" className="aspect-video w-full object-cover" />
+                </div>
                 <Button asChild type="button" variant="outline">
                   <label className="cursor-pointer">
                     <Upload className="size-4" />
@@ -246,7 +266,7 @@ export function ProductBuilder({
                   </label>
                 </Button>
               </div>
-            </label>
+            </div>
             <label className="grid gap-2 text-sm font-medium md:col-span-2">
               Included tools
               <textarea
@@ -275,11 +295,11 @@ export function ProductBuilder({
               </p>
             </div>
             <div className="grid gap-2">
-              <Button onClick={() => submit("published")}>
+              <Button onClick={() => void submit("submitted")} disabled={busy === "submitted"}>
                 <Send className="size-4" />
-                Publish to marketplace
+                Submit for review
               </Button>
-              <Button variant="outline" onClick={() => submit("draft")}>
+              <Button variant="outline" onClick={() => void submit("draft")} disabled={busy === "draft"}>
                 <Save className="size-4" />
                 Save draft
               </Button>
@@ -288,17 +308,11 @@ export function ProductBuilder({
               <div className="rounded-md border border-[hsl(var(--border))] p-3 text-sm">
                 <p className="flex items-center gap-2 font-medium text-[hsl(var(--primary))]">
                   <CheckCircle2 className="size-4" />
-                  Product saved
+                  {message || "Product saved"}
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Button asChild size="sm" variant="outline">
                     <Link href="/seller/products">Manage</Link>
-                  </Button>
-                  <Button asChild size="sm">
-                    <Link href="/marketplace">
-                      <Eye className="size-4" />
-                      Public page
-                    </Link>
                   </Button>
                 </div>
               </div>
@@ -457,13 +471,12 @@ export function CourseBuilder({
                 inputMode="numeric"
               />
             </label>
-            <label className="grid gap-2 text-sm font-medium md:col-span-2">
-              Image URL
-              <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-                <Input
-                  value={form.image}
-                  onChange={(event) => update("image", event.target.value)}
-                />
+            <div className="grid gap-2 text-sm font-medium md:col-span-2">
+              Cover image
+              <div className="grid gap-3 rounded-md border border-[hsl(var(--border))] p-3 sm:grid-cols-[10rem_1fr] sm:items-center">
+                <div className="overflow-hidden rounded-md border border-[hsl(var(--border))]">
+                  <img src={safeImage(form.image, courseImage)} alt="" className="aspect-video w-full object-cover" />
+                </div>
                 <Button asChild type="button" variant="outline">
                   <label className="cursor-pointer">
                     <FileImage className="size-4" />
@@ -472,7 +485,7 @@ export function CourseBuilder({
                   </label>
                 </Button>
               </div>
-            </label>
+            </div>
             <label className="grid gap-2 text-sm font-medium md:col-span-2">
               Preview video URL
               <Input
@@ -1355,15 +1368,12 @@ export function InstructorCourseStudio({
                         }
                       />
                     </label>
-                    <label className="grid gap-2 text-sm font-medium md:col-span-2">
-                      Cover image URL
-                      <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-                        <Input
-                          value={form.image}
-                          onChange={(event) =>
-                            update("image", event.target.value)
-                          }
-                        />
+                    <div className="grid gap-2 text-sm font-medium md:col-span-2">
+                      Cover image
+                      <div className="grid gap-3 rounded-md border border-[hsl(var(--border))] p-3 sm:grid-cols-[10rem_1fr] sm:items-center">
+                        <div className="overflow-hidden rounded-md border border-[hsl(var(--border))]">
+                          <img src={safeImage(form.image, courseImage)} alt="" className="aspect-video w-full object-cover" />
+                        </div>
                         <Button asChild type="button" variant="outline">
                           <label className="cursor-pointer">
                             <FileImage className="size-4" />
@@ -1372,7 +1382,7 @@ export function InstructorCourseStudio({
                           </label>
                         </Button>
                       </div>
-                    </label>
+                    </div>
                     <label className="grid gap-2 text-sm font-medium md:col-span-2">
                       Preview video URL
                       <Input
@@ -2396,18 +2406,97 @@ export function ProductManager({ initialProducts = [] }: { initialProducts?: Pro
   const deleteProduct = usePlatformStore((state) => state.deleteProduct);
   const [editingSlug, setEditingSlug] = useState("");
   const [editForm, setEditForm] = useState({ name: "", category: "", price: "", stock: "" });
+  const [hiddenSlugs, setHiddenSlugs] = useState<string[]>([]);
+  const [busySlug, setBusySlug] = useState("");
   const rows = useMemo(
     () => [
       ...createdProducts,
       ...initialProducts.map((product) => ({
         ...product,
-        status: "base" as const,
+        status: (product.status ?? "base") as PublishingStatus | "base",
         createdAt: "Database"
       }))
-    ],
-    [createdProducts, initialProducts]
+    ].filter((product) => !hiddenSlugs.includes(product.slug)),
+    [createdProducts, hiddenSlugs, initialProducts]
   );
   const editingProduct = createdProducts.find((product) => product.slug === editingSlug);
+
+  function isLocalProduct(product: (typeof rows)[number]) {
+    return createdProducts.some((item) => item.slug === product.slug);
+  }
+
+  async function updateDatabaseProductStatus(slug: string, status: PublishingStatus) {
+    setBusySlug(slug);
+
+    try {
+      const response = await fetch(`/api/products/${encodeURIComponent(slug)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status })
+      });
+
+      if (!response.ok) throw new Error("Product update failed.");
+    } finally {
+      setBusySlug("");
+    }
+  }
+
+  async function archiveDatabaseProduct(slug: string) {
+    setBusySlug(slug);
+
+    try {
+      await fetch(`/api/products/${encodeURIComponent(slug)}`, { method: "DELETE" });
+      setHiddenSlugs((current) => [...current, slug]);
+    } finally {
+      setBusySlug("");
+    }
+  }
+
+  function primaryProductAction(product: (typeof rows)[number]) {
+    const status = product.status ?? "draft";
+    const local = isLocalProduct(product);
+    const disabled = busySlug === product.slug;
+
+    if (status === "published") {
+      return (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={disabled}
+          onClick={() => (local ? updateProductStatus(product.slug, "archived") : void updateDatabaseProductStatus(product.slug, "archived"))}
+        >
+          <Archive className="size-4" />
+          Archive
+        </Button>
+      );
+    }
+
+    if (status === "approved") {
+      return (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={disabled}
+          onClick={() => (local ? updateProductStatus(product.slug, "published") : void updateDatabaseProductStatus(product.slug, "published"))}
+        >
+          <Send className="size-4" />
+          Publish
+        </Button>
+      );
+    }
+
+    return (
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={disabled}
+        onClick={() => (local ? updateProductStatus(product.slug, "submitted") : void updateDatabaseProductStatus(product.slug, "submitted"))}
+      >
+        <Send className="size-4" />
+        Submit
+      </Button>
+    );
+  }
 
   function startProductEdit(product: PlatformProductDraft) {
     setEditingSlug(product.slug);
@@ -2440,7 +2529,7 @@ export function ProductManager({ initialProducts = [] }: { initialProducts?: Pro
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Products</h1>
           <p className="mt-2 text-[hsl(var(--muted-foreground))]">
-            Create, publish, unpublish, and delete seller products.
+            Manage products created from MrC. Studio.
           </p>
         </div>
         <Button asChild>
@@ -2496,66 +2585,55 @@ export function ProductManager({ initialProducts = [] }: { initialProducts?: Pro
                     <StatusBadge status={product.status} />
                   </td>
                   <td className="p-4">
-                    <div className="flex justify-end gap-2">
-                      {product.status === "base" ? (
-                        <Button asChild size="sm" variant="outline">
-                          <Link href="/marketplace">Public</Link>
+                    <div className="flex flex-wrap justify-end gap-2">
+                      {isLocalProduct(product) ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => startProductEdit(product as PlatformProductDraft)}
+                        >
+                          <Edit3 className="size-4" />
+                          Edit
                         </Button>
                       ) : (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => startProductEdit(product as PlatformProductDraft)}
-                          >
+                        <Button asChild size="sm" variant="outline">
+                          <Link href={`/seller/products/${product.slug}/edit`}>
                             <Edit3 className="size-4" />
                             Edit
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() =>
-                              updateProductStatus(
-                                product.slug,
-                                product.status === "published"
-                                  ? "draft"
-                                  : "published"
-                              )
-                            }
-                          >
-                            {product.status === "published" ? (
-                              <Archive className="size-4" />
-                            ) : (
-                              <Send className="size-4" />
-                            )}
-                            {product.status === "published"
-                              ? "Unpublish"
-                              : "Publish"}
-                          </Button>
-                          <Button asChild size="sm" variant="outline">
-                            <Link href={`/marketplace/product/${product.slug}`}>
-                              <Eye className="size-4" />
-                              View
-                            </Link>
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => shareProduct(product.slug)}
-                          >
-                            <Share2 className="size-4" />
-                            Share
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => deleteProduct(product.slug)}
-                          >
-                            <Trash2 className="size-4" />
-                            Delete
-                          </Button>
-                        </>
+                          </Link>
+                        </Button>
                       )}
+                      {primaryProductAction(product)}
+                      <Button asChild size="sm" variant="outline">
+                        <Link href={`/marketplace/product/${product.slug}`}>
+                          <Eye className="size-4" />
+                          View
+                        </Link>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => shareProduct(product.slug)}
+                      >
+                        <Share2 className="size-4" />
+                        Share
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busySlug === product.slug}
+                        onClick={() => {
+                          if (isLocalProduct(product)) {
+                            deleteProduct(product.slug);
+                            return;
+                          }
+
+                          void archiveDatabaseProduct(product.slug);
+                        }}
+                      >
+                        <Trash2 className="size-4" />
+                        Delete
+                      </Button>
                     </div>
                   </td>
                 </tr>
@@ -2580,17 +2658,96 @@ export function CourseManager({ initialCourses = [] }: { initialCourses?: Course
     (state) => state.updateCourseStatus
   );
   const deleteCourse = usePlatformStore((state) => state.deleteCourse);
+  const [hiddenSlugs, setHiddenSlugs] = useState<string[]>([]);
+  const [busySlug, setBusySlug] = useState("");
   const rows = useMemo(
     () => [
       ...createdCourses,
       ...initialCourses.map((course) => ({
         ...course,
-        status: "base" as const,
+        status: (course.status ?? "base") as PublishingStatus | "base",
         createdAt: "Database"
       }))
-    ],
-    [createdCourses, initialCourses]
+    ].filter((course) => !hiddenSlugs.includes(course.slug)),
+    [createdCourses, hiddenSlugs, initialCourses]
   );
+
+  async function updateDatabaseCourseStatus(slug: string, status: PublishingStatus) {
+    setBusySlug(slug);
+
+    try {
+      const response = await fetch(`/api/courses/${encodeURIComponent(slug)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status })
+      });
+
+      if (!response.ok) throw new Error("Course update failed.");
+    } finally {
+      setBusySlug("");
+    }
+  }
+
+  async function archiveDatabaseCourse(slug: string) {
+    setBusySlug(slug);
+
+    try {
+      await fetch(`/api/courses/${encodeURIComponent(slug)}`, { method: "DELETE" });
+      setHiddenSlugs((current) => [...current, slug]);
+    } finally {
+      setBusySlug("");
+    }
+  }
+
+  function isLocalCourse(course: (typeof rows)[number]) {
+    return createdCourses.some((item) => item.slug === course.slug);
+  }
+
+  function primaryStatusAction(course: (typeof rows)[number]) {
+    const status = course.status ?? "draft";
+    const disabled = busySlug === course.slug;
+    const local = isLocalCourse(course);
+
+    if (status === "published") {
+      return (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={disabled}
+          onClick={() => (local ? updateCourseStatus(course.slug, "archived") : void updateDatabaseCourseStatus(course.slug, "archived"))}
+        >
+          <Archive className="size-4" />
+          Archive
+        </Button>
+      );
+    }
+
+    if (status === "approved") {
+      return (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={disabled}
+          onClick={() => (local ? updateCourseStatus(course.slug, "published") : void updateDatabaseCourseStatus(course.slug, "published"))}
+        >
+          <Send className="size-4" />
+          Publish
+        </Button>
+      );
+    }
+
+    return (
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={disabled}
+        onClick={() => (local ? updateCourseStatus(course.slug, "submitted") : void updateDatabaseCourseStatus(course.slug, "submitted"))}
+      >
+        <Send className="size-4" />
+        Submit
+      </Button>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -2598,7 +2755,7 @@ export function CourseManager({ initialCourses = [] }: { initialCourses?: Course
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Courses</h1>
           <p className="mt-2 text-[hsl(var(--muted-foreground))]">
-            Create, publish, unpublish, and delete instructor courses.
+            Manage courses created from MrC. Studio.
           </p>
         </div>
         <Button asChild>
@@ -2639,44 +2796,48 @@ export function CourseManager({ initialCourses = [] }: { initialCourses?: Course
                     <StatusBadge status={course.status} />
                   </td>
                   <td className="p-4">
-                    <div className="flex justify-end gap-2">
-                      {course.status === "base" ? (
-                        <Button asChild size="sm" variant="outline">
-                          <Link href="/courses">Public</Link>
-                        </Button>
-                      ) : (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() =>
-                              updateCourseStatus(
-                                course.slug,
-                                course.status === "published"
-                                  ? "draft"
-                                  : "published"
-                              )
-                            }
-                          >
-                            {course.status === "published" ? (
-                              <Archive className="size-4" />
-                            ) : (
-                              <Send className="size-4" />
-                            )}
-                            {course.status === "published"
-                              ? "Unpublish"
-                              : "Publish"}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => deleteCourse(course.slug)}
-                          >
-                            <Trash2 className="size-4" />
-                            Delete
-                          </Button>
-                        </>
-                      )}
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <Button asChild size="sm" variant="outline">
+                        <Link href={`/instructor/courses/${course.slug}/edit`}>
+                          <Edit3 className="size-4" />
+                          Edit
+                        </Link>
+                      </Button>
+                      <Button asChild size="sm" variant="outline">
+                        <Link href={`/instructor/courses/${course.slug}/curriculum`}>
+                          <BookOpen className="size-4" />
+                          Lessons
+                        </Link>
+                      </Button>
+                      <Button asChild size="sm" variant="outline">
+                        <Link href={`/instructor/courses/${course.slug}/analytics`}>
+                          <BarChart3 className="size-4" />
+                          Analytics
+                        </Link>
+                      </Button>
+                      <Button asChild size="sm" variant="outline">
+                        <Link href={`/courses/${course.slug}`}>
+                          <Eye className="size-4" />
+                          View
+                        </Link>
+                      </Button>
+                      {primaryStatusAction(course)}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busySlug === course.slug}
+                        onClick={() => {
+                          if (isLocalCourse(course)) {
+                            deleteCourse(course.slug);
+                            return;
+                          }
+
+                          void archiveDatabaseCourse(course.slug);
+                        }}
+                      >
+                        <Trash2 className="size-4" />
+                        Delete
+                      </Button>
                     </div>
                   </td>
                 </tr>

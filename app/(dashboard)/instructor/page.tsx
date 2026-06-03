@@ -1,5 +1,5 @@
-import { PlatformDashboard } from "@/components/platform/platform-dashboard";
+import { redirect } from "next/navigation";
 
 export default function InstructorPage() {
-  return <PlatformDashboard role="instructor" />;
+  redirect("/studio");
 }

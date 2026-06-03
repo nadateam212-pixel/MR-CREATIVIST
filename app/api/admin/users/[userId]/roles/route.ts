@@ -9,7 +9,8 @@ const platformRole = z.enum(["student", "instructor", "seller", "client", "freel
 const updateSchema = z.object({
   role: platformRole.optional(),
   validatedRoles: z.array(platformRole).optional(),
-  accountStatus: z.enum(["active", "suspended", "review"]).optional()
+  accountStatus: z.enum(["active", "suspended", "review"]).optional(),
+  isVerified: z.boolean().optional()
 });
 
 async function requireAdmin() {
@@ -35,6 +36,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ us
     }
     if (body.accountStatus) patch.accountStatus = body.accountStatus;
     if (body.role) patch.role = body.role;
+    if (typeof body.isVerified === "boolean") patch.isVerified = body.isVerified;
 
     const user = await User.findByIdAndUpdate(userId, patch, { returnDocument: "after", runValidators: true }).lean();
     if (!user) throw new ApiError("User not found.", 404);

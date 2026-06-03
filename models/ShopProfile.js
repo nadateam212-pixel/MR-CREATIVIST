@@ -35,8 +35,14 @@ const ShopProfileSchema = new mongoose.Schema(
     productsOrServices: { type: [ShopOfferSchema], default: [] },
     tags: [{ type: String, lowercase: true, trim: true, maxlength: 80 }],
     rating: { type: Number, min: 0, max: 5, default: 0 },
-    status: { type: String, enum: ["draft", "published", "archived"], default: "draft", index: true },
-    isFeatured: { type: Boolean, default: false }
+    status: {
+      type: String,
+      enum: ["draft", "submitted", "changes_requested", "approved", "published", "archived"],
+      default: "draft",
+      index: true
+    },
+    isFeatured: { type: Boolean, default: false },
+    isVerified: { type: Boolean, default: false }
   },
   { timestamps: true }
 );

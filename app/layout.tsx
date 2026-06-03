@@ -4,7 +4,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Toaster } from "@/components/ui/toaster";
 import { Providers } from "@/components/providers";
 import { ThemeProvider } from "@/components/theme-provider";
-import { darkThemeIds, defaultTheme, themeIds, themeStorageKey } from "@/lib/themes";
+import { darkThemeIds, themeIds, themeStorageKey } from "@/lib/themes";
 import { seoKeywords, organizationJsonLd, websiteJsonLd } from "@/lib/seo";
 import { getSiteUrl } from "@/lib/site-url";
 import "./globals.css";
@@ -16,7 +16,8 @@ const themeInitScript = `
     const themeIds = ${JSON.stringify(themeIds)};
     const darkThemeIds = ${JSON.stringify(darkThemeIds)};
     const storedTheme = window.localStorage.getItem(${JSON.stringify(themeStorageKey)});
-    const themeId = themeIds.includes(storedTheme) ? storedTheme : ${JSON.stringify(defaultTheme.id)};
+    const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    const themeId = themeIds.includes(storedTheme) ? storedTheme : systemTheme;
     const root = document.documentElement;
     const isDark = darkThemeIds.includes(themeId);
     root.dataset.theme = themeId;

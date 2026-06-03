@@ -28,11 +28,15 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     await requireMongo();
-    await requireRole(request, ["admin", "instructor"]);
+    const session = await requireRole(request, ["admin", "instructor"]);
 
     const body = courseSchema.parse(await readJson(request));
     const slug = await uniqueSlugFor(Course, body.slug ?? slugify(body.title));
-    const course = await Course.create({ ...body, slug });
+    const course = await Course.create({
+      ...body,
+      slug,
+      instructorId: session.user.id
+    });
 
     return jsonOk(normalizeCourse(course), 201);
   } catch (error) {
