@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -48,6 +48,8 @@ import {
   usePlatformStore
 } from "@/hooks/use-platform-store";
 import { normalizedExternalVideoUrl } from "@/lib/video-sources";
+import { buildStudioCoursePayload } from "@/lib/course-studio-sync";
+import { toast } from "sonner";
 
 const courseImage =
   "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1200&q=85";
@@ -705,6 +707,8 @@ export function InstructorCourseStudio({
   const [aiQuizLoading, setAiQuizLoading] = useState(false);
   const [uploadingAsset, setUploadingAsset] = useState("");
   const [assetUploadMessage, setAssetUploadMessage] = useState("");
+  const [courseSyncing, setCourseSyncing] = useState("");
+  const [lastSyncedAt, setLastSyncedAt] = useState("");
 
   const selectedCourse = selectedSlug
     ? createdCourses.find((course) => course.slug === selectedSlug)
@@ -730,6 +734,27 @@ export function InstructorCourseStudio({
     selectedAssets.some((asset) => asset.type === "video") &&
     selectedQuizzes.some((quiz) => quiz.kind === "quiz") &&
     selectedQuizzes.some((quiz) => quiz.kind === "test");
+  const syncSignature = useMemo(() => {
+    if (!selectedCourse) return "";
+
+    return JSON.stringify({
+      course: selectedCourse,
+      chapters: selectedChapters,
+      lessons: selectedLessons,
+      assets: selectedAssets,
+      quizzes: selectedQuizzes
+    });
+  }, [selectedAssets, selectedChapters, selectedCourse, selectedLessons, selectedQuizzes]);
+
+  useEffect(() => {
+    if (!selectedSlug || !selectedCourse || studioView === "setup" || !syncSignature || courseSyncing) return;
+
+    const timer = window.setTimeout(() => {
+      void syncCourseToDatabase(selectedSlug, undefined, { silent: true });
+    }, 1800);
+
+    return () => window.clearTimeout(timer);
+  }, [courseSyncing, selectedCourse, selectedSlug, studioView, syncSignature]);
 
   function update(field: keyof typeof form, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -771,6 +796,7 @@ export function InstructorCourseStudio({
         tools: "MrCreativist.AI outline\nChapter documents\nVideo uploads\nImage uploads\nAuto quiz generation\nFinal tests\nAssignments\nCertificate"
       }));
       setAssetUploadMessage("MrCreativist.AI generated the course chapters, outcomes, lesson count, and tool plan.");
+      toast.success("AI course outline generated.");
     } catch (error) {
       setForm((current) => ({
         ...current,
@@ -781,12 +807,82 @@ export function InstructorCourseStudio({
           "Image upload\nVideo upload\nBook upload\nChapter locks\nAI quiz generation\nFinal tests\nStudent score tracking\nCertificate designer"
       }));
       setAssetUploadMessage(error instanceof Error ? `${error.message} Local outline applied.` : "Local outline applied.");
+      toast.error(error instanceof Error ? `${error.message} Local outline applied.` : "Local outline applied.");
     } finally {
       setOutlineLoading(false);
     }
   }
 
-  function saveCourse(status: PublishingStatus) {
+  async function syncCourseToDatabase(
+    slug = selectedSlug ?? "",
+    status?: PublishingStatus,
+    options: { silent?: boolean; successMessage?: string } = {}
+  ) {
+    if (!slug || courseSyncing) return;
+
+    const state = usePlatformStore.getState();
+    const localCourse = state.createdCourses.find((course) => course.slug === slug);
+    if (!localCourse) return;
+
+    const payload = buildStudioCoursePayload({
+      course: localCourse,
+      chapters: state.courseChapters[slug] ?? [],
+      lessons: state.courseLessons[slug] ?? [],
+      assets: state.courseAssets.filter((asset) => asset.courseSlug === slug),
+      quizzes: state.courseQuizzes.filter((quiz) => quiz.courseSlug === slug),
+      status: status ?? localCourse.status
+    });
+    const message =
+      options.successMessage ??
+      (payload.status === "published"
+        ? "Course published successfully."
+        : payload.status === "submitted"
+          ? "Course sent for review successfully."
+          : "Course saved to database successfully.");
+
+    setCourseSyncing(slug);
+    try {
+      let response = await fetch(`/api/courses/${encodeURIComponent(slug)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      let result = await response.json().catch(() => ({}));
+
+      if (response.status === 404) {
+        response = await fetch("/api/courses", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        result = await response.json().catch(() => ({}));
+      }
+
+      if (!response.ok || result.error) {
+        throw new Error(result.error ?? "Course database sync failed.");
+      }
+
+      if (status && localCourse.status !== status) {
+        updateCourseStatus(slug, status);
+      }
+
+      const savedAt = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      setLastSyncedAt(savedAt);
+
+      if (!options.silent) {
+        toast.success(message);
+        setAssetUploadMessage(`${message} ${payload.lessonsCount} lessons are now available in public preview, player, and edit mode.`);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Course database sync failed.";
+      if (!options.silent) toast.error(errorMessage);
+      setAssetUploadMessage(errorMessage);
+    } finally {
+      setCourseSyncing("");
+    }
+  }
+
+  async function saveCourse(status: PublishingStatus) {
     const slug = createCourse({
       title: form.title,
       level: form.level,
@@ -807,6 +903,10 @@ export function InstructorCourseStudio({
 
     setSelectedSlug(slug);
     setStudioView("chapters");
+    toast.success(status === "published" ? "Course created and publishing started." : "Course draft created.");
+    await syncCourseToDatabase(slug, status, {
+      successMessage: status === "published" ? "Course published successfully." : "Course draft saved successfully."
+    });
   }
 
   function addChapter() {
@@ -824,6 +924,7 @@ export function InstructorCourseStudio({
       title: `Chapter ${selectedChapters.length + 2}`,
       requiredScore: String(Math.min(90, Number(current.requiredScore) + 5))
     }));
+    toast.success("Chapter added. Course sync queued.");
   }
 
   function assetPrimaryUrl(asset: (typeof selectedAssets)[number]) {
@@ -843,6 +944,7 @@ export function InstructorCourseStudio({
     const chapterId = lessonForm.chapterId || selectedChapters[0]?.id;
     if (!chapterId) {
       setAssetUploadMessage("Add a chapter before adding lessons.");
+      toast.error("Add a chapter before adding lessons.");
       return;
     }
 
@@ -886,6 +988,7 @@ export function InstructorCourseStudio({
       summary: "What learners should understand after this lesson.",
       content: "Add instructor notes, step-by-step guidance, examples, and learner instructions."
     }));
+    toast.success("Lesson added. Course sync queued.");
   }
 
   function addLessonFromAsset(assetId: string, type: "image" | "video" | "book" | "document", title: string, url: string, chapterOverride?: string) {
@@ -917,6 +1020,7 @@ export function InstructorCourseStudio({
     });
 
     attachAssetToLesson(selectedSlug, lessonId, assetId);
+    toast.success(type === "video" ? "Video lesson added. Course sync queued." : "Resource lesson added. Course sync queued.");
   }
 
   function addManualQuiz() {
@@ -935,6 +1039,7 @@ export function InstructorCourseStudio({
     });
 
     setQuestionForm((current) => ({ ...current, quizId }));
+    toast.success(`${quizForm.kind === "test" ? "Test" : "Quiz"} added. Course sync queued.`);
   }
 
   function addManualQuestion() {
@@ -947,6 +1052,7 @@ export function InstructorCourseStudio({
       correctIndex: Number(questionForm.correctIndex) || 0,
       explanation: questionForm.explanation
     });
+    toast.success("Quiz question added.");
   }
 
   async function generateAIQuiz() {
@@ -999,10 +1105,12 @@ export function InstructorCourseStudio({
           ? "MrCreativist.AI generated a multiple-choice quiz."
           : "Fallback quiz generated. Add the AI provider key to enable MrCreativist.AI."
       );
+      toast.success("Quiz generated. Course sync queued.");
     } catch (error) {
       const quizId = generateCourseQuiz(selectedSlug, quizForm.kind);
       setQuestionForm((current) => ({ ...current, quizId }));
       setAssetUploadMessage(error instanceof Error ? `${error.message} Fallback quiz created.` : "Fallback quiz created.");
+      toast.error(error instanceof Error ? `${error.message} Fallback quiz created.` : "Fallback quiz created.");
     } finally {
       setAiQuizLoading(false);
     }
@@ -1071,8 +1179,10 @@ export function InstructorCourseStudio({
           ? `${asset.provider ?? "Hosted"} upload attached. ${result.warning}`
           : `${asset.provider ?? "Hosted"} upload saved to the media library.`
       );
+      toast.success(type === "video" ? "Video uploaded and attached." : "Course asset uploaded and attached.");
     } catch (error) {
       setAssetUploadMessage(error instanceof Error ? error.message : "Upload failed.");
+      toast.error(error instanceof Error ? error.message : "Upload failed.");
     } finally {
       setUploadingAsset("");
     }
@@ -1153,8 +1263,10 @@ export function InstructorCourseStudio({
           ? `${normalizedVideo?.providerLabel ?? "External"} video attached to the course player.`
           : "External media link recorded in the library."
       );
+      toast.success(assetForm.type === "video" ? "Video link attached." : "Resource link attached.");
     } catch (error) {
       setAssetUploadMessage(error instanceof Error ? error.message : "Asset could not be attached.");
+      toast.error(error instanceof Error ? error.message : "Asset could not be attached.");
     } finally {
       setUploadingAsset("");
     }
@@ -1258,6 +1370,38 @@ export function InstructorCourseStudio({
               </Button>
             ))}
           </div>
+
+          {selectedCourse ? (
+            <div className="flex flex-col gap-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="font-semibold">Public database sync</p>
+                <p className="text-[hsl(var(--muted-foreground))]">
+                  {lastSyncedAt
+                    ? `Last synced at ${lastSyncedAt}. Public preview, player, and edit pages use this MongoDB curriculum.`
+                    : "Changes autosync after edits and also sync when you save, submit, or publish."}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={Boolean(courseSyncing)}
+                  onClick={() => void syncCourseToDatabase(selectedCourse.slug, selectedCourse.status, { successMessage: "Course saved to database successfully." })}
+                >
+                  {courseSyncing ? <Loader2 className="size-4 animate-spin" /> : <Cloud className="size-4" />}
+                  Sync now
+                </Button>
+                <Button
+                  type="button"
+                  disabled={Boolean(courseSyncing)}
+                  onClick={() => void syncCourseToDatabase(selectedCourse.slug, "submitted", { successMessage: "Review sent successfully." })}
+                >
+                  <Send className="size-4" />
+                  Send review
+                </Button>
+              </div>
+            </div>
+          ) : null}
 
           {studioView === "setup" ? (
             <Card>
@@ -2369,7 +2513,7 @@ export function InstructorCourseStudio({
                       disabled={!selectedCourse || !publishReady}
                       onClick={() =>
                         selectedCourse &&
-                        updateCourseStatus(selectedCourse.slug, "published")
+                        syncCourseToDatabase(selectedCourse.slug, "published", { successMessage: "Course published successfully." })
                       }
                     >
                       <Send className="size-4" />
@@ -2380,7 +2524,18 @@ export function InstructorCourseStudio({
                       variant="outline"
                       onClick={() =>
                         selectedCourse &&
-                        updateCourseStatus(selectedCourse.slug, "draft")
+                        syncCourseToDatabase(selectedCourse.slug, "submitted", { successMessage: "Review sent successfully." })
+                      }
+                    >
+                      <ClipboardCheck className="size-4" />
+                      Submit for review
+                    </Button>
+                    <Button
+                      disabled={!selectedCourse}
+                      variant="outline"
+                      onClick={() =>
+                        selectedCourse &&
+                        syncCourseToDatabase(selectedCourse.slug, "draft", { successMessage: "Course moved to draft successfully." })
                       }
                     >
                       <Save className="size-4" />
@@ -2471,7 +2626,7 @@ export function ProductManager({ initialProducts = [] }: { initialProducts?: Pro
       );
     }
 
-    if (status === "approved") {
+    if (status === "approved" || status === "submitted") {
       return (
         <Button
           size="sm"
@@ -2681,8 +2836,55 @@ export function CourseManager({ initialCourses = [] }: { initialCourses?: Course
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status })
       });
+      const result = await response.json().catch(() => ({}));
 
-      if (!response.ok) throw new Error("Course update failed.");
+      if (!response.ok || result.error) throw new Error(result.error ?? "Course update failed.");
+      toast.success(status === "published" ? "Course published successfully." : status === "submitted" ? "Review sent successfully." : "Course updated successfully.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Course update failed.");
+    } finally {
+      setBusySlug("");
+    }
+  }
+
+  async function syncLocalCourseStatus(slug: string, status: PublishingStatus) {
+    setBusySlug(slug);
+
+    try {
+      const state = usePlatformStore.getState();
+      const localCourse = state.createdCourses.find((course) => course.slug === slug);
+      if (!localCourse) throw new Error("Local course was not found.");
+
+      const payload = buildStudioCoursePayload({
+        course: localCourse,
+        chapters: state.courseChapters[slug] ?? [],
+        lessons: state.courseLessons[slug] ?? [],
+        assets: state.courseAssets.filter((asset) => asset.courseSlug === slug),
+        quizzes: state.courseQuizzes.filter((quiz) => quiz.courseSlug === slug),
+        status
+      });
+      let response = await fetch(`/api/courses/${encodeURIComponent(slug)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      let result = await response.json().catch(() => ({}));
+
+      if (response.status === 404) {
+        response = await fetch("/api/courses", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        result = await response.json().catch(() => ({}));
+      }
+
+      if (!response.ok || result.error) throw new Error(result.error ?? "Course sync failed.");
+
+      updateCourseStatus(slug, status);
+      toast.success(status === "published" ? "Course published successfully." : status === "submitted" ? "Review sent successfully." : "Course synced successfully.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Course sync failed.");
     } finally {
       setBusySlug("");
     }
@@ -2714,7 +2916,7 @@ export function CourseManager({ initialCourses = [] }: { initialCourses?: Course
           size="sm"
           variant="outline"
           disabled={disabled}
-          onClick={() => (local ? updateCourseStatus(course.slug, "archived") : void updateDatabaseCourseStatus(course.slug, "archived"))}
+          onClick={() => (local ? void syncLocalCourseStatus(course.slug, "archived") : void updateDatabaseCourseStatus(course.slug, "archived"))}
         >
           <Archive className="size-4" />
           Archive
@@ -2728,7 +2930,7 @@ export function CourseManager({ initialCourses = [] }: { initialCourses?: Course
           size="sm"
           variant="outline"
           disabled={disabled}
-          onClick={() => (local ? updateCourseStatus(course.slug, "published") : void updateDatabaseCourseStatus(course.slug, "published"))}
+          onClick={() => (local ? void syncLocalCourseStatus(course.slug, "published") : void updateDatabaseCourseStatus(course.slug, "published"))}
         >
           <Send className="size-4" />
           Publish
@@ -2741,7 +2943,7 @@ export function CourseManager({ initialCourses = [] }: { initialCourses?: Course
         size="sm"
         variant="outline"
         disabled={disabled}
-        onClick={() => (local ? updateCourseStatus(course.slug, "submitted") : void updateDatabaseCourseStatus(course.slug, "submitted"))}
+        onClick={() => (local ? void syncLocalCourseStatus(course.slug, "submitted") : void updateDatabaseCourseStatus(course.slug, "submitted"))}
       >
         <Send className="size-4" />
         Submit

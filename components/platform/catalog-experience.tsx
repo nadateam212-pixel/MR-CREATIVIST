@@ -374,7 +374,7 @@ export function CatalogExperience({
                     <CardTitle className="leading-tight">
                       <Link href={productHref} className="inline-flex min-w-0 items-center gap-1.5">
                         <span className="min-w-0">{product.name}</span>
-                        {verifiedCheckout ? <VerifiedMark label="Verified product" /> : null}
+                        {verifiedCheckout ? <VerifiedMark label="Verified seller account" /> : null}
                       </Link>
                     </CardTitle>
                     <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-[hsl(var(--muted-foreground))]">

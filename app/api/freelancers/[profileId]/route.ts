@@ -7,7 +7,9 @@ export async function GET(_: Request, context: { params: Promise<{ profileId: st
   try {
     await requireMongo();
     const { profileId } = await context.params;
-    const profile = await FreelancerProfile.findOne(mongoIdOrSlug(profileId)).lean();
+    const profile = await FreelancerProfile.findOne(mongoIdOrSlug(profileId))
+      .populate("userId", "name email phone profileImage isVerified")
+      .lean();
 
     if (!profile) return jsonOk({ error: "Freelancer profile not found." }, 404);
 
@@ -38,7 +40,8 @@ export async function PUT(request: Request, context: { params: Promise<{ profile
       patch.slug = await uniqueSlugFor(FreelancerProfile, body.slug ?? slugify(body.name), existing._id);
     }
 
-    const profile = await FreelancerProfile.findByIdAndUpdate(existing._id, patch, { returnDocument: "after", runValidators: true });
+    const profile = await FreelancerProfile.findByIdAndUpdate(existing._id, patch, { returnDocument: "after", runValidators: true })
+      .populate("userId", "name email phone profileImage isVerified");
 
     return jsonOk(normalizeFreelancer(profile));
   } catch (error) {
@@ -64,7 +67,8 @@ export async function DELETE(request: Request, context: { params: Promise<{ prof
       return jsonOk({ ok: true, deleted: true });
     }
 
-    const profile = await FreelancerProfile.findByIdAndUpdate(existing._id, { status: "archived" }, { returnDocument: "after" });
+    const profile = await FreelancerProfile.findByIdAndUpdate(existing._id, { status: "archived" }, { returnDocument: "after" })
+      .populate("userId", "name email phone profileImage isVerified");
 
     return jsonOk({ ok: true, item: normalizeFreelancer(profile) });
   } catch (error) {

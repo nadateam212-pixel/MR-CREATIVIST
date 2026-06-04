@@ -16,7 +16,12 @@ export async function GET(request: Request) {
     }
 
     const [items, total] = await Promise.all([
-      FreelancerProfile.find(filter).sort({ rating: -1, completedJobs: -1 }).skip(skip).limit(limit).lean(),
+      FreelancerProfile.find(filter)
+        .populate("userId", "name email phone profileImage isVerified")
+        .sort({ rating: -1, completedJobs: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
       FreelancerProfile.countDocuments(filter)
     ]);
 

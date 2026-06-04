@@ -16,7 +16,12 @@ export async function GET(request: Request) {
     }
 
     const [items, total] = await Promise.all([
-      Product.find(filter).sort({ isFeatured: -1, createdAt: -1 }).skip(skip).limit(limit).lean(),
+      Product.find(filter)
+        .populate("sellerId", "name email phone profileImage isVerified")
+        .sort({ isFeatured: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
       Product.countDocuments(filter)
     ]);
 

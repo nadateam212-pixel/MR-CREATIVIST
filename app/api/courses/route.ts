@@ -39,7 +39,12 @@ export async function POST(request: Request) {
       studioId: studioTrackId(session.user),
       instructorId: session.user.id,
       instructorName: body.instructorName || session.user.name || session.user.email,
-      status: session.user.role === "admin" ? body.status : body.status === "draft" ? "draft" : "submitted"
+      status:
+        session.user.role === "admin"
+          ? body.status
+          : ["draft", "submitted", "published", "unlisted"].includes(body.status)
+            ? body.status
+            : "submitted"
     });
 
     return jsonOk(normalizeCourse(course), 201);

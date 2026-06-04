@@ -7,7 +7,9 @@ export async function GET(_: Request, context: { params: Promise<{ productId: st
   try {
     await requireMongo();
     const { productId } = await context.params;
-    const product = await Product.findOne(mongoIdOrSlug(productId)).lean();
+    const product = await Product.findOne(mongoIdOrSlug(productId))
+      .populate("sellerId", "name email phone profileImage isVerified")
+      .lean();
 
     if (!product) return jsonOk({ error: "Product not found." }, 404);
 
@@ -39,7 +41,8 @@ export async function PUT(request: Request, context: { params: Promise<{ product
       patch.slug = await uniqueSlugFor(Product, body.slug ?? slugify(body.name), existing._id);
     }
 
-    const product = await Product.findByIdAndUpdate(existing._id, patch, { returnDocument: "after", runValidators: true });
+    const product = await Product.findByIdAndUpdate(existing._id, patch, { returnDocument: "after", runValidators: true })
+      .populate("sellerId", "name email phone profileImage isVerified");
 
     return jsonOk(normalizeProduct(product));
   } catch (error) {
@@ -65,7 +68,8 @@ export async function DELETE(request: Request, context: { params: Promise<{ prod
       return jsonOk({ ok: true, deleted: true });
     }
 
-    const product = await Product.findByIdAndUpdate(existing._id, { status: "archived" }, { returnDocument: "after" });
+    const product = await Product.findByIdAndUpdate(existing._id, { status: "archived" }, { returnDocument: "after" })
+      .populate("sellerId", "name email phone profileImage isVerified");
 
     return jsonOk({ ok: true, item: normalizeProduct(product) });
   } catch (error) {

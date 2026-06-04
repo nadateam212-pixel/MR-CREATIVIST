@@ -14,6 +14,34 @@ function clean<T>(value: T): T {
   return JSON.parse(JSON.stringify(value));
 }
 
+function coursePreviewDetails(course: ReturnType<typeof normalizeCourse>) {
+  const modules = Array.isArray(course.modules) ? course.modules : [];
+  const lessons = modules.flatMap((module: any) =>
+    Array.isArray(module.lessons)
+      ? module.lessons.map((lesson: any) => ({
+          moduleTitle: module.title,
+          title: lesson.title,
+          type: lesson.type,
+          videoUrl: lesson.videoUrl || lesson.video?.url || lesson.embedUrl
+        }))
+      : []
+  );
+  const videoLessons = lessons.filter((lesson) => lesson.videoUrl).length;
+
+  return {
+    modules: String(modules.length),
+    lessons: String(lessons.length),
+    videoLessons: String(videoLessons),
+    previewLessons: lessons.length
+      ? lessons
+          .slice(0, 8)
+          .map((lesson, index) => `${index + 1}. ${lesson.moduleTitle ? `${lesson.moduleTitle}: ` : ""}${lesson.title ?? "Untitled lesson"}${lesson.videoUrl ? " (video)" : ""}`)
+          .join("\n")
+      : "No lessons saved yet",
+    publicLink: course.slug ? `/courses/${course.slug}` : "Not published"
+  };
+}
+
 export default async function AdminCoursesPage() {
   await connectMongoDB();
 
@@ -45,7 +73,8 @@ export default async function AdminCoursesPage() {
         value: course.status ?? "draft",
         options: ["draft", "submitted", "changes_requested", "approved", "published", "unlisted", "archived"]
       }
-    ]
+    ],
+    details: coursePreviewDetails(course)
   }));
 
   return (

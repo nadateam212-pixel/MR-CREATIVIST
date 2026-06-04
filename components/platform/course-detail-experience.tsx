@@ -26,6 +26,7 @@ import { SafeImage } from "@/components/ui/safe-image";
 import { isFreePrice } from "@/lib/currency";
 import { courseImageForCategory, normalizeCourseImage, titleFromCourseSlug } from "@/lib/course-media";
 import { videoSourceForUrl } from "@/lib/video-sources";
+import { buildStudioCoursePayload } from "@/lib/course-studio-sync";
 import { type PlatformCourseDraft, usePlatformStore } from "@/hooks/use-platform-store";
 
 type CoursePreview = {
@@ -227,14 +228,14 @@ function CoursePreviewPlayer({
         controls
         controlsList="nodownload noremoteplayback"
         disablePictureInPicture
-        className="h-full min-h-[22rem] w-full bg-black object-cover"
+        className="h-full min-h-[28rem] w-full bg-black object-cover lg:min-h-[32rem]"
       />
     );
   }
 
   if (source.isIframe) {
     return (
-      <div className="relative h-full min-h-[22rem] w-full overflow-hidden bg-black">
+      <div className="relative h-full min-h-[28rem] w-full overflow-hidden bg-black lg:min-h-[32rem]">
         <iframe
           src={source.embedUrl}
           title="Course preview video"
@@ -248,7 +249,7 @@ function CoursePreviewPlayer({
   }
 
   return (
-    <div className="relative min-h-[22rem]">
+    <div className="relative min-h-[28rem] lg:min-h-[32rem]">
       <SafeImage
         src={poster}
         fallbackSrc={courseImageForCategory("Course")}
@@ -271,7 +272,9 @@ export function CourseDetailExperience({
 }) {
   const createdCourses = usePlatformStore((state) => state.createdCourses);
   const courseChapters = usePlatformStore((state) => state.courseChapters);
+  const courseLessons = usePlatformStore((state) => state.courseLessons);
   const courseAssets = usePlatformStore((state) => state.courseAssets);
+  const courseQuizzes = usePlatformStore((state) => state.courseQuizzes);
   const enrolledCourseSlugs = usePlatformStore((state) => state.enrolledCourseSlugs);
   const localCourse = createdCourses.find((course) => course.slug === slug);
 
@@ -285,12 +288,27 @@ export function CourseDetailExperience({
 
     return localCourse ? localCourseToPreview(localCourse) : fallbackCourseToPreview(slug);
   }, [initialCourse, localCourse, slug]);
+  const localCourseModules = useMemo(() => {
+    if (!localCourse) return [];
+
+    return buildStudioCoursePayload({
+      course: localCourse,
+      chapters: courseChapters[localCourse.slug] ?? [],
+      lessons: courseLessons[localCourse.slug] ?? [],
+      assets: courseAssets.filter((asset) => asset.courseSlug === localCourse.slug),
+      quizzes: courseQuizzes.filter((quiz) => quiz.courseSlug === localCourse.slug),
+      status: localCourse.status
+    }).modules;
+  }, [courseAssets, courseChapters, courseLessons, courseQuizzes, localCourse]);
 
   const curriculum = useMemo<CurriculumModule[]>(() => {
     if (!course) return [];
 
-    if (course.modules?.length) {
-      return course.modules
+    const databaseModules = course.modules ?? [];
+    const sourceModules = databaseModules.some((module) => (module.lessons ?? []).length) ? databaseModules : localCourseModules;
+
+    if (sourceModules.length) {
+      return sourceModules
         .slice()
         .filter((module) => module.status !== "hidden")
         .sort((left, right) => Number(left.orderIndex ?? 0) - Number(right.orderIndex ?? 0))
@@ -326,7 +344,7 @@ export function CourseDetailExperience({
       description: "",
       lessons: []
     }));
-  }, [course, courseChapters]);
+  }, [course, courseChapters, localCourseModules]);
 
   const assets = course ? courseAssets.filter((asset) => asset.courseSlug === course.slug) : [];
   const firstVideoAsset = assets.find((asset) => asset.type === "video");
@@ -361,8 +379,8 @@ export function CourseDetailExperience({
     <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6">
       <section className="grid gap-6 lg:grid-cols-[1fr_24rem]">
         <div className="space-y-6">
-          <div className="grid overflow-hidden rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] lg:grid-cols-[1.05fr_0.95fr]">
-            <div className="min-h-[22rem] bg-black">
+          <div className="grid overflow-hidden rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] lg:grid-cols-[1.25fr_0.75fr]">
+            <div className="min-h-[28rem] bg-black lg:min-h-[32rem]">
               <CoursePreviewPlayer
                 title={course.title}
                 url={previewVideoUrl}
@@ -551,9 +569,9 @@ export function CourseDetailExperience({
                 </Link>
               </Button>
               <Button asChild className="w-full" variant="outline">
-                <Link href={`/dashboard/learning/${course.slug}`}>
+                <Link href={`/courses/${course.slug}/preview`}>
                   <BookOpen className="size-4" />
-                  Preview course player
+                  Preview lessons
                 </Link>
               </Button>
             </CardContent>

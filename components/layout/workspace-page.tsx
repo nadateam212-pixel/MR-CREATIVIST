@@ -107,8 +107,8 @@ function StandardWorkspacePage({
 }) {
   const isAdmin = pathname.startsWith("/admin");
   const normalizedTags = useMemo(() => (tags.length > 0 ? tags : ["Records", "Approvals", "Exports", "Audit"]), [tags]);
-  const [records, setRecords] = useState<WorkspaceRecord[]>(() => buildInitialRecords(title, normalizedTags));
-  const [activity, setActivity] = useState("Workspace ready");
+  const [records, setRecords] = useState<WorkspaceRecord[]>([]);
+  const [activity, setActivity] = useState("Loading live workspace records");
   const [busy, setBusy] = useState("");
   const [syncing, setSyncing] = useState(true);
   const [editingRecord, setEditingRecord] = useState<WorkspaceRecord | null>(null);

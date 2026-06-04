@@ -17,7 +17,6 @@ import ShopProfile from "@/models/ShopProfile";
 import UploadAsset from "@/models/UploadAsset";
 import User from "@/models/User";
 import WalletTransaction from "@/models/WalletTransaction";
-import WorkspaceRecord from "@/models/WorkspaceRecord";
 
 type AdminMetric = {
   label: string;
@@ -409,50 +408,317 @@ async function certificatesSummary(): Promise<AdminMetric[]> {
 async function reportingWorkspace(kind: string): Promise<{ metrics: AdminMetric[]; rows: AdminRow[] }> {
   const counts = await getCounts();
   const certificateMetrics = await certificatesSummary();
-  const latestRecords = await WorkspaceRecord.find({}).sort({ updatedAt: -1 }).limit(80).lean();
-  const rows = latestRecords.map((recordDoc) =>
-    row(recordDoc, {
-      resource: "workspaceRecord",
-      title: text(recordDoc.title, "Workspace record"),
-      subtitle: `${text(recordDoc.userEmail)} - ${text(recordDoc.pathname)}`,
-      kind: text(recordDoc.kind, "workspace"),
-      status: text(recordDoc.status, "active"),
-      amount: Number(recordDoc.amount ?? 0),
-      currency: text(recordDoc.currency, "USD"),
-      details: {
-        user: text(recordDoc.userEmail),
-        role: text(recordDoc.role),
-        module: text(recordDoc.module),
-        pathname: text(recordDoc.pathname),
-        tags: text(recordDoc.tags)
-      },
-      actions: ["Archive", "Delete"]
-    })
-  );
 
-  const metrics: AdminMetric[] =
-    kind === "health"
-      ? [
-          { label: "Database", value: mongoose.connection.readyState === 1 ? "Online" : "Checking", helper: "MongoDB connection state" },
-          { label: "Users", value: compact(counts.users), helper: "Registered accounts" },
-          { label: "Content", value: compact(counts.courses + counts.products + counts.gigs + counts.shops), helper: "Course, product, gig, business records" },
-          { label: "Open support", value: compact(counts.openMessages), helper: "Contact messages requiring attention" }
-        ]
-      : kind === "settings"
-        ? [
-            { label: "Users", value: compact(counts.users), helper: "Accounts controlled by admin" },
-            { label: "Studio content", value: compact(counts.courses + counts.products + counts.gigs + counts.shops), helper: "Creator records" },
-            { label: "Transactions", value: compact(counts.payments), helper: "Wallet ledger records" },
-            { label: "Certificates", value: certificateMetrics[0].value, helper: "Issued credentials" }
-          ]
-        : [
-            { label: "Users", value: compact(counts.users), helper: "Accounts" },
-            { label: "Orders", value: compact(counts.orders), helper: "Marketplace order records" },
-            { label: "Bookings", value: compact(counts.bookings), helper: "Consulting bookings" },
-            { label: "Certificates", value: certificateMetrics[0].value, helper: "Issued credentials" }
-          ];
+  if (kind === "health") {
+    const [assets, contacts, pendingPayments] = await Promise.all([
+      UploadAsset.find({}).sort({ updatedAt: -1 }).limit(40).lean(),
+      ContactMessage.find({ status: { $in: ["new", "read"] } }).sort({ updatedAt: -1 }).limit(40).lean(),
+      WalletTransaction.find({ status: { $in: ["pending", "failed"] } }).sort({ updatedAt: -1 }).limit(40).lean()
+    ]);
+    const failedAssets = assets.filter((item) => item.status === "failed").length;
+    const processingAssets = assets.filter((item) => ["uploading", "processing"].includes(String(item.status))).length;
+    const rows = [
+      ...assets.map((item) =>
+        row(item, {
+          resource: "upload",
+          title: text(item.fileName, "Upload asset"),
+          subtitle: `${text(item.kind)} - ${text(item.provider)}`,
+          kind: text(item.ownerType, "asset"),
+          status: text(item.status, "ready"),
+          details: {
+            provider: text(item.provider),
+            mimeType: text(item.mimeType),
+            ownerType: text(item.ownerType),
+            ownerId: text(item.ownerId),
+            size: `${Math.round(Number(item.sizeBytes ?? 0) / 1024)} KB`
+          },
+          actions: ["Mark ready", "Mark failed", "Delete"]
+        })
+      ),
+      ...contacts.map((item) =>
+        row(item, {
+          resource: "contactMessage",
+          title: text(item.subject, "Support contact"),
+          subtitle: `${text(item.name)} - ${text(item.email)}`,
+          kind: "support",
+          status: text(item.status, "new"),
+          details: {
+            email: text(item.email),
+            message: text(item.message),
+            source: text(item.source)
+          },
+          actions: ["Mark read", "Mark replied", "Archive", "Delete"]
+        })
+      ),
+      ...pendingPayments.map((item) =>
+        row(item, {
+          resource: "payment",
+          title: text(item.description, "Wallet transaction"),
+          subtitle: `${text(item.userEmail)} - ${text(item.direction)}`,
+          kind: text(item.type, "wallet"),
+          status: text(item.status, "pending"),
+          amount: Number(item.amount ?? 0),
+          currency: text(item.currency, "USD"),
+          details: {
+            user: text(item.userEmail),
+            direction: text(item.direction),
+            reference: `${text(item.referenceType)} / ${text(item.referenceId)}`,
+            balanceAfter: money(Number(item.balanceAfter ?? 0), text(item.currency, "USD"))
+          },
+          actions: ["Complete", "Cancel", "Fail", "Delete"]
+        })
+      )
+    ];
 
-  return { metrics, rows };
+    return {
+      metrics: [
+        { label: "Database", value: mongoose.connection.readyState === 1 ? "Online" : "Checking", helper: "MongoDB connection state" },
+        { label: "Processing uploads", value: compact(processingAssets), helper: "Uploading or processing assets" },
+        { label: "Failed uploads", value: compact(failedAssets), helper: "Assets needing cleanup" },
+        { label: "Open support", value: compact(counts.openMessages), helper: "Contact messages requiring attention" }
+      ],
+      rows
+    };
+  }
+
+  if (kind === "settings") {
+    const [users, subscribers] = await Promise.all([
+      User.find({}).select("name email role accountStatus isVerified updatedAt createdAt").sort({ updatedAt: -1 }).limit(80).lean(),
+      NewsletterSubscriber.find({}).sort({ updatedAt: -1 }).limit(40).lean()
+    ]);
+    const rows = [
+      ...users.map((item) =>
+        row(item, {
+          resource: "user",
+          title: text(item.name, "User"),
+          subtitle: text(item.email),
+          kind: text(item.role, "client"),
+          status: text(item.accountStatus, "active"),
+          details: {
+            email: text(item.email),
+            role: text(item.role),
+            verified: item.isVerified ? "yes" : "no",
+            created: isoDate(item.createdAt)
+          },
+          actions: ["Activate", "Block", "Review", "Delete"]
+        })
+      ),
+      ...subscribers.map((item) =>
+        row(item, {
+          resource: "newsletter",
+          title: text(item.name, text(item.email)),
+          subtitle: text(item.email),
+          kind: text(item.source, "newsletter"),
+          status: text(item.status, "active"),
+          details: {
+            email: text(item.email),
+            interests: text(item.interests),
+            source: text(item.source)
+          },
+          actions: ["Reactivate", "Unsubscribe", "Delete"]
+        })
+      )
+    ];
+
+    return {
+      metrics: [
+        { label: "Users", value: compact(counts.users), helper: "Accounts controlled by admin" },
+        { label: "Studio content", value: compact(counts.courses + counts.products + counts.gigs + counts.shops), helper: "Creator records" },
+        { label: "Subscribers", value: compact(subscribers.length), helper: "Newsletter records loaded" },
+        { label: "Certificates", value: certificateMetrics[0].value, helper: "Issued credentials" }
+      ],
+      rows
+    };
+  }
+
+  if (kind === "backups") {
+    const [users, orders, bookings, certificates, assets] = await Promise.all([
+      User.find({}).select("name email role accountStatus updatedAt createdAt").sort({ updatedAt: -1 }).limit(30).lean(),
+      Order.find({}).sort({ updatedAt: -1 }).limit(30).lean(),
+      Booking.find({}).sort({ updatedAt: -1 }).limit(30).lean(),
+      CertificateCredential.find({}).sort({ updatedAt: -1 }).limit(30).lean(),
+      UploadAsset.find({}).sort({ updatedAt: -1 }).limit(30).lean()
+    ]);
+    const rows = [
+      ...users.map((item) =>
+        row(item, {
+          resource: "user",
+          title: text(item.name, "User record"),
+          subtitle: text(item.email),
+          kind: "account",
+          status: text(item.accountStatus, "active"),
+          details: {
+            email: text(item.email),
+            role: text(item.role),
+            created: isoDate(item.createdAt),
+            updated: isoDate(item.updatedAt)
+          },
+          actions: ["Activate", "Block", "Review", "Delete"]
+        })
+      ),
+      ...orders.map((item) =>
+        row(item, {
+          resource: "order",
+          title: `Order ${shortId(item)}`,
+          subtitle: `${text(item.buyerName)} - ${text(item.buyerEmail)}`,
+          kind: text(item.paymentMethod, "order"),
+          status: text(item.status, "paid"),
+          amount: Number(item.total ?? 0),
+          currency: text(item.currency, "USD"),
+          details: {
+            buyer: `${text(item.buyerName)} (${text(item.buyerEmail)})`,
+            total: money(Number(item.total ?? 0), text(item.currency, "USD")),
+            items: Array.isArray(item.items) ? `${item.items.length} item(s)` : "0 items"
+          },
+          actions: ["Mark paid", "Fulfill", "Refund", "Cancel", "Delete"]
+        })
+      ),
+      ...bookings.map((item) =>
+        row(item, {
+          resource: "booking",
+          title: `${text(item.clientName)} booking`,
+          subtitle: text(item.clientEmail),
+          kind: text(item.sessionType, "consulting"),
+          status: text(item.status, "requested"),
+          details: {
+            client: text(item.clientEmail),
+            scheduledFor: isoDate(item.scheduledFor),
+            notes: text(item.notes, "No notes")
+          },
+          actions: ["Confirm", "Complete", "Cancel", "Delete"]
+        })
+      ),
+      ...certificates.map((item) =>
+        row(item, {
+          resource: "certificate",
+          title: text(item.courseTitle, "Certificate"),
+          subtitle: `${text(item.learnerName)} - ${text(item.userEmail)}`,
+          kind: "certificate",
+          status: text(item.status, "issued"),
+          details: {
+            learner: text(item.learnerName),
+            email: text(item.userEmail),
+            course: text(item.courseTitle),
+            code: text(item.verificationCode)
+          },
+          actions: ["Revoke", "Delete"]
+        })
+      ),
+      ...assets.map((item) =>
+        row(item, {
+          resource: "upload",
+          title: text(item.fileName, "Upload asset"),
+          subtitle: `${text(item.kind)} - ${text(item.provider)}`,
+          kind: text(item.ownerType, "asset"),
+          status: text(item.status, "ready"),
+          details: {
+            url: text(item.url),
+            provider: text(item.provider),
+            size: `${Math.round(Number(item.sizeBytes ?? 0) / 1024)} KB`
+          },
+          actions: ["Mark ready", "Mark failed", "Delete"]
+        })
+      )
+    ];
+
+    return {
+      metrics: [
+        { label: "Users", value: compact(counts.users), helper: "Accounts in MongoDB" },
+        { label: "Orders", value: compact(counts.orders), helper: "Marketplace order records" },
+        { label: "Bookings", value: compact(counts.bookings), helper: "Consulting bookings" },
+        { label: "Assets", value: compact(assets.length), helper: "Recent upload records loaded" }
+      ],
+      rows
+    };
+  }
+
+  const [orders, transactions, bookings, certificates] = await Promise.all([
+    Order.find({}).sort({ updatedAt: -1 }).limit(45).lean(),
+    WalletTransaction.find({}).sort({ updatedAt: -1 }).limit(45).lean(),
+    Booking.find({}).sort({ updatedAt: -1 }).limit(45).lean(),
+    CertificateCredential.find({}).sort({ updatedAt: -1 }).limit(45).lean()
+  ]);
+  const revenue = orders
+    .filter((item) => ["paid", "fulfilled"].includes(String(item.status)))
+    .reduce((total, item) => total + Number(item.total ?? 0), 0);
+  const rows = [
+    ...orders.map((item) =>
+      row(item, {
+        resource: "order",
+        title: `Order ${shortId(item)}`,
+        subtitle: `${text(item.buyerName)} - ${text(item.buyerEmail)}`,
+        kind: text(item.paymentMethod, "order"),
+        status: text(item.status, "paid"),
+        amount: Number(item.total ?? 0),
+        currency: text(item.currency, "USD"),
+        details: {
+          buyer: `${text(item.buyerName)} (${text(item.buyerEmail)})`,
+          items: Array.isArray(item.items) ? `${item.items.length} item(s)` : "0 items",
+          total: money(Number(item.total ?? 0), text(item.currency, "USD"))
+        },
+        actions: ["Mark paid", "Fulfill", "Refund", "Cancel", "Delete"]
+      })
+    ),
+    ...transactions.map((item) =>
+      row(item, {
+        resource: "payment",
+        title: text(item.description, `${text(item.type)} transaction`),
+        subtitle: `${text(item.userEmail)} - ${text(item.referenceType, "manual")}`,
+        kind: text(item.type, "transaction"),
+        status: text(item.status, "pending"),
+        amount: Number(item.amount ?? 0),
+        currency: text(item.currency, "USD"),
+        details: {
+          user: text(item.userEmail),
+          direction: text(item.direction),
+          reference: `${text(item.referenceType)} / ${text(item.referenceId)}`,
+          balanceAfter: money(Number(item.balanceAfter ?? 0), text(item.currency, "USD"))
+        },
+        actions: ["Complete", "Cancel", "Fail", "Delete"]
+      })
+    ),
+    ...bookings.map((item) =>
+      row(item, {
+        resource: "booking",
+        title: `${text(item.clientName)} booking`,
+        subtitle: text(item.clientEmail),
+        kind: text(item.sessionType, "consulting"),
+        status: text(item.status, "requested"),
+        details: {
+          client: text(item.clientEmail),
+          scheduledFor: isoDate(item.scheduledFor),
+          notes: text(item.notes, "No notes")
+        },
+        actions: ["Confirm", "Complete", "Cancel", "Delete"]
+      })
+    ),
+    ...certificates.map((item) =>
+      row(item, {
+        resource: "certificate",
+        title: text(item.courseTitle, "Certificate"),
+        subtitle: `${text(item.learnerName)} - ${text(item.userEmail)}`,
+        kind: "certificate",
+        status: text(item.status, "issued"),
+        details: {
+          learner: text(item.learnerName),
+          email: text(item.userEmail),
+          course: text(item.courseTitle),
+          code: text(item.verificationCode)
+        },
+        actions: ["Revoke", "Delete"]
+      })
+    )
+  ];
+
+  return {
+    metrics: [
+      { label: "Orders", value: compact(counts.orders), helper: "Marketplace orders" },
+      { label: "Revenue", value: money(revenue, "USD"), helper: "Paid and fulfilled order window" },
+      { label: "Transactions", value: compact(counts.payments), helper: "Wallet ledger records" },
+      { label: "Certificates", value: certificateMetrics[0].value, helper: "Issued credentials" }
+    ],
+    rows
+  };
 }
 
 async function notificationsWorkspace(): Promise<{ metrics: AdminMetric[]; rows: AdminRow[] }> {
@@ -665,6 +931,8 @@ function actionStatus(action: string, resource: string) {
   if (normalized.includes("paid")) return "paid";
   if (normalized.includes("fulfill")) return "fulfilled";
   if (normalized.includes("refund")) return "refunded";
+  if (normalized.includes("revoke")) return "revoked";
+  if (normalized.includes("issue")) return "issued";
   if (normalized.includes("confirm")) return "confirmed";
   if (normalized.includes("complete")) return resource === "payment" ? "completed" : "completed";
   if (normalized.includes("cancel")) return "cancelled";
@@ -691,7 +959,7 @@ function modelForResource(resource: string) {
     gig: Gig,
     shop: ShopProfile,
     consulting: ConsultingService,
-    workspaceRecord: WorkspaceRecord,
+    certificate: CertificateCredential,
     newsletter: NewsletterSubscriber,
     affiliate: ReferralProfile,
     upload: UploadAsset,

@@ -189,7 +189,7 @@ export function ProductDetailExperience({ slug, initialProduct }: { slug: string
               <p className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">
                 {verifiedCheckout
                   ? "Supports wallet, card, PayPal, mobile money, coupons, invoices, refunds, and seller payout attribution."
-                  : "Online checkout opens after the seller or listing is verified. Use message or WhatsApp to agree on delivery directly."}
+                  : "Online checkout opens after the seller account is verified. Use message or WhatsApp to agree on delivery directly."}
               </p>
             </CardContent>
           </Card>

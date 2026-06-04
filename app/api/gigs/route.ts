@@ -26,7 +26,12 @@ export async function GET(request: Request) {
     }
 
     const [items, total] = await Promise.all([
-      Gig.find(filter).sort({ isFeatured: -1, rating: -1, orders: -1, createdAt: -1 }).skip(skip).limit(limit).lean(),
+      Gig.find(filter)
+        .populate("ownerId", "name email phone profileImage isVerified")
+        .sort({ isFeatured: -1, rating: -1, orders: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
       Gig.countDocuments(filter)
     ]);
 

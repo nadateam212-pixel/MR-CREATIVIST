@@ -229,9 +229,14 @@ export function AdminContentTable({
   }
 
   function shareRow(row: AdminContentRow) {
-    const text = `${row.title} - ${row.href ?? row.apiPath ?? ""}`;
+    const href = row.href
+      ? row.href.startsWith("/")
+        ? `${window.location.origin}${row.href}`
+        : row.href
+      : row.apiPath ?? "";
+    const text = href ? href : `${row.title} - ${row.apiPath ?? ""}`;
     void navigator.clipboard?.writeText(text);
-    toast.success("Share summary copied.");
+    toast.success(row.href ? "Public link copied." : "Share summary copied.");
   }
 
   return (

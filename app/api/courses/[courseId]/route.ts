@@ -2,6 +2,24 @@ import Course from "@/models/Course";
 import { jsonError, jsonOk, mongoIdOrSlug, readJson, requireMongo, requireRole, uniqueSlugFor } from "@/lib/mongo-api";
 import { normalizeCourse, slugify } from "@/lib/platform-db";
 import { courseSchema } from "@/lib/mongo-validations";
+import { studioTrackId } from "@/lib/studio-identity";
+
+function normalizedOwner(value?: unknown) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function canManageCourse(existing: { instructorId?: unknown; studioId?: unknown; instructorName?: unknown }, user: { id?: string | null; name?: string | null; email?: string | null }) {
+  const ownsById = existing.instructorId && user.id && String(existing.instructorId) === String(user.id);
+  const ownsByStudio = existing.studioId && String(existing.studioId) === studioTrackId(user);
+  const legacyInstructor = normalizedOwner(existing.instructorName);
+  const ownsLegacyCourse =
+    !existing.instructorId &&
+    !existing.studioId &&
+    legacyInstructor &&
+    [normalizedOwner(user.name), normalizedOwner(user.email)].includes(legacyInstructor);
+
+  return Boolean(ownsById || ownsByStudio || ownsLegacyCourse);
+}
 
 export async function GET(_: Request, context: { params: Promise<{ courseId: string }> }) {
   try {
@@ -28,7 +46,7 @@ export async function PUT(request: Request, context: { params: Promise<{ courseI
     const existing = await Course.findOne(mongoIdOrSlug(courseId));
     if (!existing) return jsonOk({ error: "Course not found." }, 404);
     const isAdmin = session.user.role === "admin";
-    const ownsCourse = existing.instructorId && String(existing.instructorId) === String(session.user.id);
+    const ownsCourse = canManageCourse(existing, session.user);
 
     if (!isAdmin && !ownsCourse) {
       return jsonOk({ error: "You can only manage courses created by your Studio account." }, 403);
@@ -37,7 +55,14 @@ export async function PUT(request: Request, context: { params: Promise<{ courseI
     const body = courseSchema.partial().parse(await readJson(request));
     const patch = {
       ...body,
-      ...(isAdmin ? {} : { status: body.status === "draft" ? "draft" : "submitted" })
+      ...(isAdmin
+        ? {}
+        : {
+            status:
+              body.status && ["draft", "submitted", "published", "unlisted", "archived"].includes(body.status)
+                ? body.status
+                : existing.status
+          })
     };
     if (body.slug || body.title) {
       patch.slug = await uniqueSlugFor(Course, body.slug ?? slugify(body.title), existing._id);
@@ -64,7 +89,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ cour
     }
 
     const isAdmin = session.user.role === "admin";
-    const ownsCourse = existing.instructorId && String(existing.instructorId) === String(session.user.id);
+    const ownsCourse = canManageCourse(existing, session.user);
 
     if (!isAdmin && !ownsCourse) {
       return jsonOk({ error: "You can only archive courses created by your Studio account." }, 403);

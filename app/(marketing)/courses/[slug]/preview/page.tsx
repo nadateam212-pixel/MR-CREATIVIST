@@ -1,23 +1,43 @@
 import type { Metadata } from "next";
-import { PublicFeaturePage } from "@/components/platform/public-feature-page";
+import { notFound } from "next/navigation";
+import { CourseLearningEntry } from "@/components/platform/course-learning-entry";
+import { CourseLearningWorkspace } from "@/components/platform/course-learning-workspace";
+import { buildCourseStructure } from "@/lib/learning-engine";
+import { connectMongoDB } from "@/lib/mongodb";
+import Course from "@/models/Course";
 
 export const metadata: Metadata = { title: "Course Preview" };
 
-export default function CoursePreviewPage() {
-  return (
-    <PublicFeaturePage
-      eyebrow="Free preview"
-      title="Preview course lessons"
-      description="Preview video, text, quiz, resource, and live-class lesson formats before enrollment."
-      primaryHref="/courses"
-      primaryLabel="Browse courses"
-      highlights={[
-        "Preview lesson player with progress-safe access",
-        "Curriculum outline, attachments, captions, and instructor notes",
-        "Enrollment CTA with coupon and wallet-ready checkout",
-        "Course reviews, requirements, audience fit, and learning outcomes"
-      ]}
-      workflow={["Open course detail", "Watch free lessons", "Review curriculum", "Enroll through checkout"]}
-    />
-  );
+export default async function CoursePreviewPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  await connectMongoDB();
+  const courseDoc = await Course.findOne({ slug, status: { $ne: "archived" } }).lean();
+  if (!courseDoc) notFound();
+
+  const course = buildCourseStructure(courseDoc);
+  if (!course.totalLessons) {
+    return (
+      <CourseLearningEntry
+        courseId={slug}
+        learnerName="Guest learner"
+        databaseMessage="This course has no public lessons saved in MongoDB yet. If it was built in this browser, the local Studio curriculum will open after hydration."
+      />
+    );
+  }
+
+  const initialProgress = {
+    completedLessonKeys: [],
+    currentLessonKey: course.flatLessons[0]?.key ?? "",
+    progressPercent: 0,
+    status: "preview",
+    certificateIssuedAt: null,
+    events: [],
+    studySecondsByLesson: {},
+    studySecondsByModule: {},
+    moduleRequiredSeconds: {},
+    totalStudySeconds: 0,
+    quizAttempts: {}
+  };
+
+  return <CourseLearningWorkspace course={course} initialProgress={initialProgress} learnerName="Guest learner" />;
 }

@@ -565,10 +565,6 @@ export const usePlatformStore = create<PlatformState>()(
           ...state.courseChapters,
           [courseSlug]: nextChapters
         },
-        courseLessons: {
-          ...state.courseLessons,
-          [courseSlug]: (state.courseLessons[courseSlug] ?? []).filter((lesson) => lesson.chapterId !== chapterId)
-        },
         createdCourses: state.createdCourses.map((course) =>
           course.slug === courseSlug
             ? {

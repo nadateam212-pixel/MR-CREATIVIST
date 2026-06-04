@@ -197,7 +197,7 @@ export function FreelancerStudio({
                       <div className="min-w-0 flex-1">
                         <p className="flex min-w-0 items-center gap-1.5 font-black leading-tight">
                           <span className="truncate">{gig.title}</span>
-                          {gig.isVerified ? <VerifiedMark label="Verified gig" /> : null}
+                          {gig.isVerified ? <VerifiedMark label="Verified freelancer account" /> : null}
                         </p>
                         <p className="mt-1 flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.12em] text-[hsl(var(--muted-foreground))]">
                           <span className="truncate">{gig.ownerName ?? "Freelancer"}</span>

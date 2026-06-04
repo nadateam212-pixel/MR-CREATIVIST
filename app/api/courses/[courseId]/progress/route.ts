@@ -7,7 +7,6 @@ import User from "@/models/User";
 import {
   buildCourseStructure,
   calculateProgressPercent,
-  moduleCompletionReady,
   nextLessonKey,
   publicLearningProgress
 } from "@/lib/learning-engine";
@@ -55,13 +54,14 @@ function studySecondsByLesson(events: { lessonKey?: string; seconds?: number }[]
 function previousModulesReady(
   structure: ReturnType<typeof buildCourseStructure>,
   moduleIndex: number,
-  completedLessonKeys: string[],
-  lessonSeconds: Record<string, number>
+  completedLessonKeys: string[]
 ) {
+  const completed = new Set(completedLessonKeys);
+
   return structure.modules
     .slice(0, moduleIndex)
     .every((module: { key: string; lessons: { key: string; durationMinutes: number }[] }) =>
-      moduleCompletionReady(structure, module, completedLessonKeys, lessonSeconds).ready
+      module.lessons.every((lesson) => completed.has(lesson.key))
     );
 }
 
@@ -140,12 +140,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ cou
       return jsonOk({ error: "Enroll in this course before opening the full learning workspace." }, 403);
     }
     const completedLessonKeys = new Set(existingProgress?.completedLessonKeys ?? []);
-    const existingLessonSeconds = studySecondsByLesson(existingProgress?.events ?? []);
 
-    if (lesson && !previousModulesReady(structure, lesson.moduleIndex, Array.from(completedLessonKeys).map(String), existingLessonSeconds)) {
+    if (lesson && !previousModulesReady(structure, lesson.moduleIndex, Array.from(completedLessonKeys).map(String))) {
       return jsonOk(
         {
-          error: "Finish the previous chapter lessons and required study time before unlocking this chapter."
+          error: "Finish the previous chapter lessons before unlocking this chapter."
         },
         403
       );

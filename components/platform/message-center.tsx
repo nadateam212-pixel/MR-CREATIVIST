@@ -16,8 +16,11 @@ type Contact = {
   id: string;
   name?: string;
   email?: string;
+  phone?: string;
   role?: string;
   profileImage?: string;
+  isVerified?: boolean;
+  source?: string;
   unreadCount?: number;
   lastMessage?: ChatMessage | null;
 };
@@ -57,6 +60,7 @@ export function MessageCenter({ recipientId }: { recipientId?: string }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [selectedId, setSelectedId] = useState(initialRecipient);
   const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("all");
   const [content, setContent] = useState("");
   const [subject, setSubject] = useState(searchParams.get("subject") ?? "");
   const [contextType, setContextType] = useState(searchParams.get("contextType") ?? "direct");
@@ -69,9 +73,19 @@ export function MessageCenter({ recipientId }: { recipientId?: string }) {
     () => contacts.find((contact) => contact.id === selectedId) ?? null,
     [contacts, selectedId]
   );
-  const filteredContacts = contacts.filter((contact) =>
-    `${contact.name ?? ""} ${contact.email ?? ""} ${contact.role ?? ""}`.toLowerCase().includes(query.toLowerCase())
-  );
+  const unreadTotal = contacts.reduce((total, contact) => total + Number(contact.unreadCount ?? 0), 0);
+  const filteredContacts = contacts.filter((contact) => {
+    const target = `${contact.name ?? ""} ${contact.email ?? ""} ${contact.phone ?? ""} ${contact.role ?? ""} ${contact.lastMessage?.content ?? ""} ${contact.lastMessage?.contextType ?? ""}`.toLowerCase();
+    const matchesQuery = !query.trim() || target.includes(query.trim().toLowerCase());
+    const context = contact.lastMessage?.contextType ?? "";
+    const matchesFilter =
+      filter === "all" ||
+      (filter === "unread" && Number(contact.unreadCount ?? 0) > 0) ||
+      (filter === "read" && Boolean(contact.lastMessage) && Number(contact.unreadCount ?? 0) === 0) ||
+      (filter === "business" && ["business", "shop"].includes(context)) ||
+      context === filter;
+    return matchesQuery && matchesFilter;
+  });
 
   const loadMessages = useCallback(
     async (nextSelectedId = selectedId) => {
@@ -79,6 +93,7 @@ export function MessageCenter({ recipientId }: { recipientId?: string }) {
       try {
         const params = new URLSearchParams();
         if (nextSelectedId) params.set("userId", nextSelectedId);
+        if (query.trim()) params.set("q", query.trim());
         const response = await fetch(`/api/messages?${params.toString()}`, { cache: "no-store" });
         const payload = await response.json();
 
@@ -97,16 +112,16 @@ export function MessageCenter({ recipientId }: { recipientId?: string }) {
         setLoading(false);
       }
     },
-    [selectedId]
+    [query, selectedId]
   );
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       void loadMessages(initialRecipient);
-    }, 0);
+    }, query.trim() ? 300 : 0);
 
     return () => window.clearTimeout(timer);
-  }, [initialRecipient, loadMessages]);
+  }, [initialRecipient, loadMessages, query]);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -163,10 +178,39 @@ export function MessageCenter({ recipientId }: { recipientId?: string }) {
           <div className="flex items-center gap-3">
             <Inbox className="size-5 text-[hsl(var(--primary))]" />
             <CardTitle>Messages</CardTitle>
+            {unreadTotal ? <Badge>{unreadTotal} unread</Badge> : null}
           </div>
           <div className="relative pt-3">
             <Search className="absolute left-3 top-[1.55rem] size-4 text-[hsl(var(--muted-foreground))]" />
-            <Input value={query} onChange={(event) => setQuery(event.target.value)} className="pl-9" placeholder="Search users" />
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              className="pl-9"
+              placeholder="Search names, phone, business, gig, product, or email"
+            />
+          </div>
+          <div className="flex flex-wrap gap-1.5 pt-2">
+            {[
+              ["all", "All"],
+              ["unread", "Unread"],
+              ["read", "Read"],
+              ["product", "Product"],
+              ["gig", "Gig"],
+              ["business", "Business"],
+              ["course", "Course"],
+              ["support", "Support"]
+            ].map(([value, label]) => (
+              <Button
+                key={value}
+                type="button"
+                size="sm"
+                variant={filter === value ? "default" : "outline"}
+                onClick={() => setFilter(value)}
+                className="h-8"
+              >
+                {label}
+              </Button>
+            ))}
           </div>
         </CardHeader>
         <CardContent className="grid max-h-[calc(100vh-16rem)] gap-2 overflow-y-auto p-3 pt-0">
@@ -200,13 +244,18 @@ export function MessageCenter({ recipientId }: { recipientId?: string }) {
                   <span className="mt-1 block truncate text-xs text-[hsl(var(--muted-foreground))]">
                     {contact.lastMessage?.content ?? contact.role ?? "Platform user"}
                   </span>
+                  {!contact.lastMessage && contact.source ? (
+                    <span className="mt-2 inline-flex text-[0.68rem] font-bold uppercase tracking-[0.12em] text-[hsl(var(--primary))]">
+                      {contact.source === "recommended" ? "People you may know" : "Search result"}
+                    </span>
+                  ) : null}
                 </span>
               </button>
             );
           })}
           {filteredContacts.length === 0 ? (
             <div className="rounded-md border border-dashed border-[hsl(var(--border))] p-6 text-center text-sm text-[hsl(var(--muted-foreground))]">
-              No users found. New users appear here after registration.
+              No matching messages or accounts. Search names, phone numbers, businesses, gigs, products, or emails.
             </div>
           ) : null}
         </CardContent>

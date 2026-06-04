@@ -36,6 +36,16 @@ export default async function CoursePlayerPage({ params }: { params: Promise<{ c
     );
   }
 
+  if (!course.totalLessons) {
+    return (
+      <CourseLearningEntry
+        courseId={courseId}
+        learnerName={session.user.name ?? "MR Creativist Learner"}
+        databaseMessage="This course has no lessons saved in MongoDB yet. If it was built in this browser, the local Studio curriculum will open after hydration."
+      />
+    );
+  }
+
   if (!snapshot.enrolled && !snapshot.isCourseManager) {
     redirect(`/courses/${course.slug ?? courseId}/enroll`);
   }

@@ -7,7 +7,9 @@ export async function GET(_: Request, context: { params: Promise<{ serviceId: st
   try {
     await requireMongo();
     const { serviceId } = await context.params;
-    const service = await ConsultingService.findOne(mongoIdOrSlug(serviceId)).lean();
+    const service = await ConsultingService.findOne(mongoIdOrSlug(serviceId))
+      .populate("expertId", "name email phone profileImage isVerified")
+      .lean();
 
     if (!service) return jsonOk({ error: "Consulting service not found." }, 404);
 
@@ -38,7 +40,8 @@ export async function PUT(request: Request, context: { params: Promise<{ service
       patch.slug = await uniqueSlugFor(ConsultingService, body.slug ?? slugify(body.expertName || body.title), existing._id);
     }
 
-    const service = await ConsultingService.findByIdAndUpdate(existing._id, patch, { returnDocument: "after", runValidators: true });
+    const service = await ConsultingService.findByIdAndUpdate(existing._id, patch, { returnDocument: "after", runValidators: true })
+      .populate("expertId", "name email phone profileImage isVerified");
 
     return jsonOk(normalizeConsultingService(service));
   } catch (error) {
@@ -64,7 +67,8 @@ export async function DELETE(request: Request, context: { params: Promise<{ serv
       return jsonOk({ ok: true, deleted: true });
     }
 
-    const service = await ConsultingService.findByIdAndUpdate(existing._id, { status: "archived" }, { returnDocument: "after" });
+    const service = await ConsultingService.findByIdAndUpdate(existing._id, { status: "archived" }, { returnDocument: "after" })
+      .populate("expertId", "name email phone profileImage isVerified");
 
     return jsonOk({ ok: true, item: normalizeConsultingService(service) });
   } catch (error) {

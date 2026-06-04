@@ -7,7 +7,9 @@ export async function GET(_: Request, context: { params: Promise<{ gigId: string
   try {
     await requireMongo();
     const { gigId } = await context.params;
-    const gig = await Gig.findOne(mongoIdOrSlug(gigId)).lean();
+    const gig = await Gig.findOne(mongoIdOrSlug(gigId))
+      .populate("ownerId", "name email phone profileImage isVerified")
+      .lean();
 
     if (!gig) return jsonOk({ error: "Gig not found." }, 404);
 
@@ -40,7 +42,8 @@ export async function PUT(request: Request, context: { params: Promise<{ gigId: 
       patch.slug = await uniqueSlugFor(Gig, body.slug ?? slugify(body.title), existing._id);
     }
 
-    const gig = await Gig.findByIdAndUpdate(existing._id, patch, { returnDocument: "after", runValidators: true });
+    const gig = await Gig.findByIdAndUpdate(existing._id, patch, { returnDocument: "after", runValidators: true })
+      .populate("ownerId", "name email phone profileImage isVerified");
 
     return jsonOk(normalizeGig(gig));
   } catch (error) {
@@ -66,7 +69,8 @@ export async function DELETE(request: Request, context: { params: Promise<{ gigI
       return jsonOk({ ok: true, deleted: true });
     }
 
-    const gig = await Gig.findByIdAndUpdate(existing._id, { status: "archived" }, { returnDocument: "after" });
+    const gig = await Gig.findByIdAndUpdate(existing._id, { status: "archived" }, { returnDocument: "after" })
+      .populate("ownerId", "name email phone profileImage isVerified");
 
     return jsonOk({ ok: true, item: normalizeGig(gig) });
   } catch (error) {

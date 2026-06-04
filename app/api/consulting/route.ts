@@ -16,7 +16,12 @@ export async function GET(request: Request) {
     }
 
     const [items, total] = await Promise.all([
-      ConsultingService.find(filter).sort({ rating: -1, createdAt: -1 }).skip(skip).limit(limit).lean(),
+      ConsultingService.find(filter)
+        .populate("expertId", "name email phone profileImage isVerified")
+        .sort({ rating: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
       ConsultingService.countDocuments(filter)
     ]);
 

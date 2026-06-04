@@ -270,6 +270,42 @@ export function DashboardShell({ children, user }: { children: React.ReactNode; 
   const sidebarGroups = [workspaceGroup];
   const mobileNavItems = uniqueNavItems(sidebarGroups.flatMap((group) => group.items));
   const bottomNavItems = workspaceGroup.items.slice(0, 5);
+  const [messageCount, setMessageCount] = useState(0);
+  const [notificationCount, setNotificationCount] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCounts() {
+      try {
+        const [messagesResponse, notificationsResponse] = await Promise.all([
+          fetch("/api/messages?summary=1", { cache: "no-store" }),
+          fetch("/api/notifications?summary=1", { cache: "no-store" })
+        ]);
+        const [messagesPayload, notificationsPayload] = await Promise.all([
+          messagesResponse.ok ? messagesResponse.json() : Promise.resolve({ unreadCount: 0 }),
+          notificationsResponse.ok ? notificationsResponse.json() : Promise.resolve({ unreadCount: 0 })
+        ]);
+        if (!cancelled) {
+          setMessageCount(Number(messagesPayload.unreadCount ?? 0));
+          setNotificationCount(Number(notificationsPayload.unreadCount ?? 0));
+        }
+      } catch {
+        if (!cancelled) {
+          setMessageCount(0);
+          setNotificationCount(0);
+        }
+      }
+    }
+
+    void loadCounts();
+    const interval = window.setInterval(loadCounts, 30000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-[hsl(var(--muted))]/25 pb-24 lg:pb-0">
@@ -309,6 +345,26 @@ export function DashboardShell({ children, user }: { children: React.ReactNode; 
               <Link href="/">
                 <Home className="size-4" />
                 <span className="hidden sm:inline">Back to Home</span>
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="icon" className="relative">
+              <Link href="/messages" aria-label="Messages">
+                <MessageSquare className="size-4" />
+                {messageCount ? (
+                  <span className="absolute -right-2 -top-2 flex min-w-5 items-center justify-center rounded-full bg-[hsl(var(--primary))] px-1 text-[0.65rem] font-black text-[hsl(var(--primary-foreground))]">
+                    {messageCount > 99 ? "99+" : messageCount}
+                  </span>
+                ) : null}
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="icon" className="relative">
+              <Link href="/notifications" aria-label="Notifications">
+                <Bell className="size-4" />
+                {notificationCount ? (
+                  <span className="absolute -right-2 -top-2 flex min-w-5 items-center justify-center rounded-full bg-[hsl(var(--primary))] px-1 text-[0.65rem] font-black text-[hsl(var(--primary-foreground))]">
+                    {notificationCount > 99 ? "99+" : notificationCount}
+                  </span>
+                ) : null}
               </Link>
             </Button>
             <ModeToggle />

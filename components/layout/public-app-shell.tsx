@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -132,6 +132,84 @@ export function PublicAppShell({
   const cartCount = usePlatformStore((state) => state.cartCount);
   const [profileOpen, setProfileOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
+  const [messageCount, setMessageCount] = useState(0);
+  const [notificationCount, setNotificationCount] = useState(0);
+  const profileMenuRef = useRef<HTMLDivElement | null>(null);
+  const activityMenuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    setProfileOpen(false);
+    setActivityOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    function closeOpenMenus(event: PointerEvent) {
+      const target = event.target as Node;
+
+      if (profileOpen && profileMenuRef.current && !profileMenuRef.current.contains(target)) {
+        setProfileOpen(false);
+      }
+
+      if (activityOpen && activityMenuRef.current && !activityMenuRef.current.contains(target)) {
+        setActivityOpen(false);
+      }
+    }
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setProfileOpen(false);
+        setActivityOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", closeOpenMenus);
+    document.addEventListener("keydown", closeOnEscape);
+
+    return () => {
+      document.removeEventListener("pointerdown", closeOpenMenus);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [activityOpen, profileOpen]);
+
+  useEffect(() => {
+    if (!user) {
+      setMessageCount(0);
+      setNotificationCount(0);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadCounts() {
+      try {
+        const [messagesResponse, notificationsResponse] = await Promise.all([
+          fetch("/api/messages?summary=1", { cache: "no-store" }),
+          fetch("/api/notifications?summary=1", { cache: "no-store" })
+        ]);
+        const [messagesPayload, notificationsPayload] = await Promise.all([
+          messagesResponse.ok ? messagesResponse.json() : Promise.resolve({ unreadCount: 0 }),
+          notificationsResponse.ok ? notificationsResponse.json() : Promise.resolve({ unreadCount: 0 })
+        ]);
+        if (!cancelled) {
+          setMessageCount(Number(messagesPayload.unreadCount ?? 0));
+          setNotificationCount(Number(notificationsPayload.unreadCount ?? 0));
+        }
+      } catch {
+        if (!cancelled) {
+          setMessageCount(0);
+          setNotificationCount(0);
+        }
+      }
+    }
+
+    void loadCounts();
+    const interval = window.setInterval(loadCounts, 30000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [user]);
 
   return (
     <div className="public-theme-shell min-h-screen overflow-x-hidden bg-[hsl(var(--background))] pb-20 text-[hsl(var(--foreground))] lg:pb-0">
@@ -234,26 +312,36 @@ export function PublicAppShell({
                 asChild
                 size="icon"
                 variant="outline"
-                className="border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))]"
+                className="relative border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))]"
               >
                 <Link href="/messages" aria-label="Messages">
                   <MessageSquare className="size-4" />
+                  {messageCount ? (
+                    <span className="absolute -right-2 -top-2 flex min-w-5 items-center justify-center rounded-full bg-[hsl(var(--primary))] px-1 text-[0.65rem] font-black text-[hsl(var(--primary-foreground))]">
+                      {messageCount > 99 ? "99+" : messageCount}
+                    </span>
+                  ) : null}
                 </Link>
               </Button>
               <Button
                 asChild
                 size="icon"
                 variant="outline"
-                className="border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))]"
+                className="relative border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))]"
               >
                 <Link href="/notifications" aria-label="Notifications">
                   <Bell className="size-4" />
+                  {notificationCount ? (
+                    <span className="absolute -right-2 -top-2 flex min-w-5 items-center justify-center rounded-full bg-[hsl(var(--primary))] px-1 text-[0.65rem] font-black text-[hsl(var(--primary-foreground))]">
+                      {notificationCount > 99 ? "99+" : notificationCount}
+                    </span>
+                  ) : null}
                 </Link>
               </Button>
               <ModeToggle className="hidden border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] sm:inline-flex" />
 
               {user ? (
-                <div className="relative">
+                <div className="relative" ref={profileMenuRef}>
                   <button
                     type="button"
                     onClick={() => setProfileOpen((current) => !current)}
@@ -287,7 +375,7 @@ export function PublicAppShell({
                         </Link>
                       ))}
                       <form action={logoutAction} className="mt-1 border-t border-[hsl(var(--border))] pt-1">
-                        <button type="submit" className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-red-300 hover:bg-red-500/10">
+                        <button type="submit" onClick={() => setProfileOpen(false)} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-red-300 hover:bg-red-500/10">
                           <LogOut className="size-4" />
                           Logout
                         </button>
@@ -326,7 +414,7 @@ export function PublicAppShell({
 
       <MobileBottomNav />
 
-      <div className="fixed bottom-24 right-5 z-50 hidden lg:block lg:bottom-5">
+      <div className="fixed bottom-24 right-5 z-50 hidden lg:block lg:bottom-5" ref={activityMenuRef}>
         {activityOpen ? (
           <div className="mb-3 w-80 max-w-[calc(100vw-2.5rem)] rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 text-[hsl(var(--foreground))] shadow-2xl shadow-black/15">
             <div className="mb-3 flex items-center justify-between">

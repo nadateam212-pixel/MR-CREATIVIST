@@ -14,7 +14,9 @@ export async function GET(_: Request, context: { params: Promise<{ shopId: strin
   try {
     await requireMongo();
     const { shopId } = await context.params;
-    const shop = await ShopProfile.findOne(mongoIdOrSlug(shopId)).lean();
+    const shop = await ShopProfile.findOne(mongoIdOrSlug(shopId))
+      .populate("ownerId", "name email phone profileImage isVerified")
+      .lean();
 
     if (!shop) return jsonOk({ error: "Shop not found." }, 404);
 
@@ -50,7 +52,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ shopI
     const shop = await ShopProfile.findByIdAndUpdate(existing._id, patch, {
       returnDocument: "after",
       runValidators: true
-    });
+    }).populate("ownerId", "name email phone profileImage isVerified");
 
     return jsonOk(normalizeShopProfile(shop));
   } catch (error) {
@@ -75,7 +77,8 @@ export async function DELETE(request: Request, context: { params: Promise<{ shop
       return jsonOk({ ok: true, deleted: true });
     }
 
-    const shop = await ShopProfile.findByIdAndUpdate(existing._id, { status: "archived" }, { returnDocument: "after" });
+    const shop = await ShopProfile.findByIdAndUpdate(existing._id, { status: "archived" }, { returnDocument: "after" })
+      .populate("ownerId", "name email phone profileImage isVerified");
 
     return jsonOk({ ok: true, item: normalizeShopProfile(shop) });
   } catch (error) {

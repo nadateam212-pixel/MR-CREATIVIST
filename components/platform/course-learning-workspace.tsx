@@ -291,18 +291,6 @@ export function CourseLearningWorkspace({
   const activeIndex = course.flatLessons.findIndex((lesson) => lesson.key === activeLesson?.key);
   const previousLesson = activeIndex > 0 ? course.flatLessons[activeIndex - 1] : null;
   const nextLesson = course.flatLessons.find((lesson) => !completedSet.has(lesson.key) && lesson.key !== activeLesson?.key);
-  const allComplete =
-    progressPercent >= 100 &&
-    course.modules.every((module) => {
-      const lessonsComplete = module.lessons.every((lesson) => completedSet.has(lesson.key));
-      const requiredSeconds = module.lessons.reduce((total, lesson) => total + Number(lesson.durationMinutes ?? 0), 0) * 60;
-      const studiedSeconds = module.lessons.reduce(
-        (total, lesson) => total + Number(effectiveStudySecondsByLesson[lesson.key] ?? 0),
-        0
-      );
-
-      return lessonsComplete && studiedSeconds >= requiredSeconds;
-    });
   const effectiveStudySecondsByLesson = {
     ...studySecondsByLesson,
     ...(activeLesson
@@ -311,6 +299,13 @@ export function CourseLearningWorkspace({
         }
       : {})
   };
+  const allComplete =
+    progressPercent >= 100 &&
+    course.modules.every((module) => {
+      const lessonsComplete = module.lessons.every((lesson) => completedSet.has(lesson.key));
+
+      return lessonsComplete;
+    });
   const activeVideoSource = useMemo(
     () => {
       return videoSourceForUrl(
@@ -356,7 +351,7 @@ export function CourseLearningWorkspace({
   function moduleUnlocked(moduleIndex: number, completed = completedSet) {
     if (moduleIndex <= 0) return true;
 
-    return course.modules.slice(0, moduleIndex).every((module) => moduleComplete(module.key, completed) && moduleStudyReady(module.key));
+    return course.modules.slice(0, moduleIndex).every((module) => moduleComplete(module.key, completed));
   }
 
   function lessonUnlocked(key: string, completed = completedSet) {
@@ -1104,14 +1099,14 @@ export function CourseLearningWorkspace({
                       controls
                       controlsList="nodownload noremoteplayback"
                       disablePictureInPicture
-                      className="aspect-video w-full rounded-md bg-black"
+                      className="aspect-video min-h-[18rem] w-full rounded-md bg-black object-contain lg:min-h-[32rem]"
                       onPlay={() => void persistLesson(activeLesson, "played", { complete: false })}
                       onPause={() => setMediaPlaying(false)}
                       onTimeUpdate={(event) => setMediaSeconds(event.currentTarget.currentTime)}
                       onEnded={() => void completeActive("watched")}
                     />
                   ) : activeVideoSource.isIframe ? (
-                    <div className="relative aspect-video w-full overflow-hidden rounded-md border border-[hsl(var(--border))] bg-black">
+                    <div className="relative aspect-video min-h-[18rem] w-full overflow-hidden rounded-md border border-[hsl(var(--border))] bg-black lg:min-h-[32rem]">
                       <iframe
                         key={activeVideoSource.embedUrl}
                         ref={
@@ -1130,7 +1125,7 @@ export function CourseLearningWorkspace({
                       />
                     </div>
                   ) : (
-                    <div className="flex aspect-video flex-col items-center justify-center rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--muted))] p-6 text-center">
+                    <div className="flex aspect-video min-h-[18rem] flex-col items-center justify-center rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--muted))] p-6 text-center lg:min-h-[32rem]">
                       <Play className="mb-4 size-10 text-[hsl(var(--primary))]" />
                       <h2 className="text-lg font-semibold">Video lesson</h2>
                       <p className="mt-2 max-w-lg text-sm text-[hsl(var(--muted-foreground))]">

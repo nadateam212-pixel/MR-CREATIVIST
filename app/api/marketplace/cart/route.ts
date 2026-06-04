@@ -9,11 +9,14 @@ const cartSchema = z.object({
   quantity: z.coerce.number().int().min(1).max(99).default(1)
 });
 
-async function productAllowsCheckout(product: { isVerified?: boolean; sellerId?: unknown }) {
-  if (product.isVerified) return true;
-  if (!product.sellerId) return false;
+async function productAllowsCheckout(product: { sellerId?: unknown }) {
+  const sellerId =
+    product.sellerId && typeof product.sellerId === "object" && "_id" in product.sellerId
+      ? product.sellerId._id
+      : product.sellerId;
+  if (!sellerId) return false;
 
-  const verifiedSeller = await User.exists({ _id: product.sellerId, isVerified: true });
+  const verifiedSeller = await User.exists({ _id: sellerId, isVerified: true });
   return Boolean(verifiedSeller);
 }
 
@@ -29,7 +32,9 @@ export async function POST(request: Request) {
   try {
     await requireMongo();
     const body = cartSchema.parse(await readJson(request));
-    const product = await Product.findOne(mongoIdOrSlug(body.productId)).lean();
+    const product = await Product.findOne(mongoIdOrSlug(body.productId))
+      .populate("sellerId", "name email phone profileImage isVerified")
+      .lean();
 
     if (!product) return jsonOk({ error: "Product not found." }, 404);
     if (product.status !== "published") return jsonOk({ error: "Product is not available for checkout." }, 403);

@@ -4,11 +4,14 @@ import User from "@/models/User";
 import { orderSchema } from "@/lib/mongo-validations";
 import { jsonError, jsonOk, mongoIdOrSlug, parsePagination, readJson, requireMongo } from "@/lib/mongo-api";
 
-async function productAllowsCheckout(product: { isVerified?: boolean; sellerId?: unknown }) {
-  if (product.isVerified) return true;
-  if (!product.sellerId) return false;
+async function productAllowsCheckout(product: { sellerId?: unknown }) {
+  const sellerId =
+    product.sellerId && typeof product.sellerId === "object" && "_id" in product.sellerId
+      ? product.sellerId._id
+      : product.sellerId;
+  if (!sellerId) return false;
 
-  const verifiedSeller = await User.exists({ _id: product.sellerId, isVerified: true });
+  const verifiedSeller = await User.exists({ _id: sellerId, isVerified: true });
   return Boolean(verifiedSeller);
 }
 
