@@ -6,6 +6,7 @@ const ProductSchema = new mongoose.Schema(
     slug: { type: String, required: true, unique: true, lowercase: true, trim: true, index: true },
     type: { type: String, enum: ["Digital", "Physical", "Template", "Download", "Software", "Creator assets", "Service"], required: true },
     description: { type: String, required: true, maxlength: 5000 },
+    studioId: { type: String, trim: true, index: true },
     sellerId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     sellerName: { type: String, required: true, trim: true },
     price: { type: Number, required: true, min: 0 },

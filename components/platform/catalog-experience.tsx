@@ -6,12 +6,13 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import {
-  BadgeCheck,
   BookOpen,
   CheckCircle2,
   Clock,
   Download,
   Filter,
+  MessageCircle,
+  MessageSquare,
   PackageCheck,
   Search,
   ShoppingCart,
@@ -25,6 +26,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { PriceDisplay } from "@/components/ui/price-display";
 import { SafeImage } from "@/components/ui/safe-image";
+import { VerifiedMark } from "@/components/ui/verified-mark";
 import { convertMoney, isFreePrice, parseMoney } from "@/lib/currency";
 import { courseImageForCategory } from "@/lib/course-media";
 import { useI18n } from "@/hooks/use-i18n";
@@ -50,6 +52,7 @@ type CatalogCourse = {
 };
 type CatalogProduct = {
   id?: string;
+  sellerId?: string;
   name: string;
   slug: string;
   type: string;
@@ -64,6 +67,9 @@ type CatalogProduct = {
   image: string;
   tools: string[];
   isVerified?: boolean;
+  sellerVerified?: boolean;
+  sellerEmail?: string;
+  sellerPhone?: string;
 };
 
 export function CatalogExperience({
@@ -165,9 +171,32 @@ export function CatalogExperience({
   }
 
   function handleAddToCart(product: CatalogProduct) {
+    if (!canCheckoutProduct(product)) {
+      const nextMessage = `${product.name} is not verified for online checkout yet. Contact the seller directly.`;
+      setActionMessage(nextMessage);
+      toast.message(nextMessage);
+      return;
+    }
+
     addToCart(product.slug);
     setActionMessage(`${product.name} added to cart.`);
     toast.success(`${product.name} added to cart.`);
+  }
+
+  function canCheckoutProduct(product: CatalogProduct) {
+    return Boolean(product.isVerified || product.sellerVerified);
+  }
+
+  function messageHref(product: CatalogProduct) {
+    if (product.sellerId) return `/messages/${product.sellerId}`;
+    return `/messages?context=product&product=${encodeURIComponent(product.slug)}`;
+  }
+
+  function whatsappHref(product: CatalogProduct) {
+    const phone = product.sellerPhone?.replace(/[^\d+]/g, "");
+    const text = encodeURIComponent(`Hello ${product.seller}, I am interested in ${product.name} on MR Creativist.`);
+
+    return phone ? `https://wa.me/${phone.replace(/^\+/, "")}?text=${text}` : `https://wa.me/?text=${text}`;
   }
 
   return (
@@ -330,6 +359,7 @@ export function CatalogExperience({
               })
             : filteredProducts.map((product) => {
                 const productHref = `/marketplace/product/${product.slug}`;
+                const verifiedCheckout = canCheckoutProduct(product);
 
                 return (
                 <Card key={product.slug} className="overflow-hidden">
@@ -340,16 +370,17 @@ export function CatalogExperience({
                     <div className="flex flex-wrap gap-2">
                       <Badge>{product.type}</Badge>
                       <Badge>{product.category}</Badge>
-                      {product.isVerified ? (
-                        <Badge className="border-sky-500/45 text-sky-500">
-                          <BadgeCheck className="mr-1 size-3" />
-                          Verified
-                        </Badge>
-                      ) : null}
                     </div>
                     <CardTitle className="leading-tight">
-                      <Link href={productHref}>{product.name}</Link>
+                      <Link href={productHref} className="inline-flex min-w-0 items-center gap-1.5">
+                        <span className="min-w-0">{product.name}</span>
+                        {verifiedCheckout ? <VerifiedMark label="Verified product" /> : null}
+                      </Link>
                     </CardTitle>
+                    <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-[hsl(var(--muted-foreground))]">
+                      <span>{product.seller}</span>
+                      {verifiedCheckout ? <VerifiedMark label="Verified seller" /> : null}
+                    </p>
                   </CardHeader>
                   <CardContent className="space-y-5">
                     <div className="grid grid-cols-3 gap-2 text-sm text-[hsl(var(--muted-foreground))]">
@@ -366,10 +397,6 @@ export function CatalogExperience({
                         {product.delivery}
                       </span>
                     </div>
-                    <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-[hsl(var(--muted-foreground))]">
-                      <span>{product.seller}</span>
-                      {product.isVerified ? <BadgeCheck className="size-4 text-sky-500" aria-label="Verified seller" /> : null}
-                    </p>
                     <div className="flex flex-wrap gap-2">
                       {product.tools.slice(0, 3).map((tool) => (
                         <Badge key={tool}>{tool}</Badge>
@@ -383,14 +410,31 @@ export function CatalogExperience({
                           className="text-xl text-[hsl(var(--primary))]"
                         />
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap justify-end gap-2">
                         <Button asChild size="sm" variant="outline">
                           <Link href={productHref}>{t("commerce.view")}</Link>
                         </Button>
-                        <Button size="sm" onClick={() => handleAddToCart(product)}>
-                          <ShoppingCart className="size-4" />
-                          {t("commerce.add")}
-                        </Button>
+                        {verifiedCheckout ? (
+                          <Button size="sm" onClick={() => handleAddToCart(product)}>
+                            <ShoppingCart className="size-4" />
+                            {t("commerce.add")}
+                          </Button>
+                        ) : (
+                          <>
+                            <Button asChild size="sm">
+                              <Link href={messageHref(product)}>
+                                <MessageSquare className="size-4" />
+                                Message
+                              </Link>
+                            </Button>
+                            <Button asChild size="sm" variant="outline">
+                              <a href={whatsappHref(product)} target="_blank" rel="noreferrer">
+                                <MessageCircle className="size-4" />
+                                WhatsApp
+                              </a>
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </div>
                   </CardContent>

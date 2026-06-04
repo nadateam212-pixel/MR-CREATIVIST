@@ -41,9 +41,10 @@ async function getAccountState(userId: string) {
     const elevated = elevatedAccountRoles.includes(role as (typeof elevatedAccountRoles)[number]);
     const available =
       role === "client" ||
+      elevated ||
       validatedRoles.includes(role) ||
       (role === "student" && Boolean(hasEnrollment));
-    const pending = application?.status === "pending" || application?.status === "needs_more_info";
+    const pending = !available && (application?.status === "pending" || application?.status === "needs_more_info");
 
     return {
       role,
@@ -55,6 +56,8 @@ async function getAccountState(userId: string) {
       reason: available
         ? role === "student" && !validatedRoles.includes("student")
           ? "Available because you enrolled in a course."
+          : elevated && !validatedRoles.includes(role)
+            ? "Studio access is self-service. Admin can still verify badges and approve courses."
           : "Validated for this account."
         : role === "student"
           ? "Enroll in a course to unlock student mode."
@@ -62,7 +65,7 @@ async function getAccountState(userId: string) {
             ? "Application is waiting for admin review."
             : "Apply and upload required documents for admin validation.",
       dashboardPath: roleDashboardPaths[role],
-      requirements: elevated ? roleApplicationRequirements[role as keyof typeof roleApplicationRequirements] : [],
+      requirements: elevated && !available ? roleApplicationRequirements[role as keyof typeof roleApplicationRequirements] : [],
       applicationId: application ? String(application._id) : null
     };
   });
@@ -115,8 +118,9 @@ export async function PATCH(request: Request) {
     }
 
     const update =
-      body.role === "student" && state.hasEnrollment
-        ? { role: body.role, $addToSet: { validatedRoles: "student" } }
+      (body.role === "student" && state.hasEnrollment) ||
+      elevatedAccountRoles.includes(body.role as (typeof elevatedAccountRoles)[number])
+        ? { role: body.role, $addToSet: { validatedRoles: body.role } }
         : { role: body.role };
     await User.findByIdAndUpdate(session.user.id, update, { runValidators: true });
 

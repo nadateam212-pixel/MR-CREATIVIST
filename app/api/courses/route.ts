@@ -2,6 +2,7 @@ import Course from "@/models/Course";
 import { jsonError, jsonOk, parsePagination, readJson, requireMongo, requireRole, uniqueSlugFor } from "@/lib/mongo-api";
 import { normalizeCourse, slugify } from "@/lib/platform-db";
 import { courseSchema } from "@/lib/mongo-validations";
+import { studioTrackId } from "@/lib/studio-identity";
 
 export async function GET(request: Request) {
   try {
@@ -35,7 +36,10 @@ export async function POST(request: Request) {
     const course = await Course.create({
       ...body,
       slug,
-      instructorId: session.user.id
+      studioId: studioTrackId(session.user),
+      instructorId: session.user.id,
+      instructorName: body.instructorName || session.user.name || session.user.email,
+      status: session.user.role === "admin" ? body.status : body.status === "draft" ? "draft" : "submitted"
     });
 
     return jsonOk(normalizeCourse(course), 201);

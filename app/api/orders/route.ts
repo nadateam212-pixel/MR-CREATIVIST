@@ -1,7 +1,16 @@
 import Order from "@/models/Order";
 import Product from "@/models/Product";
+import User from "@/models/User";
 import { orderSchema } from "@/lib/mongo-validations";
 import { jsonError, jsonOk, mongoIdOrSlug, parsePagination, readJson, requireMongo } from "@/lib/mongo-api";
+
+async function productAllowsCheckout(product: { isVerified?: boolean; sellerId?: unknown }) {
+  if (product.isVerified) return true;
+  if (!product.sellerId) return false;
+
+  const verifiedSeller = await User.exists({ _id: product.sellerId, isVerified: true });
+  return Boolean(verifiedSeller);
+}
 
 export async function GET(request: Request) {
   try {
@@ -27,6 +36,10 @@ export async function POST(request: Request) {
     for (const item of body.items) {
       const product = await Product.findOne(mongoIdOrSlug(item.productId)).lean();
       if (!product) return jsonOk({ error: `Product not found: ${item.productId}` }, 404);
+      if (product.status !== "published") return jsonOk({ error: `Product is not available for checkout: ${product.name}` }, 403);
+      if (!(await productAllowsCheckout(product))) {
+        return jsonOk({ error: `${product.name} is not verified for online checkout yet. Contact the seller directly.` }, 403);
+      }
 
       orderItems.push({
         productId: product._id,

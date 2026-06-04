@@ -1311,7 +1311,7 @@ export function CourseLearningWorkspace({
                   <div className="rounded-md border border-[hsl(var(--border))] p-4">
                     <h2 className="font-semibold">Practical assignment</h2>
                     <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-                      Build a small proof of work for this chapter. Include the decisions you made, the result, and the next improvement you would make.
+                      {activeLesson.summary || "Follow the instructor's assignment instructions for this lesson."}
                     </p>
                   </div>
                   <Button onClick={() => void completeActive("assignment_submitted", 100)} disabled={savingKey === activeLesson.key}>
@@ -1323,26 +1323,31 @@ export function CourseLearningWorkspace({
 
               {activeLesson.type === "download" ? (
                 <div className="space-y-4">
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {(activeLesson.resources.length
-                      ? activeLesson.resources
-                      : [{ label: `${activeLesson.title} workbook`, url: "#" }, { label: "Practice checklist", url: "#" }]
-                    ).map((resource) => (
-                      <Link
-                        key={resource.label}
-                        href={resource.url}
-                        target="_blank"
-                        className="rounded-md border border-[hsl(var(--border))] p-3 text-sm font-medium hover:bg-[hsl(var(--muted))]"
-                      >
-                        <Download className="mb-3 size-4 text-[hsl(var(--primary))]" />
-                        {resource.label}
-                      </Link>
-                    ))}
-                  </div>
-                  <Button onClick={() => void completeActive("downloaded")} disabled={savingKey === activeLesson.key}>
-                    <CheckCircle2 className="size-4" />
-                    Mark resources downloaded
-                  </Button>
+                  {activeLesson.resources.length ? (
+                    <>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {activeLesson.resources.map((resource) => (
+                          <Link
+                            key={resource.label}
+                            href={resource.url}
+                            target="_blank"
+                            className="rounded-md border border-[hsl(var(--border))] p-3 text-sm font-medium hover:bg-[hsl(var(--muted))]"
+                          >
+                            <Download className="mb-3 size-4 text-[hsl(var(--primary))]" />
+                            {resource.label}
+                          </Link>
+                        ))}
+                      </div>
+                      <Button onClick={() => void completeActive("downloaded")} disabled={savingKey === activeLesson.key}>
+                        <CheckCircle2 className="size-4" />
+                        Mark resources downloaded
+                      </Button>
+                    </>
+                  ) : (
+                    <div className="rounded-md border border-dashed border-[hsl(var(--border))] p-4 text-sm text-[hsl(var(--muted-foreground))]">
+                      No downloadable resources are attached to this lesson yet.
+                    </div>
+                  )}
                 </div>
               ) : null}
 

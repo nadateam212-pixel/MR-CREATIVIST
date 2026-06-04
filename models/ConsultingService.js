@@ -4,6 +4,7 @@ const ConsultingServiceSchema = new mongoose.Schema(
   {
     title: { type: String, required: true, trim: true, maxlength: 180 },
     slug: { type: String, required: true, unique: true, lowercase: true, trim: true, index: true },
+    studioId: { type: String, trim: true, index: true },
     expertId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     expertName: { type: String, required: true, trim: true },
     expertTitle: { type: String, required: true, trim: true },

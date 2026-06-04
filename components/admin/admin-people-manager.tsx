@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Archive, BadgeCheck, CheckCircle2, ExternalLink, MessageSquare, Share2, ShieldOff, UserRound } from "lucide-react";
+import { Archive, BadgeCheck, CheckCircle2, ExternalLink, Eye, MessageSquare, RotateCcw, Share2, ShieldOff, Trash2, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,7 @@ export function AdminPeopleManager({
 }) {
   const [rows, setRows] = useState(initialRows);
   const [busy, setBusy] = useState("");
+  const [selectedRow, setSelectedRow] = useState<AdminPersonRow | null>(initialRows[0] ?? null);
 
   function updateRow(id: string, patch: Partial<AdminPersonRow>) {
     setRows((current) => current.map((row) => (row.id === id ? { ...row, ...patch } : row)));
@@ -88,6 +89,27 @@ export function AdminPeopleManager({
     }
   }
 
+  async function deleteProfile(row: AdminPersonRow) {
+    if (!row.archivePath || !window.confirm(`Permanently delete ${row.name}? This cannot be undone.`)) return;
+
+    setBusy(`${row.id}:delete`);
+    try {
+      const separator = row.archivePath.includes("?") ? "&" : "?";
+      const response = await fetch(`${row.archivePath}${separator}hard=1`, { method: "DELETE" });
+      const payload = await response.json();
+
+      if (!response.ok) throw new Error(payload.error ?? "Delete failed.");
+
+      setRows((current) => current.filter((item) => item.id !== row.id));
+      setSelectedRow((current) => (current?.id === row.id ? null : current));
+      toast.success("Profile deleted successfully.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Delete failed.");
+    } finally {
+      setBusy("");
+    }
+  }
+
   async function updateProfile(row: AdminPersonRow, patch: Record<string, unknown>, label: string) {
     if (!row.updatePath) return;
 
@@ -121,12 +143,13 @@ export function AdminPeopleManager({
   }
 
   return (
-    <Card className="overflow-hidden">
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="overflow-x-auto p-0">
-        <table className="w-full min-w-[64rem] text-left text-sm">
+    <div className="space-y-5">
+      <Card className="overflow-hidden">
+        <CardHeader>
+          <CardTitle>{title}</CardTitle>
+        </CardHeader>
+        <CardContent className="overflow-x-auto p-0">
+          <table className="w-full min-w-[64rem] text-left text-sm">
           <thead className="border-y border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))]">
             <tr>
               <th className="p-4 font-medium">Person</th>
@@ -176,14 +199,10 @@ export function AdminPeopleManager({
                           </Link>
                         </Button>
                       ) : null}
-                      {row.publicHref ? (
-                        <Button asChild size="sm" variant="outline">
-                          <Link href={row.publicHref} target="_blank">
-                            <ExternalLink className="size-4" />
-                            View
-                          </Link>
-                        </Button>
-                      ) : null}
+                      <Button size="sm" variant="outline" onClick={() => setSelectedRow(row)}>
+                        <Eye className="size-4" />
+                        View
+                      </Button>
                       {row.userId ? (
                         <Button asChild size="sm" variant="outline">
                           <Link href={`/messages/${row.userId}`}>
@@ -222,9 +241,24 @@ export function AdminPeopleManager({
                         Share
                       </Button>
                       {row.archivePath ? (
-                        <Button size="sm" variant="outline" onClick={() => void archiveProfile(row)} disabled={busy === `${row.id}:archive`}>
-                          <Archive className="size-4" />
-                          Archive
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            row.status === "archived"
+                              ? void updateProfile(row, { status: "published" }, "Unarchive")
+                              : void archiveProfile(row)
+                          }
+                          disabled={busy === `${row.id}:archive` || busy === `${row.id}:Unarchive`}
+                        >
+                          {row.status === "archived" ? <RotateCcw className="size-4" /> : <Archive className="size-4" />}
+                          {row.status === "archived" ? "Unarchive" : "Archive"}
+                        </Button>
+                      ) : null}
+                      {row.archivePath ? (
+                        <Button size="sm" variant="outline" onClick={() => void deleteProfile(row)} disabled={busy === `${row.id}:delete`}>
+                          <Trash2 className="size-4" />
+                          Delete
                         </Button>
                       ) : null}
                     </div>
@@ -239,8 +273,39 @@ export function AdminPeopleManager({
               </tr>
             )}
           </tbody>
-        </table>
-      </CardContent>
-    </Card>
+          </table>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Person details</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {selectedRow ? (
+            <div className="grid gap-3 md:grid-cols-2">
+              {Object.entries({
+                name: selectedRow.name,
+                email: selectedRow.email ?? "Not recorded",
+                role: selectedRow.role,
+                title: selectedRow.title ?? "Not recorded",
+                status: selectedRow.status,
+                metric: selectedRow.metric ?? "Ready",
+                adminPath: selectedRow.href ?? "Not linked",
+                publicPath: selectedRow.publicHref ?? "Not linked"
+              }).map(([key, value]) => (
+                <div key={`${selectedRow.id}:${key}`} className="rounded-md border border-[hsl(var(--border))] p-3">
+                  <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[hsl(var(--muted-foreground))]">
+                    {key.replace(/([A-Z])/g, " $1")}
+                  </p>
+                  <p className="mt-1 break-words text-sm leading-6">{String(value)}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-[hsl(var(--muted-foreground))]">Select a person or profile to view details inside the admin dashboard.</p>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }

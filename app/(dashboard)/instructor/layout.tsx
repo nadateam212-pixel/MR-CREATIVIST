@@ -3,10 +3,13 @@ import { auth } from "@/auth";
 
 export default async function InstructorLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
-  const role = session?.user?.role;
 
-  if (role !== "instructor" && role !== "admin") {
-    redirect("/dashboard?account=instructor-required");
+  if (!session?.user) {
+    redirect("/login");
+  }
+
+  if (session.user.accountStatus === "suspended") {
+    redirect("/dashboard?account=suspended");
   }
 
   return children;

@@ -12,10 +12,6 @@ import { type CourseAssetDraft, type CourseLessonDraft, type CourseQuizDraft, us
 type SnapshotCourse = Parameters<typeof CourseLearningWorkspace>[0]["course"];
 type SnapshotProgress = Parameters<typeof CourseLearningWorkspace>[0]["initialProgress"];
 
-function fallbackLessonType(index: number) {
-  return ["video", "article", "assignment", "quiz"][index % 4];
-}
-
 function playableVideoUrl(...urls: Array<string | undefined>) {
   const playable = urls.find((url) => {
     const source = videoSourceForUrl(url);
@@ -115,15 +111,13 @@ function localCourseStructure(courseId: string): SnapshotCourse | null {
       .filter((quiz) => !chapterLessons.some((lesson) => lesson.id === `quiz-lesson-${quiz.id}`))
       .map((quiz, quizIndex) => quizToLesson(quiz, chapter.id, quizIndex));
     const chapterLearningItems = [...chapterLessons, ...chapterQuizLessons].sort((left, right) => left.order - right.order);
-    const lessonCount = chapterLearningItems.length || (moduleIndex === chapters.length - 1 ? 4 : 3);
 
     return {
       key: `m${moduleIndex + 1}`,
       title,
       description: chapter.description,
-      lessons: Array.from({ length: lessonCount }, (_, lessonIndex) => {
-        const explicitLesson = chapterLearningItems[lessonIndex];
-        const type = explicitLesson?.type ?? fallbackLessonType(lessonIndex);
+      lessons: chapterLearningItems.map((explicitLesson, lessonIndex) => {
+        const type = explicitLesson?.type ?? "article";
         const quiz = explicitLesson?.id.startsWith("quiz-lesson-")
           ? quizzes.find((item) => `quiz-lesson-${item.id}` === explicitLesson.id)
           : quizzes.find((item) => item.chapterId === chapter.id);
@@ -144,7 +138,7 @@ function localCourseStructure(courseId: string): SnapshotCourse | null {
             (type === "video"
               ? `Watch: ${title}`
               : type === "article"
-                ? `Read: ${title} playbook`
+                ? `Read: ${title}`
                 : type === "image"
                   ? `View: ${title} reference`
                   : type === "download"
@@ -153,7 +147,7 @@ function localCourseStructure(courseId: string): SnapshotCourse | null {
                       ? `Practice lab: ${title}`
                       : `Checkpoint quiz: ${title}`),
           type,
-          durationMinutes: explicitLesson?.durationMinutes ?? (type === "quiz" ? 15 : Math.max(20, Math.round(Number(chapter.estimatedMinutes ?? 45) / lessonCount))),
+          durationMinutes: explicitLesson?.durationMinutes ?? (type === "quiz" ? 15 : 20),
           videoUrl:
             type === "video"
               ? playableVideoUrl(explicitLesson?.videoUrl, assetUrl(videoAsset), moduleIndex === 0 && lessonIndex === 0 ? firstVideoUrl : undefined)

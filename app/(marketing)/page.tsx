@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { LocalizedPrice } from "@/components/platform/localized-price";
 import { SafeImage } from "@/components/ui/safe-image";
+import { VerifiedMark } from "@/components/ui/verified-mark";
 import { brand } from "@/lib/brand";
 import { getCourses, getFreelancers, getJobPosts, getProducts, getShopProfiles } from "@/lib/platform-db";
 
@@ -37,6 +38,7 @@ type RankedItem = {
   learners?: number;
   downloads?: number;
   completed?: number;
+  isVerified?: boolean;
   createdAt?: string | Date;
   updatedAt?: string | Date;
   productsOrServices?: unknown[];
@@ -349,8 +351,11 @@ export default async function HomePage() {
                 <SafeImage src={freelancer.image} alt={freelancer.name} fill sizes="220px" className="object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent" />
                 <div className="absolute inset-x-0 bottom-0 p-4">
-                  <p className="font-bold">{freelancer.name}</p>
-                  <p className="text-xs text-slate-300">{freelancer.role}</p>
+                  <p className="flex items-center gap-1 font-bold text-white">
+                    <span className="min-w-0 truncate">{freelancer.name}</span>
+                    {"isVerified" in freelancer && freelancer.isVerified ? <VerifiedMark label="Verified freelancer" className="size-4" /> : null}
+                  </p>
+                  <p className="text-xs text-white/80">{freelancer.role}</p>
                 </div>
               </div>
               <CardContent className="p-4">

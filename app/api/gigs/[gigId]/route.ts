@@ -33,7 +33,7 @@ export async function PUT(request: Request, context: { params: Promise<{ gigId: 
     const body = gigSchema.partial().parse(await readJson(request));
     const patch: Record<string, unknown> = {
       ...body,
-      ...(isAdmin ? {} : { status: body.status === "draft" ? "draft" : "submitted", isVerified: existing.isVerified })
+      ...(isAdmin ? {} : { status: body.status === "draft" ? "draft" : "published", isVerified: existing.isVerified })
     };
 
     if (body.slug || body.title) {
@@ -60,6 +60,11 @@ export async function DELETE(request: Request, context: { params: Promise<{ gigI
     const isAdmin = session.user.role === "admin";
     const ownsGig = existing.ownerId && String(existing.ownerId) === String(session.user.id);
     if (!isAdmin && !ownsGig) return jsonOk({ error: "You can only archive gigs created by your Studio account." }, 403);
+
+    if (isAdmin && new URL(request.url).searchParams.get("hard") === "1") {
+      await Gig.findByIdAndDelete(existing._id);
+      return jsonOk({ ok: true, deleted: true });
+    }
 
     const gig = await Gig.findByIdAndUpdate(existing._id, { status: "archived" }, { returnDocument: "after" });
 

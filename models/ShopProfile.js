@@ -14,6 +14,7 @@ const ShopOfferSchema = new mongoose.Schema(
 
 const ShopProfileSchema = new mongoose.Schema(
   {
+    studioId: { type: String, trim: true, index: true },
     ownerId: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true },
     ownerName: { type: String, trim: true, maxlength: 120 },
     name: { type: String, required: true, trim: true, maxlength: 180 },

@@ -8,12 +8,11 @@ import {
   BookOpen,
   CheckCircle2,
   Clock,
+  Download,
   FileCheck2,
   GraduationCap,
   Layers3,
   PlayCircle,
-  ShieldCheck,
-  Sparkles,
   Star,
   Users,
   Video
@@ -50,7 +49,55 @@ type CoursePreview = {
   outcomes: string[];
   chapters: string[];
   tools: string[];
+  modules?: CourseModulePreview[];
+  resources?: CourseResourcePreview[];
   status?: string;
+};
+
+type CourseResourcePreview = {
+  label?: string;
+  title?: string;
+  type?: string;
+  url?: string;
+  accessRule?: string;
+  downloadable?: boolean;
+  description?: string;
+};
+
+type CourseLessonPreview = {
+  title?: string;
+  type?: "video" | "article" | "image" | "quiz" | "assignment" | "download" | string;
+  sourceType?: string;
+  durationMinutes?: number;
+  durationSeconds?: number;
+  summary?: string;
+  videoUrl?: string;
+  imageUrl?: string;
+  resources?: CourseResourcePreview[];
+  isPreview?: boolean;
+  freePreview?: boolean;
+};
+
+type CourseModulePreview = {
+  title?: string;
+  description?: string;
+  orderIndex?: number;
+  status?: string;
+  lessons?: CourseLessonPreview[];
+};
+
+type CurriculumModule = {
+  title: string;
+  description: string;
+  lessons: Array<{
+    title: string;
+    type: string;
+    durationMinutes: number;
+    videoUrl: string;
+    resources: CourseResourcePreview[];
+    summary: string;
+    isPreview: boolean;
+  }>;
 };
 
 function localCourseToPreview(course: PlatformCourseDraft): CoursePreview {
@@ -74,6 +121,7 @@ function localCourseToPreview(course: PlatformCourseDraft): CoursePreview {
     outcomes: course.outcomes,
     chapters: course.chapters,
     tools: course.tools,
+    resources: [],
     status: course.status
   };
 }
@@ -97,11 +145,11 @@ function fallbackCourseToPreview(slug: string): CoursePreview {
     certificate: "Completion certificate",
     image: courseImageForCategory("Course"),
     trailerUrl: "",
-    description:
-      "This preview is ready for your instructor workspace data. Add chapters, videos, outcomes, and assessments to turn it into a complete course path.",
-    outcomes: ["Define the learner goal", "Add lessons and resources", "Publish assessments and certificates"],
-    chapters: ["Orientation", "Core lessons", "Practice lab", "Final assessment"],
-    tools: ["Video lessons", "Downloads", "Quizzes", "Assignments", "Certificate"],
+    description: "This course is not published yet.",
+    outcomes: [],
+    chapters: [],
+    tools: [],
+    resources: [],
     status: "preview"
   };
 }
@@ -116,6 +164,45 @@ function embeddedPreviewClass(provider: string) {
   if (provider === "google-drive") return "absolute inset-x-0 -top-12 h-[calc(100%+6rem)] w-full border-0";
 
   return "absolute inset-0 h-full w-full border-0";
+}
+
+function playableVideoUrl(...urls: Array<string | undefined>) {
+  const playable = urls.find((url) => {
+    const source = videoSourceForUrl(url);
+    return source.provider !== "empty" && source.provider !== "unsupported";
+  });
+
+  return playable || "";
+}
+
+function resourceLabel(resource: CourseResourcePreview, index: number) {
+  return resource.label || resource.title || `Resource ${index + 1}`;
+}
+
+function normalizedResources(resources?: CourseResourcePreview[]) {
+  return Array.isArray(resources)
+    ? resources.filter((resource) => resource.url).map((resource, index) => ({
+        ...resource,
+        label: resourceLabel(resource, index)
+      }))
+    : [];
+}
+
+function lessonDurationMinutes(lesson: CourseLessonPreview) {
+  const minutes = Number(lesson.durationMinutes ?? 0);
+  if (minutes > 0) return minutes;
+
+  const seconds = Number(lesson.durationSeconds ?? 0);
+  return seconds > 0 ? Math.max(1, Math.round(seconds / 60)) : 0;
+}
+
+function formatLessonMinutes(minutes: number) {
+  if (minutes <= 0) return "Self-paced";
+  if (minutes < 60) return `${minutes} min`;
+
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest ? `${hours}h ${rest}m` : `${hours}h`;
 }
 
 function CoursePreviewPlayer({
@@ -199,8 +286,28 @@ export function CourseDetailExperience({
     return localCourse ? localCourseToPreview(localCourse) : fallbackCourseToPreview(slug);
   }, [initialCourse, localCourse, slug]);
 
-  const chapters = useMemo(() => {
+  const curriculum = useMemo<CurriculumModule[]>(() => {
     if (!course) return [];
+
+    if (course.modules?.length) {
+      return course.modules
+        .slice()
+        .filter((module) => module.status !== "hidden")
+        .sort((left, right) => Number(left.orderIndex ?? 0) - Number(right.orderIndex ?? 0))
+        .map((module, moduleIndex) => ({
+          title: module.title || `Module ${moduleIndex + 1}`,
+          description: module.description || "",
+          lessons: (module.lessons ?? []).map((lesson, lessonIndex) => ({
+            title: lesson.title || `Lesson ${lessonIndex + 1}`,
+            type: lesson.type || "article",
+            durationMinutes: lessonDurationMinutes(lesson),
+            videoUrl: playableVideoUrl(lesson.videoUrl),
+            resources: normalizedResources(lesson.resources),
+            summary: lesson.summary || "",
+            isPreview: Boolean(lesson.isPreview || lesson.freePreview)
+          }))
+        }));
+    }
 
     const localChapters = courseChapters[course.slug];
     if (localChapters?.length) {
@@ -210,38 +317,44 @@ export function CourseDetailExperience({
         .map((chapter) => ({
           title: chapter.title,
           description: chapter.description,
-          estimatedMinutes: chapter.estimatedMinutes,
-          requiredScore: chapter.requiredScore,
-          isLocked: chapter.isLocked
+          lessons: []
         }));
     }
 
-    return course.chapters.map((chapter, index) => ({
+    return course.chapters.map((chapter) => ({
       title: chapter,
-      description: `${chapter} lessons, resources, checkpoint questions, and practice work.`,
-      estimatedMinutes: 35 + index * 10,
-      requiredScore: Math.min(85, index * 20),
-      isLocked: index > 0
+      description: "",
+      lessons: []
     }));
   }, [course, courseChapters]);
 
   const assets = course ? courseAssets.filter((asset) => asset.courseSlug === course.slug) : [];
   const firstVideoAsset = assets.find((asset) => asset.type === "video");
+  const flatLessons = curriculum.flatMap((module) => module.lessons);
+  const firstPreviewLesson = flatLessons.find((lesson) => lesson.isPreview && lesson.videoUrl);
+  const firstVideoLesson = flatLessons.find((lesson) => lesson.videoUrl);
+  const courseResources = normalizedResources(course.resources);
+  const lessonResources = flatLessons.flatMap((lesson) => lesson.resources);
   const previewVideoUrl =
-    course.trailerUrl ||
+    playableVideoUrl(
+      course.trailerUrl,
+      firstPreviewLesson?.videoUrl,
+      firstVideoLesson?.videoUrl,
+      firstVideoAsset?.embedUrl,
+      firstVideoAsset?.playbackUrl,
+      firstVideoAsset?.url
+    ) ||
     firstVideoAsset?.embedUrl ||
     firstVideoAsset?.playbackUrl ||
     firstVideoAsset?.url ||
     "";
-  const videos = assets.filter((asset) => asset.type === "video").length;
-  const resources = assets.filter((asset) => asset.type !== "video").length;
+  const videos = flatLessons.filter((lesson) => lesson.videoUrl).length + assets.filter((asset) => asset.type === "video").length;
+  const resources = courseResources.length + lessonResources.length + assets.filter((asset) => asset.type !== "video").length;
   const enrolled = course ? enrolledCourseSlugs.includes(course.slug) : false;
-  const totalMinutes = chapters.reduce((total, chapter) => total + chapter.estimatedMinutes, 0);
+  const totalMinutes = flatLessons.reduce((total, lesson) => total + lesson.durationMinutes, 0);
   const effort = totalMinutes > 0 ? `${Math.max(1, Math.round(totalMinutes / 60))} hours` : course?.duration ?? "Self-paced";
-  const outcomes = course?.outcomes?.length
-    ? course.outcomes
-    : ["Build practical skills", "Complete guided labs", "Earn certificate-ready proof"];
-  const tools = course?.tools?.length ? course.tools : ["Video lessons", "Practice tasks", "Certificate"];
+  const outcomes = course?.outcomes?.length ? course.outcomes : [];
+  const tools = course?.tools?.length ? course.tools : [];
   const freeCourse = isFreePrice(course.price);
 
   return (
@@ -287,7 +400,7 @@ export function CourseDetailExperience({
             {[
               { label: "Rating", value: course.rating.toFixed(1), icon: Star },
               { label: "Learners", value: course.learners.toLocaleString(), icon: Users },
-              { label: "Curriculum", value: countLabel(chapters.length, "module"), icon: Layers3 },
+              { label: "Curriculum", value: `${countLabel(curriculum.length, "module")} / ${countLabel(flatLessons.length, "lesson")}`, icon: Layers3 },
               { label: "Assets", value: `${videos} videos / ${resources} files`, icon: Video }
             ].map((metric) => (
               <Card key={metric.label}>
@@ -305,50 +418,16 @@ export function CourseDetailExperience({
               <CardTitle>What you will learn</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-3 md:grid-cols-2">
-              {outcomes.map((outcome) => (
-                <div key={outcome} className="rounded-md border border-[hsl(var(--border))] p-4">
-                  <CheckCircle2 className="mb-3 size-5 text-[hsl(var(--primary))]" />
-                  <p className="font-medium">{outcome}</p>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Zero-to-hero curriculum</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-3">
-              {chapters.length ? (
-                chapters.map((chapter, index) => (
-                  <div key={`${chapter.title}-${index}`} className="rounded-md border border-[hsl(var(--border))] p-4">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="text-xs font-semibold text-[hsl(var(--primary))]">Module {String(index + 1).padStart(2, "0")}</p>
-                        <h2 className="mt-1 font-semibold">{chapter.title}</h2>
-                        <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{chapter.description}</p>
-                      </div>
-                      <Badge>{chapter.isLocked ? `Unlock at ${chapter.requiredScore}%` : "Preview ready"}</Badge>
-                    </div>
-                    <div className="mt-4 grid gap-2 text-sm text-[hsl(var(--muted-foreground))] sm:grid-cols-3">
-                      <span className="flex items-center gap-2">
-                        <Clock className="size-4" />
-                        {chapter.estimatedMinutes} min
-                      </span>
-                      <span className="flex items-center gap-2">
-                        <FileCheck2 className="size-4" />
-                        Quiz checkpoint
-                      </span>
-                      <span className="flex items-center gap-2">
-                        <ShieldCheck className="size-4" />
-                        Practice task
-                      </span>
-                    </div>
+              {outcomes.length ? (
+                outcomes.map((outcome) => (
+                  <div key={outcome} className="rounded-md border border-[hsl(var(--border))] p-4">
+                    <CheckCircle2 className="mb-3 size-5 text-[hsl(var(--primary))]" />
+                    <p className="font-medium">{outcome}</p>
                   </div>
                 ))
               ) : (
-                <div className="rounded-md border border-[hsl(var(--border))] p-4 text-sm text-[hsl(var(--muted-foreground))]">
-                  Curriculum modules will appear here once the instructor adds chapters.
+                <div className="rounded-md border border-[hsl(var(--border))] p-4 text-sm text-[hsl(var(--muted-foreground))] md:col-span-2">
+                  Learning outcomes will appear after the instructor publishes them.
                 </div>
               )}
             </CardContent>
@@ -356,20 +435,93 @@ export function CourseDetailExperience({
 
           <Card>
             <CardHeader>
-              <CardTitle>Assessments and proof</CardTitle>
+              <CardTitle>Curriculum</CardTitle>
             </CardHeader>
-            <CardContent className="grid gap-3 md:grid-cols-3">
-              {[
-                ["Practice", "Lessons include exercises and downloadable resources."],
-                ["Validate", "Quizzes and assignments check readiness before the next module."],
-                ["Certify", "Completion unlocks a certificate workflow and verification code."]
-              ].map(([title, body]) => (
-                <div key={title} className="rounded-md border border-[hsl(var(--border))] p-4">
-                  <Sparkles className="mb-3 size-5 text-[hsl(var(--primary))]" />
-                  <p className="font-semibold">{title}</p>
-                  <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{body}</p>
+            <CardContent className="grid gap-3">
+              {curriculum.length ? (
+                curriculum.map((module, index) => (
+                  <div key={`${module.title}-${index}`} className="rounded-md border border-[hsl(var(--border))] p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold text-[hsl(var(--primary))]">Module {String(index + 1).padStart(2, "0")}</p>
+                        <h2 className="mt-1 font-semibold">{module.title}</h2>
+                        {module.description ? (
+                          <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{module.description}</p>
+                        ) : null}
+                      </div>
+                      <Badge>{countLabel(module.lessons.length, "lesson")}</Badge>
+                    </div>
+                    {module.lessons.length ? (
+                      <div className="mt-4 grid gap-2">
+                        {module.lessons.map((lesson, lessonIndex) => (
+                          <div key={`${module.title}-${lesson.title}-${lessonIndex}`} className="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] p-3">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div>
+                                <p className="font-medium">{lesson.title}</p>
+                                {lesson.summary ? <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{lesson.summary}</p> : null}
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                <Badge>{lesson.type}</Badge>
+                                <Badge>{formatLessonMinutes(lesson.durationMinutes)}</Badge>
+                                {lesson.videoUrl ? <Badge className="border-emerald-500/45 text-emerald-600">Video</Badge> : null}
+                                {lesson.isPreview ? <Badge className="border-sky-500/45 text-sky-600">Preview</Badge> : null}
+                              </div>
+                            </div>
+                            {lesson.resources.length ? (
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                {lesson.resources.map((resource, resourceIndex) => (
+                                  <Button key={`${lesson.title}-${resource.url}-${resourceIndex}`} asChild size="sm" variant="outline">
+                                    <a href={resource.url} target="_blank" rel="noreferrer" download={resource.downloadable ? "" : undefined}>
+                                      <Download className="size-4" />
+                                      {resourceLabel(resource, resourceIndex)}
+                                    </a>
+                                  </Button>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-4 rounded-md border border-dashed border-[hsl(var(--border))] p-3 text-sm text-[hsl(var(--muted-foreground))]">
+                        No lessons are published in this module yet.
+                      </p>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-md border border-[hsl(var(--border))] p-4 text-sm text-[hsl(var(--muted-foreground))]">
+                  Curriculum modules will appear once the instructor publishes them.
                 </div>
-              ))}
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Course downloads</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-3 md:grid-cols-2">
+              {courseResources.length ? (
+                courseResources.map((resource, index) => (
+                  <a
+                    key={`${resource.url}-${index}`}
+                    href={resource.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    download={resource.downloadable ? "" : undefined}
+                    className="rounded-md border border-[hsl(var(--border))] p-4 hover:bg-[hsl(var(--muted))]/50"
+                  >
+                    <Download className="mb-3 size-5 text-[hsl(var(--primary))]" />
+                    <p className="font-medium">{resourceLabel(resource, index)}</p>
+                    {resource.description ? <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">{resource.description}</p> : null}
+                  </a>
+                ))
+              ) : (
+                <div className="rounded-md border border-[hsl(var(--border))] p-4 text-sm text-[hsl(var(--muted-foreground))] md:col-span-2">
+                  No course downloads are published yet.
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -389,7 +541,7 @@ export function CourseDetailExperience({
               <Progress value={course.progress} />
               <div className="grid gap-2 text-sm text-[hsl(var(--muted-foreground))]">
                 <p>Instructor: {course.instructor}</p>
-                <p>{course.lessons || chapters.length} lessons / {effort}</p>
+                <p>{flatLessons.length || course.lessons || 0} lessons / {effort}</p>
                 <p>Wallet, Stripe, PayPal, and mobile money ready.</p>
               </div>
               <Button asChild className="w-full">
@@ -412,12 +564,16 @@ export function CourseDetailExperience({
               <CardTitle>Included tools</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-2">
-              {tools.map((tool) => (
-                <div key={tool} className="flex items-center gap-2 text-sm">
-                  <FileCheck2 className="size-4 text-[hsl(var(--primary))]" />
-                  {tool}
-                </div>
-              ))}
+              {tools.length ? (
+                tools.map((tool) => (
+                  <div key={tool} className="flex items-center gap-2 text-sm">
+                    <FileCheck2 className="size-4 text-[hsl(var(--primary))]" />
+                    {tool}
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-[hsl(var(--muted-foreground))]">Instructor tools will appear here after publishing.</p>
+              )}
             </CardContent>
           </Card>
 

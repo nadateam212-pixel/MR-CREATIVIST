@@ -1,5 +1,6 @@
 import { z } from "zod";
 import Product from "@/models/Product";
+import User from "@/models/User";
 import { jsonError, jsonOk, mongoIdOrSlug, readJson, requireMongo } from "@/lib/mongo-api";
 import { normalizeProduct } from "@/lib/platform-db";
 
@@ -7,6 +8,14 @@ const cartSchema = z.object({
   productId: z.string().min(1),
   quantity: z.coerce.number().int().min(1).max(99).default(1)
 });
+
+async function productAllowsCheckout(product: { isVerified?: boolean; sellerId?: unknown }) {
+  if (product.isVerified) return true;
+  if (!product.sellerId) return false;
+
+  const verifiedSeller = await User.exists({ _id: product.sellerId, isVerified: true });
+  return Boolean(verifiedSeller);
+}
 
 export async function GET() {
   return jsonOk({
@@ -23,6 +32,10 @@ export async function POST(request: Request) {
     const product = await Product.findOne(mongoIdOrSlug(body.productId)).lean();
 
     if (!product) return jsonOk({ error: "Product not found." }, 404);
+    if (product.status !== "published") return jsonOk({ error: "Product is not available for checkout." }, 403);
+    if (!(await productAllowsCheckout(product))) {
+      return jsonOk({ error: "This seller is not verified for online checkout yet. Contact the seller directly." }, 403);
+    }
 
     return jsonOk(
       {

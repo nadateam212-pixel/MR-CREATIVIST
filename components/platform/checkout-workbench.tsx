@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, CreditCard, Download, Minus, PackageCheck, Plus, ShieldCheck, ShoppingCart, Tag, Wallet } from "lucide-react";
+import { CheckCircle2, CreditCard, Download, MessageSquare, Minus, PackageCheck, Plus, ShieldCheck, ShoppingCart, Tag, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,12 +16,15 @@ import { useUserPreferences } from "@/hooks/use-user-preferences";
 
 type CheckoutProduct = {
   id?: string;
+  sellerId?: string;
   slug: string;
   name: string;
   type: string;
   delivery: string;
   seller: string;
   price: string;
+  isVerified?: boolean;
+  sellerVerified?: boolean;
 };
 
 export function CheckoutWorkbench({ mode = "cart", products = [] }: { mode?: "cart" | "checkout"; products?: CheckoutProduct[] }) {
@@ -62,8 +65,17 @@ export function CheckoutWorkbench({ mode = "cart", products = [] }: { mode?: "ca
   const total = Math.max(0, subtotal - discount + tax);
   const suggestedProducts = useMemo(() => marketplaceProducts.slice(0, 3), [marketplaceProducts]);
   const displayMoney = (amount: number) => formatConvertedAmount(amount, "USD", preferences.currency, preferences.usdToFrw);
+  const canCheckoutProduct = (product: CheckoutProduct) => Boolean(product.isVerified || product.sellerVerified);
+  const unverifiedCartProducts = cartProducts.filter((product) => !canCheckoutProduct(product));
 
   async function completeOrder() {
+    if (unverifiedCartProducts.length) {
+      const message = "Remove unverified contact-only products before checkout.";
+      setOrderStatus(message);
+      toast.error(message);
+      return;
+    }
+
     setOrderStatus("Saving order...");
 
     try {
@@ -125,15 +137,30 @@ export function CheckoutWorkbench({ mode = "cart", products = [] }: { mode?: "ca
                 {orderStatus ? <p className="mt-3 text-sm font-medium">{orderStatus}</p> : null}
               </div>
             ) : cartProducts.length > 0 ? (
-              cartProducts.map((product) => (
+              <>
+              {unverifiedCartProducts.length ? (
+                <div className="rounded-lg border border-amber-500/35 bg-amber-500/10 p-4 text-sm font-medium text-amber-700">
+                  {unverifiedCartProducts.length} contact-only product{unverifiedCartProducts.length === 1 ? "" : "s"} must be removed or discussed with the seller before online checkout.
+                </div>
+              ) : null}
+              {cartProducts.map((product) => (
                 <div key={product.slug} className="grid gap-4 rounded-lg border border-[hsl(var(--border))] p-4 md:grid-cols-[1fr_auto] md:items-center">
                   <div>
                     <div className="flex flex-wrap gap-2">
                       <Badge>{product.type}</Badge>
                       <Badge>{product.delivery}</Badge>
+                      {canCheckoutProduct(product) ? <Badge>Verified checkout</Badge> : <Badge>Contact seller</Badge>}
                     </div>
                     <h2 className="mt-3 text-lg font-semibold">{product.name}</h2>
                     <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Sold by {product.seller}</p>
+                    {!canCheckoutProduct(product) ? (
+                      <Button asChild size="sm" variant="outline" className="mt-3">
+                        <Link href={"sellerId" in product && product.sellerId ? `/messages/${product.sellerId}` : `/marketplace/product/${product.slug}`}>
+                          <MessageSquare className="size-4" />
+                          Contact seller
+                        </Link>
+                      </Button>
+                    ) : null}
                   </div>
                   <div className="flex flex-wrap items-center gap-3">
                     <Button size="icon" variant="outline" onClick={() => updateCartQuantity(product.slug, product.quantity - 1)}>
@@ -146,7 +173,8 @@ export function CheckoutWorkbench({ mode = "cart", products = [] }: { mode?: "ca
                     <p className="w-24 text-right font-semibold">{displayMoney(product.subtotal)}</p>
                   </div>
                 </div>
-              ))
+              ))}
+              </>
             ) : (
               <div className="grid gap-4 md:grid-cols-3">
                 {suggestedProducts.map((product) => (
@@ -154,17 +182,26 @@ export function CheckoutWorkbench({ mode = "cart", products = [] }: { mode?: "ca
                     <Badge>{product.type}</Badge>
                     <h3 className="mt-3 font-semibold">{product.name}</h3>
                     <PriceDisplay price={product.price} className="mt-2 text-sm font-medium text-[hsl(var(--muted-foreground))]" />
-                    <Button
-                      className="mt-4 w-full"
-                      size="sm"
-                      onClick={() => {
-                        addToCart(product.slug);
-                        toast.success(`${product.name} added to cart.`);
-                      }}
-                    >
-                      <ShoppingCart className="size-4" />
-                      Add
-                    </Button>
+                    {canCheckoutProduct(product) ? (
+                      <Button
+                        className="mt-4 w-full"
+                        size="sm"
+                        onClick={() => {
+                          addToCart(product.slug);
+                          toast.success(`${product.name} added to cart.`);
+                        }}
+                      >
+                        <ShoppingCart className="size-4" />
+                        Add
+                      </Button>
+                    ) : (
+                      <Button asChild className="mt-4 w-full" size="sm" variant="outline">
+                        <Link href={`/marketplace/product/${product.slug}`}>
+                          <MessageSquare className="size-4" />
+                          Contact
+                        </Link>
+                      </Button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -230,17 +267,24 @@ export function CheckoutWorkbench({ mode = "cart", products = [] }: { mode?: "ca
             </div>
 
             {mode === "checkout" ? (
-              <Button className="w-full" disabled={total <= 0 || cartProducts.length === 0} onClick={completeOrder}>
+              <Button className="w-full" disabled={total <= 0 || cartProducts.length === 0 || unverifiedCartProducts.length > 0} onClick={completeOrder}>
                 <CreditCard className="size-4" />
                 Pay securely
               </Button>
             ) : (
-              <Button asChild className="w-full" disabled={cartProducts.length === 0}>
-                <Link href="/marketplace/checkout">
+              cartProducts.length > 0 && unverifiedCartProducts.length === 0 ? (
+                <Button asChild className="w-full">
+                  <Link href="/marketplace/checkout">
+                    <ShieldCheck className="size-4" />
+                    Proceed to checkout
+                  </Link>
+                </Button>
+              ) : (
+                <Button className="w-full" disabled>
                   <ShieldCheck className="size-4" />
                   Proceed to checkout
-                </Link>
-              </Button>
+                </Button>
+              )
             )}
           </CardContent>
         </Card>

@@ -68,6 +68,7 @@ const CourseSchema = new mongoose.Schema(
     slug: { type: String, required: true, unique: true, lowercase: true, trim: true, index: true },
     shortDescription: { type: String, required: true, maxlength: 260 },
     description: { type: String, required: true, maxlength: 5000 },
+    studioId: { type: String, trim: true, index: true },
     instructorId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     instructorName: { type: String, required: true, trim: true },
     level: { type: String, enum: ["Beginner", "Intermediate", "Advanced", "All levels", "Expert"], default: "Beginner" },

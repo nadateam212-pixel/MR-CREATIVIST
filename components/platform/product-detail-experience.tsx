@@ -5,17 +5,19 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Download, PackageCheck, ShieldCheck, Star, Store, Truck, Wallet } from "lucide-react";
+import { Download, MessageCircle, MessageSquare, PackageCheck, ShieldCheck, Star, Store, Truck, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { PageShell } from "@/components/layout/page-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PriceDisplay } from "@/components/ui/price-display";
+import { VerifiedMark } from "@/components/ui/verified-mark";
 import { usePlatformStore } from "@/hooks/use-platform-store";
 
 type ProductDetail = {
   id?: string;
+  sellerId?: string;
   name: string;
   slug: string;
   type: string;
@@ -30,6 +32,10 @@ type ProductDetail = {
   image: string;
   description?: string;
   tools: string[];
+  isVerified?: boolean;
+  sellerVerified?: boolean;
+  sellerPhone?: string;
+  sellerEmail?: string;
 };
 
 export function ProductDetailExperience({ slug, initialProduct }: { slug: string; initialProduct: ProductDetail | null }) {
@@ -56,9 +62,23 @@ export function ProductDetailExperience({ slug, initialProduct }: { slug: string
     );
   }
 
-  const activeProduct = product;
+  const activeProduct = product as ProductDetail;
+  const verifiedCheckout = Boolean(activeProduct.isVerified || activeProduct.sellerVerified);
+  const whatsappText = encodeURIComponent(`Hello ${activeProduct.seller}, I am interested in ${activeProduct.name} on MR Creativist.`);
+  const whatsappPhone = activeProduct.sellerPhone?.replace(/[^\d+]/g, "").replace(/^\+/, "");
+  const whatsappHref = whatsappPhone ? `https://wa.me/${whatsappPhone}?text=${whatsappText}` : `https://wa.me/?text=${whatsappText}`;
+  const sellerMessageHref = activeProduct.sellerId
+    ? `/messages/${activeProduct.sellerId}`
+    : `/messages?context=product&product=${encodeURIComponent(activeProduct.slug)}`;
 
   function addProductToCart(openCheckout = false) {
+    if (!verifiedCheckout) {
+      const nextMessage = "This seller is not verified for online checkout yet. Contact the seller directly.";
+      setCartMessage(nextMessage);
+      toast.message(nextMessage);
+      return;
+    }
+
     addToCart(activeProduct.slug);
     setCartMessage(`${activeProduct.name} added to cart.`);
     toast.success(`${activeProduct.name} added to cart.`);
@@ -123,27 +143,53 @@ export function ProductDetailExperience({ slug, initialProduct }: { slug: string
               <div className="flex flex-wrap gap-2">
                 <Badge>{activeProduct.type}</Badge>
                 <Badge>{activeProduct.delivery}</Badge>
+                <Badge>{verifiedCheckout ? "Online checkout" : "Contact seller"}</Badge>
               </div>
               <CardTitle className="pt-3">
                 <PriceDisplay price={activeProduct.price} compareAt={activeProduct.compareAt} className="text-3xl text-[hsl(var(--primary))]" />
               </CardTitle>
+              <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-[hsl(var(--muted-foreground))]">
+                Sold by {activeProduct.seller}
+                {verifiedCheckout ? <VerifiedMark label="Verified seller" /> : null}
+              </p>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Button className="w-full" onClick={() => addProductToCart(false)}>
-                <Wallet className="size-4" />
-                Add to cart
-              </Button>
-              <Button className="w-full" variant="outline" onClick={() => addProductToCart(true)}>
-                <PackageCheck className="size-4" />
-                Add and view cart
-              </Button>
+              {verifiedCheckout ? (
+                <>
+                  <Button className="w-full" onClick={() => addProductToCart(false)}>
+                    <Wallet className="size-4" />
+                    Add to cart
+                  </Button>
+                  <Button className="w-full" variant="outline" onClick={() => addProductToCart(true)}>
+                    <PackageCheck className="size-4" />
+                    Add and view cart
+                  </Button>
+                </>
+              ) : (
+                <div className="grid gap-2">
+                  <Button asChild className="w-full">
+                    <Link href={sellerMessageHref}>
+                      <MessageSquare className="size-4" />
+                      Message seller
+                    </Link>
+                  </Button>
+                  <Button asChild className="w-full" variant="outline">
+                    <a href={whatsappHref} target="_blank" rel="noreferrer">
+                      <MessageCircle className="size-4" />
+                      Contact on WhatsApp
+                    </a>
+                  </Button>
+                </div>
+              )}
               {cartMessage ? (
                 <p className="rounded-md border border-[hsl(var(--primary))]/25 bg-[hsl(var(--primary))]/10 p-3 text-sm font-medium text-[hsl(var(--primary))]">
                   {cartMessage}
                 </p>
               ) : null}
               <p className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-                Supports wallet, card, PayPal, mobile money, coupons, invoices, refunds, and seller payout attribution.
+                {verifiedCheckout
+                  ? "Supports wallet, card, PayPal, mobile money, coupons, invoices, refunds, and seller payout attribution."
+                  : "Online checkout opens after the seller or listing is verified. Use message or WhatsApp to agree on delivery directly."}
               </p>
             </CardContent>
           </Card>

@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 
 const GigSchema = new mongoose.Schema(
   {
+    studioId: { type: String, trim: true, index: true },
     ownerId: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true },
     ownerName: { type: String, trim: true },
     slug: { type: String, required: true, unique: true, lowercase: true, trim: true, index: true },

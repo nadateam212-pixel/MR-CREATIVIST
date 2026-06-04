@@ -12,6 +12,7 @@ const ReviewSchema = new mongoose.Schema(
 
 const FreelancerProfileSchema = new mongoose.Schema(
   {
+    studioId: { type: String, trim: true, index: true },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     slug: { type: String, required: true, unique: true, lowercase: true, trim: true, index: true },
     name: { type: String, required: true, trim: true },

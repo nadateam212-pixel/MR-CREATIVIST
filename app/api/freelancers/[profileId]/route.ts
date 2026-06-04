@@ -32,7 +32,7 @@ export async function PUT(request: Request, context: { params: Promise<{ profile
     const body = freelancerProfileSchema.partial().parse(await readJson(request));
     const patch = {
       ...body,
-      ...(isAdmin ? {} : { status: body.status === "draft" ? "draft" : "submitted", isVerified: existing.isVerified })
+      ...(isAdmin ? {} : { status: body.status === "draft" ? "draft" : "published", isVerified: existing.isVerified })
     };
     if (body.slug || body.name) {
       patch.slug = await uniqueSlugFor(FreelancerProfile, body.slug ?? slugify(body.name), existing._id);
@@ -58,6 +58,11 @@ export async function DELETE(request: Request, context: { params: Promise<{ prof
     const isAdmin = session.user.role === "admin";
     const ownsProfile = existing.userId && String(existing.userId) === String(session.user.id);
     if (!isAdmin && !ownsProfile) return jsonOk({ error: "You can only archive your own freelancer profile." }, 403);
+
+    if (isAdmin && new URL(request.url).searchParams.get("hard") === "1") {
+      await FreelancerProfile.findByIdAndDelete(existing._id);
+      return jsonOk({ ok: true, deleted: true });
+    }
 
     const profile = await FreelancerProfile.findByIdAndUpdate(existing._id, { status: "archived" }, { returnDocument: "after" });
 

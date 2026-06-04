@@ -2,6 +2,7 @@ import Product from "@/models/Product";
 import { jsonError, jsonOk, parsePagination, readJson, requireMongo, requireRole, uniqueSlugFor } from "@/lib/mongo-api";
 import { normalizeProduct, slugify } from "@/lib/platform-db";
 import { productSchema } from "@/lib/mongo-validations";
+import { studioTrackId } from "@/lib/studio-identity";
 
 export async function GET(request: Request) {
   try {
@@ -35,9 +36,10 @@ export async function POST(request: Request) {
     const product = await Product.create({
       ...body,
       slug,
+      studioId: studioTrackId(session.user),
       sellerId: session.user.id,
       sellerName: body.sellerName || session.user.name || session.user.email,
-      status: session.user.role === "admin" ? body.status : body.status === "draft" ? "draft" : "submitted",
+      status: session.user.role === "admin" ? body.status : body.status === "draft" ? "draft" : "published",
       isVerified: session.user.role === "admin" ? body.isVerified : false
     });
 

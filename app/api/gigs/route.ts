@@ -2,6 +2,7 @@ import Gig from "@/models/Gig";
 import { gigSchema } from "@/lib/mongo-validations";
 import { jsonError, jsonOk, parsePagination, readJson, requireMongo, requireRole, uniqueSlugFor } from "@/lib/mongo-api";
 import { normalizeGig, slugify } from "@/lib/platform-db";
+import { studioTrackId } from "@/lib/studio-identity";
 
 export async function GET(request: Request) {
   try {
@@ -45,9 +46,10 @@ export async function POST(request: Request) {
     const gig = await Gig.create({
       ...body,
       slug,
+      studioId: studioTrackId(session.user),
       ownerId: session.user.id,
       ownerName: body.ownerName || session.user.name || session.user.email,
-      status: isAdmin ? body.status : body.status === "draft" ? "draft" : "submitted",
+      status: isAdmin ? body.status : body.status === "draft" ? "draft" : "published",
       isVerified: isAdmin ? body.isVerified : false
     });
 

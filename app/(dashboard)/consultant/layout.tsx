@@ -3,10 +3,13 @@ import { auth } from "@/auth";
 
 export default async function ConsultantLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
-  const role = session?.user?.role;
 
-  if (role !== "consultant" && role !== "admin") {
-    redirect("/dashboard?account=consultant-required");
+  if (!session?.user) {
+    redirect("/login");
+  }
+
+  if (session.user.accountStatus === "suspended") {
+    redirect("/dashboard?account=suspended");
   }
 
   return children;

@@ -5,7 +5,6 @@
 import { useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import {
-  BadgeCheck,
   BriefcaseBusiness,
   CalendarDays,
   CheckCircle2,
@@ -33,6 +32,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { VerifiedMark } from "@/components/ui/verified-mark";
 import { useUserPreferences } from "@/hooks/use-user-preferences";
 import { formatConvertedAmount, type SupportedCurrency } from "@/lib/currency";
 
@@ -365,7 +365,7 @@ export function ShopDirectory({ shops, showHeader = true }: { shops: PublicShopP
                   <div className="min-w-0">
                     <p className="flex min-w-0 items-center gap-2 text-lg font-black">
                       <span className="truncate">{shop.name}</span>
-                      {shop.isVerified ? <BadgeCheck className="size-4 shrink-0 text-sky-300" aria-label="Verified business" /> : null}
+                      {shop.isVerified ? <VerifiedMark label="Verified business" className="size-4" /> : null}
                     </p>
                     <p className="truncate text-xs font-bold uppercase tracking-[0.14em] text-white/80">{shop.category}</p>
                   </div>
@@ -374,12 +374,6 @@ export function ShopDirectory({ shops, showHeader = true }: { shops: PublicShopP
               <CardContent className="space-y-5 p-5">
                 <div className="flex flex-wrap gap-2">
                   {shop.isFeatured ? <Badge className="border-[hsl(var(--primary))]/50 text-[hsl(var(--primary))]">Featured</Badge> : null}
-                  {shop.isVerified ? (
-                    <Badge className="border-sky-500/45 text-sky-500">
-                      <BadgeCheck className="mr-1 size-3" />
-                      Verified
-                    </Badge>
-                  ) : null}
                   <Badge>
                     <Star className="mr-1 size-3 fill-current" />
                     {(shop.rating ?? 0).toFixed(1)}

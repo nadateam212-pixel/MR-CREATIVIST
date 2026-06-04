@@ -43,9 +43,16 @@ export async function PUT(request: Request, context: { params: Promise<{ project
 export async function DELETE(request: Request, context: { params: Promise<{ projectId: string }> }) {
   try {
     await requireMongo();
-    await requireRole(request, ["admin", "freelancer", "seller"]);
+    const session = await requireRole(request, ["admin", "freelancer", "seller"]);
 
     const { projectId } = await context.params;
+    if (session.user.role === "admin" && new URL(request.url).searchParams.get("hard") === "1") {
+      const deleted = await MultimediaProject.findOneAndDelete(mongoIdOrSlug(projectId));
+      if (!deleted) return jsonOk({ error: "Project not found." }, 404);
+
+      return jsonOk({ ok: true, deleted: true });
+    }
+
     const project = await MultimediaProject.findOneAndUpdate(mongoIdOrSlug(projectId), { status: "archived" }, { returnDocument: "after" });
 
     if (!project) return jsonOk({ error: "Project not found." }, 404);

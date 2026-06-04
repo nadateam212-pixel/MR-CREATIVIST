@@ -40,7 +40,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ shopI
     const isAdmin = session.user.role === "admin";
     const patch: Record<string, unknown> = {
       ...body,
-      ...(isAdmin ? {} : { status: body.status === "draft" ? "draft" : "submitted", isVerified: existing.isVerified })
+      ...(isAdmin ? {} : { status: body.status === "draft" ? "draft" : "published", isVerified: existing.isVerified })
     };
 
     if (body.slug || body.name) {
@@ -68,6 +68,11 @@ export async function DELETE(request: Request, context: { params: Promise<{ shop
     if (!existing) return jsonOk({ error: "Shop not found." }, 404);
     if (!canManageShop(session, existing)) {
       return jsonOk({ error: "You can only archive your own shop." }, 403);
+    }
+
+    if (session.user.role === "admin" && new URL(request.url).searchParams.get("hard") === "1") {
+      await ShopProfile.findByIdAndDelete(existing._id);
+      return jsonOk({ ok: true, deleted: true });
     }
 
     const shop = await ShopProfile.findByIdAndUpdate(existing._id, { status: "archived" }, { returnDocument: "after" });

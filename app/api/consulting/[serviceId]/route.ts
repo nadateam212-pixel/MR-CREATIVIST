@@ -32,7 +32,7 @@ export async function PUT(request: Request, context: { params: Promise<{ service
     const body = consultingServiceSchema.partial().parse(await readJson(request));
     const patch = {
       ...body,
-      ...(isAdmin ? {} : { status: body.status === "draft" ? "draft" : "submitted", isVerified: existing.isVerified })
+      ...(isAdmin ? {} : { status: body.status === "draft" ? "draft" : "published", isVerified: existing.isVerified })
     };
     if (body.slug || body.expertName || body.title) {
       patch.slug = await uniqueSlugFor(ConsultingService, body.slug ?? slugify(body.expertName || body.title), existing._id);
@@ -58,6 +58,11 @@ export async function DELETE(request: Request, context: { params: Promise<{ serv
     const isAdmin = session.user.role === "admin";
     const ownsService = existing.expertId && String(existing.expertId) === String(session.user.id);
     if (!isAdmin && !ownsService) return jsonOk({ error: "You can only archive your own consulting service." }, 403);
+
+    if (isAdmin && new URL(request.url).searchParams.get("hard") === "1") {
+      await ConsultingService.findByIdAndDelete(existing._id);
+      return jsonOk({ ok: true, deleted: true });
+    }
 
     const service = await ConsultingService.findByIdAndUpdate(existing._id, { status: "archived" }, { returnDocument: "after" });
 

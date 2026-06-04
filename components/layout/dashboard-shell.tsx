@@ -1,6 +1,7 @@
 "use client";
 
 import type { Session } from "next-auth";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -162,6 +163,8 @@ function uniqueNavItems(items: NavItem[]) {
 }
 
 function AccountProfileMenu({ user }: { user: Session["user"] }) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const isAdmin = user.role === "admin" || user.validatedRoles?.includes("admin");
   const initials = (user.name ?? user.email ?? "MC")
     .split(/\s+/)
@@ -174,9 +177,36 @@ function AccountProfileMenu({ user }: { user: Session["user"] }) {
     ...(isAdmin ? [{ href: "/admin/dashboard", label: "Admin", icon: ShieldCheck }] : [])
   ];
 
+  useEffect(() => {
+    if (!open) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      if (menuRef.current?.contains(event.target as Node)) return;
+      setOpen(false);
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
+
   return (
-    <details className="group relative">
-      <summary className="flex h-10 cursor-pointer list-none items-center gap-2 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-2 text-sm font-semibold text-[hsl(var(--foreground))] transition hover:bg-[hsl(var(--muted))] [&::-webkit-details-marker]:hidden">
+    <div ref={menuRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className="flex h-10 cursor-pointer list-none items-center gap-2 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-2 text-sm font-semibold text-[hsl(var(--foreground))] transition hover:bg-[hsl(var(--muted))]"
+      >
         <span
           className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-full bg-[hsl(var(--primary))]/15 text-xs font-black text-[hsl(var(--primary))]"
           style={user.image ? { backgroundImage: `url(${user.image})`, backgroundPosition: "center", backgroundSize: "cover" } : undefined}
@@ -185,43 +215,52 @@ function AccountProfileMenu({ user }: { user: Session["user"] }) {
           {user.image ? null : initials || <UserRound className="size-4" />}
         </span>
         <span className="hidden max-w-36 truncate sm:inline">{user.name ?? "Account"}</span>
-        <ChevronDown className="size-4 text-[hsl(var(--muted-foreground))] transition group-open:rotate-180" />
-      </summary>
-      <div className="absolute right-0 z-50 mt-2 w-64 overflow-hidden rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-2 shadow-xl">
-        <div className="border-b border-[hsl(var(--border))] px-3 py-3">
-          <p className="truncate text-sm font-black">{user.name ?? "MR Creativist"}</p>
-          <p className="mt-1 truncate text-xs text-[hsl(var(--muted-foreground))]">{user.email}</p>
-        </div>
-        <div className="py-2">
-          {menuItems.map((item) => {
-            const Icon = item.icon;
+        <ChevronDown className={open ? "size-4 rotate-180 text-[hsl(var(--muted-foreground))] transition" : "size-4 text-[hsl(var(--muted-foreground))] transition"} />
+      </button>
 
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold text-[hsl(var(--foreground))] transition hover:bg-[hsl(var(--muted))]"
-              >
-                {Icon ? <Icon className="size-4 text-[hsl(var(--primary))]" /> : null}
-                {item.label}
-              </Link>
-            );
-          })}
-        </div>
-        <div className="border-t border-[hsl(var(--border))] p-2">
-          <div className="mb-2 flex items-center justify-between rounded-md px-3 py-2 text-sm font-semibold">
-            <span>Theme</span>
-            <ModeToggle />
+      {open ? (
+        <div
+          role="menu"
+          aria-label="Account tools"
+          className="absolute right-0 z-50 mt-2 w-64 overflow-hidden rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-2 shadow-xl"
+        >
+          <div className="border-b border-[hsl(var(--border))] px-3 py-3">
+            <p className="truncate text-sm font-black">{user.name ?? "MR Creativist"}</p>
+            <p className="mt-1 truncate text-xs text-[hsl(var(--muted-foreground))]">{user.email}</p>
           </div>
-          <form action={logoutAction}>
-            <Button type="submit" variant="outline" className="w-full justify-start">
-              <LogOut className="size-4" />
-              Log out
-            </Button>
-          </form>
+          <div className="py-2">
+            {menuItems.map((item) => {
+              const Icon = item.icon;
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  role="menuitem"
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold text-[hsl(var(--foreground))] transition hover:bg-[hsl(var(--muted))]"
+                >
+                  {Icon ? <Icon className="size-4 text-[hsl(var(--primary))]" /> : null}
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+          <div className="border-t border-[hsl(var(--border))] p-2">
+            <div className="mb-2 flex items-center justify-between rounded-md px-3 py-2 text-sm font-semibold">
+              <span>Theme</span>
+              <ModeToggle />
+            </div>
+            <form action={logoutAction}>
+              <Button type="submit" variant="outline" className="w-full justify-start" onClick={() => setOpen(false)}>
+                <LogOut className="size-4" />
+                Log out
+              </Button>
+            </form>
+          </div>
         </div>
-      </div>
-    </details>
+      ) : null}
+    </div>
   );
 }
 

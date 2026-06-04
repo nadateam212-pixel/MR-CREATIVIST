@@ -1,8 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
-import { Archive, BadgeCheck, CheckCircle2, Edit3, ExternalLink, Search, Share2, Trash2, X } from "lucide-react";
+import { Archive, BadgeCheck, CheckCircle2, Edit3, Eye, RotateCcw, Search, Share2, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,6 +27,7 @@ export type AdminContentRow = {
   editFields?: AdminContentField[];
   isVerified?: boolean;
   statusActions?: { label: string; status?: string; patch?: Record<string, unknown> }[];
+  details?: Record<string, string>;
 };
 
 function statusTone(status: string) {
@@ -64,6 +64,7 @@ export function AdminContentTable({
   const [busy, setBusy] = useState("");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedRow, setSelectedRow] = useState<AdminContentRow | null>(initialRows[0] ?? null);
 
   const editingRow = rows.find((row) => row.id === editingId);
   const statuses = useMemo(() => Array.from(new Set(rows.map((row) => row.status))).sort(), [rows]);
@@ -206,6 +207,27 @@ export function AdminContentTable({
     }
   }
 
+  async function deleteRow(row: AdminContentRow) {
+    if (!row.apiPath || !window.confirm(`Permanently delete ${row.title}? This cannot be undone.`)) return;
+
+    setBusy(`${row.id}:delete`);
+    try {
+      const separator = row.apiPath.includes("?") ? "&" : "?";
+      const response = await fetch(`${row.apiPath}${separator}hard=1`, { method: "DELETE" });
+      const payload = await response.json();
+
+      if (!response.ok) throw new Error(payload.error ?? "Delete failed.");
+
+      setRows((current) => current.filter((item) => item.id !== row.id));
+      setSelectedRow((current) => (current?.id === row.id ? null : current));
+      toast.success("Record deleted successfully.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Delete failed.");
+    } finally {
+      setBusy("");
+    }
+  }
+
   function shareRow(row: AdminContentRow) {
     const text = `${row.title} - ${row.href ?? row.apiPath ?? ""}`;
     void navigator.clipboard?.writeText(text);
@@ -322,14 +344,10 @@ export function AdminContentTable({
                     </td>
                     <td className="p-4">
                       <div className="flex flex-wrap justify-end gap-2">
-                        {row.href ? (
-                          <Button asChild size="sm" variant="outline">
-                            <Link href={row.href} target="_blank">
-                              <ExternalLink className="size-4" />
-                              View
-                            </Link>
-                          </Button>
-                        ) : null}
+                        <Button size="sm" variant="outline" onClick={() => setSelectedRow(row)}>
+                          <Eye className="size-4" />
+                          View
+                        </Button>
                         {row.apiPath ? (
                           <Button size="sm" variant="outline" onClick={() => startEdit(row)}>
                             <Edit3 className="size-4" />
@@ -355,9 +373,24 @@ export function AdminContentTable({
                           Share
                         </Button>
                         {row.apiPath ? (
-                          <Button size="sm" variant="outline" onClick={() => void archiveRow(row)} disabled={busy === `${row.id}:archive`}>
-                            {row.status === "archived" ? <Archive className="size-4" /> : <Trash2 className="size-4" />}
-                            {row.status === "archived" ? "Archived" : "Delete"}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              row.status === "archived"
+                                ? void runAction(row, { label: "Unarchive", status: "published" })
+                                : void archiveRow(row)
+                            }
+                            disabled={busy === `${row.id}:archive` || busy === `${row.id}:published`}
+                          >
+                            {row.status === "archived" ? <RotateCcw className="size-4" /> : <Archive className="size-4" />}
+                            {row.status === "archived" ? "Unarchive" : "Archive"}
+                          </Button>
+                        ) : null}
+                        {row.apiPath ? (
+                          <Button size="sm" variant="outline" onClick={() => void deleteRow(row)} disabled={busy === `${row.id}:delete`}>
+                            <Trash2 className="size-4" />
+                            Delete
                           </Button>
                         ) : null}
                       </div>
@@ -373,6 +406,34 @@ export function AdminContentTable({
               )}
             </tbody>
           </table>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Record details</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {selectedRow ? (
+            <div className="grid gap-3 md:grid-cols-2">
+              {Object.entries({
+                title: selectedRow.title,
+                subtitle: selectedRow.subtitle ?? "Not recorded",
+                kind: selectedRow.kind ?? "record",
+                status: normalizeStatus(selectedRow.status),
+                publicPath: selectedRow.href ?? "Not linked",
+                ...(selectedRow.details ?? {})
+              }).map(([key, value]) => (
+                <div key={`${selectedRow.id}:${key}`} className="rounded-md border border-[hsl(var(--border))] p-3">
+                  <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[hsl(var(--muted-foreground))]">
+                    {key.replace(/([A-Z])/g, " $1")}
+                  </p>
+                  <p className="mt-1 break-words text-sm leading-6">{String(value)}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-[hsl(var(--muted-foreground))]">Select a record to view details inside the admin dashboard.</p>
+          )}
         </CardContent>
       </Card>
     </div>

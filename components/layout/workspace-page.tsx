@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AdminWorkspaceConsole } from "@/components/admin/admin-workspace-console";
 
 type WorkspaceRecord = {
   id: string;
@@ -79,16 +80,31 @@ function statusLabel(status: string) {
   return status.replaceAll("_", " ");
 }
 
-export function WorkspacePage({
-  title,
-  description,
-  tags = []
-}: {
+export function WorkspacePage(props: {
   title: string;
   description: string;
   tags?: string[];
 }) {
   const pathname = usePathname();
+
+  if (pathname.startsWith("/admin")) {
+    return <AdminWorkspaceConsole title={props.title} description={props.description} pathname={pathname} />;
+  }
+
+  return <StandardWorkspacePage {...props} pathname={pathname} />;
+}
+
+function StandardWorkspacePage({
+  title,
+  description,
+  tags = [],
+  pathname
+}: {
+  title: string;
+  description: string;
+  tags?: string[];
+  pathname: string;
+}) {
   const isAdmin = pathname.startsWith("/admin");
   const normalizedTags = useMemo(() => (tags.length > 0 ? tags : ["Records", "Approvals", "Exports", "Audit"]), [tags]);
   const [records, setRecords] = useState<WorkspaceRecord[]>(() => buildInitialRecords(title, normalizedTags));

@@ -35,7 +35,10 @@ export async function PUT(request: Request, context: { params: Promise<{ courseI
     }
 
     const body = courseSchema.partial().parse(await readJson(request));
-    const patch = { ...body };
+    const patch = {
+      ...body,
+      ...(isAdmin ? {} : { status: body.status === "draft" ? "draft" : "submitted" })
+    };
     if (body.slug || body.title) {
       patch.slug = await uniqueSlugFor(Course, body.slug ?? slugify(body.title), existing._id);
     }
@@ -65,6 +68,11 @@ export async function DELETE(request: Request, context: { params: Promise<{ cour
 
     if (!isAdmin && !ownsCourse) {
       return jsonOk({ error: "You can only archive courses created by your Studio account." }, 403);
+    }
+
+    if (isAdmin && new URL(request.url).searchParams.get("hard") === "1") {
+      await Course.findByIdAndDelete(existing._id);
+      return jsonOk({ ok: true, deleted: true });
     }
 
     const course = await Course.findByIdAndUpdate(existing._id, { status: "archived" }, { returnDocument: "after" });

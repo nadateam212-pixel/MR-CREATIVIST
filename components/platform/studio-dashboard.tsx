@@ -33,44 +33,94 @@ type StudioTool = {
   meta: string;
 };
 
+type StudioOwner = {
+  name?: string | null;
+  email?: string | null;
+  studioId: string;
+  role?: string | null;
+  accountStatus?: string | null;
+};
+
+export type StudioSummary = {
+  courses: number;
+  products: number;
+  gigs: number;
+  businesses: number;
+  consulting: number;
+  freelancerProfiles: number;
+  published: number;
+  drafts: number;
+  review: number;
+  archived: number;
+  verified: number;
+  total: number;
+};
+
 const categories: StudioCategory[] = ["Create new", "Manage", "Analytics", "Settings"];
 
 const studioTools: StudioTool[] = [
-  { title: "Create course", href: "/instructor/courses/create", icon: GraduationCap, category: "Create new", meta: "Google Drive lessons" },
-  { title: "Add product", href: "/seller/products/create", icon: Package, category: "Create new", meta: "Digital or service" },
-  { title: "Business profile", href: "/seller/shop", icon: Building2, category: "Create new", meta: "Public listing" },
-  { title: "Freelancer gig", href: "/freelancer/gigs", icon: BriefcaseBusiness, category: "Create new", meta: "Service packages" },
-  { title: "Consulting service", href: "/consultant/profile", icon: CalendarDays, category: "Create new", meta: "Bookings and rates" },
-  { title: "Courses", href: "/instructor/courses", icon: BookOpen, category: "Manage", meta: "Drafts and review" },
-  { title: "Products", href: "/seller/products", icon: ShoppingBag, category: "Manage", meta: "Catalog and orders" },
-  { title: "Uploads", href: "/instructor/resources", icon: Upload, category: "Manage", meta: "Files and resources" },
+  { title: "Create course", href: "/instructor/courses/create", icon: GraduationCap, category: "Create new", meta: "Private draft, admin approval before public" },
+  { title: "Add product", href: "/seller/products/create", icon: Package, category: "Create new", meta: "Publishes under your Studio" },
+  { title: "Business profile", href: "/seller/shop", icon: Building2, category: "Create new", meta: "Storefront, contacts, services" },
+  { title: "Freelancer gig", href: "/freelancer/gigs", icon: BriefcaseBusiness, category: "Create new", meta: "Service packages and requests" },
+  { title: "Consulting service", href: "/consultant/profile", icon: CalendarDays, category: "Create new", meta: "Bookings, sessions, rates" },
+  { title: "Courses", href: "/instructor/courses", icon: BookOpen, category: "Manage", meta: "Owned courses and review states" },
+  { title: "Products", href: "/seller/products", icon: ShoppingBag, category: "Manage", meta: "Catalog, pricing, downloads" },
+  { title: "Uploads", href: "/instructor/resources", icon: Upload, category: "Manage", meta: "Course files and resources" },
   { title: "Earnings", href: "/instructor/earnings", icon: Wallet, category: "Analytics", meta: "Revenue and payouts" },
-  { title: "Performance", href: "/dashboard", icon: BarChart3, category: "Analytics", meta: "Views and sales" },
+  { title: "Performance", href: "/dashboard", icon: BarChart3, category: "Analytics", meta: "Learning, sales, wallet signals" },
   { title: "Public profile", href: "/profile", icon: FileText, category: "Settings", meta: "Creator identity" },
   { title: "Account settings", href: "/settings", icon: Settings, category: "Settings", meta: "Language and currency" }
 ];
 
-const stats = [
-  { label: "Published", value: "24", tone: "bg-emerald-500" },
-  { label: "Drafts", value: "7", tone: "bg-sky-500" },
-  { label: "Review", value: "5", tone: "bg-amber-500" },
-  { label: "Revenue", value: "FRW 2.4M", tone: "bg-violet-500" }
-];
+const defaultSummary: StudioSummary = {
+  courses: 0,
+  products: 0,
+  gigs: 0,
+  businesses: 0,
+  consulting: 0,
+  freelancerProfiles: 0,
+  published: 0,
+  drafts: 0,
+  review: 0,
+  archived: 0,
+  verified: 0,
+  total: 0
+};
 
-const bars = [
-  { label: "Courses", value: 74 },
-  { label: "Products", value: 52 },
-  { label: "Gigs", value: 38 },
-  { label: "Business", value: 61 },
-  { label: "Consulting", value: 44 }
-];
-
-export function StudioDashboard() {
+export function StudioDashboard({
+  owner,
+  summary = defaultSummary
+}: {
+  owner?: StudioOwner;
+  summary?: StudioSummary;
+}) {
   const [activeCategory, setActiveCategory] = useState<StudioCategory>("Create new");
   const tools = useMemo(
     () => studioTools.filter((tool) => tool.category === activeCategory),
     [activeCategory]
   );
+  const stats = useMemo(
+    () => [
+      { label: "Live public", value: String(summary.published), tone: "bg-emerald-500" },
+      { label: "Drafts", value: String(summary.drafts), tone: "bg-sky-500" },
+      { label: "Admin review", value: String(summary.review), tone: "bg-amber-500" },
+      { label: "Studio records", value: String(summary.total), tone: "bg-violet-500" }
+    ],
+    [summary]
+  );
+  const bars = useMemo(() => {
+    const items = [
+      { label: "Courses", count: summary.courses },
+      { label: "Products", count: summary.products },
+      { label: "Gigs", count: summary.gigs },
+      { label: "Business", count: summary.businesses },
+      { label: "Consulting", count: summary.consulting + summary.freelancerProfiles }
+    ];
+    const max = Math.max(1, ...items.map((item) => item.count));
+
+    return items.map((item) => ({ ...item, value: Math.round((item.count / max) * 100) }));
+  }, [summary]);
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6">
@@ -99,14 +149,26 @@ export function StudioDashboard() {
           </div>
         </div>
 
-        <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {stats.map((item) => (
-            <div key={item.label} className="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] p-4">
-              <span className={cn("mb-4 block h-1.5 w-12 rounded-full", item.tone)} />
-              <p className="text-sm font-semibold text-[hsl(var(--muted-foreground))]">{item.label}</p>
-              <p className="mt-2 text-2xl font-black">{item.value}</p>
+        <div className="mt-6 grid gap-3 xl:grid-cols-[1fr_22rem]">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {stats.map((item) => (
+              <div key={item.label} className="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] p-4">
+                <span className={cn("mb-4 block h-1.5 w-12 rounded-full", item.tone)} />
+                <p className="text-sm font-semibold text-[hsl(var(--muted-foreground))]">{item.label}</p>
+                <p className="mt-2 text-2xl font-black">{item.value}</p>
+              </div>
+            ))}
+          </div>
+          <div className="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-[hsl(var(--muted-foreground))]">Private Studio ID</p>
+                <p className="mt-2 truncate font-mono text-lg font-black">{owner?.studioId ?? "MRC-STUDIO"}</p>
+              </div>
+              <Badge>Owner scoped</Badge>
             </div>
-          ))}
+            <p className="mt-3 truncate text-sm font-semibold text-[hsl(var(--muted-foreground))]">{owner?.name ?? "Studio owner"} - {owner?.email ?? "No email"}</p>
+          </div>
         </div>
       </section>
 
@@ -115,7 +177,7 @@ export function StudioDashboard() {
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <h2 className="text-xl font-black">{activeCategory}</h2>
-              <p className="text-sm text-[hsl(var(--muted-foreground))]">Choose one tool and continue.</p>
+              <p className="text-sm text-[hsl(var(--muted-foreground))]">Create and manage records inside your own Studio.</p>
             </div>
             <Sparkles className="size-5 text-[hsl(var(--primary))]" />
           </div>
@@ -146,15 +208,15 @@ export function StudioDashboard() {
         <div className="space-y-5">
           <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5 shadow-sm">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-lg font-black">Activity</h2>
-              <Badge>Live</Badge>
+              <h2 className="text-lg font-black">Studio map</h2>
+              <Badge>{summary.verified} verified</Badge>
             </div>
             <div className="mt-5 grid gap-3">
               {bars.map((item) => (
                 <div key={item.label}>
                   <div className="mb-2 flex items-center justify-between text-sm font-semibold">
                     <span>{item.label}</span>
-                    <span>{item.value}%</span>
+                    <span>{item.count}</span>
                   </div>
                   <div className="h-3 overflow-hidden rounded-full bg-[hsl(var(--muted))]">
                     <span className="block h-full rounded-full bg-[hsl(var(--primary))]" style={{ width: `${item.value}%` }} />
@@ -165,21 +227,11 @@ export function StudioDashboard() {
           </div>
 
           <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5 shadow-sm">
-            <h2 className="text-lg font-black">Publishing Mix</h2>
-            <div className="mt-5 flex items-center gap-5">
-              <div
-                className="size-32 shrink-0 rounded-full"
-                style={{
-                  background:
-                    "conic-gradient(hsl(var(--primary)) 0 42%, #22c55e 42% 64%, #f59e0b 64% 82%, #8b5cf6 82% 100%)"
-                }}
-              />
-              <div className="grid gap-2 text-sm font-semibold text-[hsl(var(--muted-foreground))]">
-                <span>Courses 42%</span>
-                <span>Products 22%</span>
-                <span>Gigs 18%</span>
-                <span>Business 18%</span>
-              </div>
+            <h2 className="text-lg font-black">Publishing rules</h2>
+            <div className="mt-4 grid gap-3 text-sm font-semibold text-[hsl(var(--muted-foreground))]">
+              <p className="rounded-md border border-[hsl(var(--border))] p-3">Courses stay private or in review until an admin approves publication.</p>
+              <p className="rounded-md border border-[hsl(var(--border))] p-3">Products, gigs, business profiles, and consulting services publish under your Studio ownership.</p>
+              <p className="rounded-md border border-[hsl(var(--border))] p-3">Verification adds the public check mark and unlocks trusted checkout where applicable.</p>
             </div>
           </div>
 

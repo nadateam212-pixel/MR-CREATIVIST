@@ -2,6 +2,7 @@ import FreelancerProfile from "@/models/FreelancerProfile";
 import { freelancerProfileSchema } from "@/lib/mongo-validations";
 import { jsonError, jsonOk, parsePagination, readJson, requireMongo, requireRole, uniqueSlugFor } from "@/lib/mongo-api";
 import { normalizeFreelancer, slugify } from "@/lib/platform-db";
+import { studioTrackId } from "@/lib/studio-identity";
 
 export async function GET(request: Request) {
   try {
@@ -35,8 +36,9 @@ export async function POST(request: Request) {
     const profile = await FreelancerProfile.create({
       ...body,
       slug,
+      studioId: studioTrackId(session.user),
       userId: session.user.id,
-      status: session.user.role === "admin" ? body.status : body.status === "draft" ? "draft" : "submitted",
+      status: session.user.role === "admin" ? body.status : body.status === "draft" ? "draft" : "published",
       isVerified: session.user.role === "admin" ? body.isVerified : false
     });
 

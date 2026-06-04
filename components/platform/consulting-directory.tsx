@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { BadgeCheck, CalendarDays, Languages, Search, Star, Video, X } from "lucide-react";
+import { CalendarDays, Languages, Search, Star, Video, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { VerifiedMark } from "@/components/ui/verified-mark";
 
 type Consultant = {
   id?: string;
@@ -109,12 +110,7 @@ export function ConsultingDirectory({ consultants }: { consultants: Consultant[]
                       </p>
                       <CardTitle className="mt-2 flex flex-wrap items-center gap-2 uppercase">
                         <span>{consultant.name}</span>
-                        {consultant.isVerified ? (
-                          <Badge className="border-sky-500/45 text-sky-500">
-                            <BadgeCheck className="mr-1 size-3" />
-                            Verified
-                          </Badge>
-                        ) : null}
+                        {consultant.isVerified ? <VerifiedMark label="Verified consultant" /> : null}
                       </CardTitle>
                     </div>
                     <span className="flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-700">

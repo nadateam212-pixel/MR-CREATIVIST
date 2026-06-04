@@ -33,7 +33,7 @@ export async function PUT(request: Request, context: { params: Promise<{ product
     const body = productSchema.partial().parse(await readJson(request));
     const patch = {
       ...body,
-      ...(isAdmin ? {} : { status: body.status === "draft" ? "draft" : "submitted", isVerified: existing.isVerified })
+      ...(isAdmin ? {} : { status: body.status === "draft" ? "draft" : "published", isVerified: existing.isVerified })
     };
     if (body.slug || body.name) {
       patch.slug = await uniqueSlugFor(Product, body.slug ?? slugify(body.name), existing._id);
@@ -59,6 +59,11 @@ export async function DELETE(request: Request, context: { params: Promise<{ prod
     const isAdmin = session.user.role === "admin";
     const ownsProduct = existing.sellerId && String(existing.sellerId) === String(session.user.id);
     if (!isAdmin && !ownsProduct) return jsonOk({ error: "You can only archive products created by your Studio account." }, 403);
+
+    if (isAdmin && new URL(request.url).searchParams.get("hard") === "1") {
+      await Product.findByIdAndDelete(existing._id);
+      return jsonOk({ ok: true, deleted: true });
+    }
 
     const product = await Product.findByIdAndUpdate(existing._id, { status: "archived" }, { returnDocument: "after" });
 

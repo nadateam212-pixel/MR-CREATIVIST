@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element */
+
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -258,7 +260,7 @@ export function PublicAppShell({
                     className="flex h-11 items-center gap-2 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-2 text-left hover:bg-[hsl(var(--muted))]"
                   >
                     <span className="relative flex size-8 items-center justify-center overflow-hidden rounded-full bg-[hsl(var(--primary))] text-xs font-black text-[hsl(var(--primary-foreground))]">
-                      {user.image ? <Image src={user.image} alt={user.name ?? "Profile"} fill sizes="32px" className="object-cover" /> : initials(user.name)}
+                      {user.image ? <img src={user.image} alt={user.name ?? "Profile"} className="h-full w-full object-cover" referrerPolicy="no-referrer" /> : initials(user.name)}
                     </span>
                     <span className="hidden max-w-28 truncate text-sm font-semibold sm:block">{user.name ?? "Profile"}</span>
                     <ChevronDown className="hidden size-4 text-[hsl(var(--muted-foreground))] sm:block" />
@@ -277,6 +279,7 @@ export function PublicAppShell({
                         <Link
                           key={item.href}
                           href={item.href}
+                          onClick={() => setProfileOpen(false)}
                           className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]"
                         >
                           <item.icon className="size-4" />

@@ -144,7 +144,7 @@ export function AccountSwitcher({ activeRole }: { activeRole?: PlatformRole }) {
             <div>
               <p className="text-sm font-semibold">Account modes</p>
               <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
-                Client and student modes are self-service. Professional modes need admin validation.
+                Client, student, and Studio modes are self-service. Admin verification is used for trust badges and course publishing.
               </p>
             </div>
             <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(false)}>
