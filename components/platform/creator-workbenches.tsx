@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -110,8 +110,19 @@ type CourseCatalogRow = {
   slug: string;
   category: string;
   price: string;
+  lessons?: number;
+  modules?: { lessons?: unknown[] }[];
   status?: PublishingStatus | "base";
 };
+
+function persistedCourseLessonCount(course: { lessons?: unknown; lessonsCount?: unknown; modules?: { lessons?: unknown[] }[] }) {
+  const directLessons = Number(course.lessons ?? course.lessonsCount ?? 0);
+  const moduleLessons = Array.isArray(course.modules)
+    ? course.modules.reduce((total, module) => total + (Array.isArray(module.lessons) ? module.lessons.length : 0), 0)
+    : 0;
+
+  return Math.max(Number.isFinite(directLessons) ? directLessons : 0, moduleLessons);
+}
 
 export function ProductBuilder({
   sellerName = "MR Creativist Seller"
@@ -710,24 +721,30 @@ export function InstructorCourseStudio({
   const [courseSyncing, setCourseSyncing] = useState("");
   const [lastSyncedAt, setLastSyncedAt] = useState("");
 
-  const selectedCourse = selectedSlug
-    ? createdCourses.find((course) => course.slug === selectedSlug)
-    : null;
-  const selectedChapters = selectedSlug
-    ? (courseChapters[selectedSlug] ?? [])
-    : [];
-  const selectedLessons = selectedSlug
-    ? (courseLessons[selectedSlug] ?? [])
-    : [];
-  const selectedAssets = selectedSlug
-    ? courseAssets.filter((asset) => asset.courseSlug === selectedSlug)
-    : [];
-  const selectedQuizzes = selectedSlug
-    ? courseQuizzes.filter((quiz) => quiz.courseSlug === selectedSlug)
-    : [];
-  const selectedStudents = selectedSlug
-    ? (studentCourseRecords[selectedSlug] ?? [])
-    : [];
+  const selectedCourse = useMemo(
+    () => (selectedSlug ? createdCourses.find((course) => course.slug === selectedSlug) ?? null : null),
+    [createdCourses, selectedSlug]
+  );
+  const selectedChapters = useMemo(
+    () => (selectedSlug ? courseChapters[selectedSlug] ?? [] : []),
+    [courseChapters, selectedSlug]
+  );
+  const selectedLessons = useMemo(
+    () => (selectedSlug ? courseLessons[selectedSlug] ?? [] : []),
+    [courseLessons, selectedSlug]
+  );
+  const selectedAssets = useMemo(
+    () => (selectedSlug ? courseAssets.filter((asset) => asset.courseSlug === selectedSlug) : []),
+    [courseAssets, selectedSlug]
+  );
+  const selectedQuizzes = useMemo(
+    () => (selectedSlug ? courseQuizzes.filter((quiz) => quiz.courseSlug === selectedSlug) : []),
+    [courseQuizzes, selectedSlug]
+  );
+  const selectedStudents = useMemo(
+    () => (selectedSlug ? studentCourseRecords[selectedSlug] ?? [] : []),
+    [selectedSlug, studentCourseRecords]
+  );
   const publishReady =
     Boolean(selectedCourse) &&
     selectedChapters.length >= 2 &&
@@ -745,16 +762,6 @@ export function InstructorCourseStudio({
       quizzes: selectedQuizzes
     });
   }, [selectedAssets, selectedChapters, selectedCourse, selectedLessons, selectedQuizzes]);
-
-  useEffect(() => {
-    if (!selectedSlug || !selectedCourse || studioView === "setup" || !syncSignature || courseSyncing) return;
-
-    const timer = window.setTimeout(() => {
-      void syncCourseToDatabase(selectedSlug, undefined, { silent: true });
-    }, 1800);
-
-    return () => window.clearTimeout(timer);
-  }, [courseSyncing, selectedCourse, selectedSlug, studioView, syncSignature]);
 
   function update(field: keyof typeof form, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -813,11 +820,11 @@ export function InstructorCourseStudio({
     }
   }
 
-  async function syncCourseToDatabase(
+  const syncCourseToDatabase = useCallback(async (
     slug = selectedSlug ?? "",
     status?: PublishingStatus,
     options: { silent?: boolean; successMessage?: string } = {}
-  ) {
+  ) => {
     if (!slug || courseSyncing) return;
 
     const state = usePlatformStore.getState();
@@ -861,6 +868,10 @@ export function InstructorCourseStudio({
       if (!response.ok || result.error) {
         throw new Error(result.error ?? "Course database sync failed.");
       }
+      const persistedLessons = persistedCourseLessonCount(result);
+      if (persistedLessons < payload.lessonsCount) {
+        throw new Error(`Course sync validation failed: MongoDB saved ${persistedLessons} of ${payload.lessonsCount} lessons.`);
+      }
 
       if (status && localCourse.status !== status) {
         updateCourseStatus(slug, status);
@@ -880,7 +891,17 @@ export function InstructorCourseStudio({
     } finally {
       setCourseSyncing("");
     }
-  }
+  }, [courseSyncing, selectedSlug, updateCourseStatus]);
+
+  useEffect(() => {
+    if (!selectedSlug || !selectedCourse || studioView === "setup" || !syncSignature || courseSyncing) return;
+
+    const timer = window.setTimeout(() => {
+      void syncCourseToDatabase(selectedSlug, undefined, { silent: true });
+    }, 1800);
+
+    return () => window.clearTimeout(timer);
+  }, [courseSyncing, selectedCourse, selectedSlug, studioView, syncCourseToDatabase, syncSignature]);
 
   async function saveCourse(status: PublishingStatus) {
     const slug = createCourse({
@@ -2813,19 +2834,38 @@ export function CourseManager({ initialCourses = [] }: { initialCourses?: Course
     (state) => state.updateCourseStatus
   );
   const deleteCourse = usePlatformStore((state) => state.deleteCourse);
+  const [databaseCourses, setDatabaseCourses] = useState(
+    () =>
+      initialCourses.map((course) => ({
+        ...course,
+        status: (course.status ?? "base") as PublishingStatus | "base",
+        createdAt: "Database"
+      }))
+  );
   const [hiddenSlugs, setHiddenSlugs] = useState<string[]>([]);
   const [busySlug, setBusySlug] = useState("");
   const rows = useMemo(
     () => [
       ...createdCourses,
-      ...initialCourses.map((course) => ({
-        ...course,
-        status: (course.status ?? "base") as PublishingStatus | "base",
-        createdAt: "Database"
-      }))
+      ...databaseCourses
     ].filter((course) => !hiddenSlugs.includes(course.slug)),
-    [createdCourses, hiddenSlugs, initialCourses]
+    [createdCourses, databaseCourses, hiddenSlugs]
   );
+
+  function mergeDatabaseCourse(slug: string, patch: Partial<CourseCatalogRow>) {
+    setDatabaseCourses((current) =>
+      current.map((course) =>
+        course.slug === slug
+          ? {
+              ...course,
+              ...patch,
+              status: (patch.status ?? course.status ?? "base") as PublishingStatus | "base",
+              createdAt: "Database"
+            }
+          : course
+      )
+    );
+  }
 
   async function updateDatabaseCourseStatus(slug: string, status: PublishingStatus) {
     setBusySlug(slug);
@@ -2839,6 +2879,7 @@ export function CourseManager({ initialCourses = [] }: { initialCourses?: Course
       const result = await response.json().catch(() => ({}));
 
       if (!response.ok || result.error) throw new Error(result.error ?? "Course update failed.");
+      mergeDatabaseCourse(slug, result);
       toast.success(status === "published" ? "Course published successfully." : status === "submitted" ? "Review sent successfully." : "Course updated successfully.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Course update failed.");
@@ -2880,6 +2921,10 @@ export function CourseManager({ initialCourses = [] }: { initialCourses?: Course
       }
 
       if (!response.ok || result.error) throw new Error(result.error ?? "Course sync failed.");
+      const persistedLessons = persistedCourseLessonCount(result);
+      if (persistedLessons < payload.lessonsCount) {
+        throw new Error(`Course sync validation failed: MongoDB saved ${persistedLessons} of ${payload.lessonsCount} lessons.`);
+      }
 
       updateCourseStatus(slug, status);
       toast.success(status === "published" ? "Course published successfully." : status === "submitted" ? "Review sent successfully." : "Course synced successfully.");
@@ -2905,6 +2950,10 @@ export function CourseManager({ initialCourses = [] }: { initialCourses?: Course
     return createdCourses.some((item) => item.slug === course.slug);
   }
 
+  function savedLessonCount(course: (typeof rows)[number]) {
+    return persistedCourseLessonCount(course);
+  }
+
   function primaryStatusAction(course: (typeof rows)[number]) {
     const status = course.status ?? "draft";
     const disabled = busySlug === course.slug;
@@ -2924,7 +2973,7 @@ export function CourseManager({ initialCourses = [] }: { initialCourses?: Course
       );
     }
 
-    if (status === "approved") {
+    if (["approved", "submitted", "changes_requested"].includes(status)) {
       return (
         <Button
           size="sm"
@@ -2943,10 +2992,10 @@ export function CourseManager({ initialCourses = [] }: { initialCourses?: Course
         size="sm"
         variant="outline"
         disabled={disabled}
-        onClick={() => (local ? void syncLocalCourseStatus(course.slug, "submitted") : void updateDatabaseCourseStatus(course.slug, "submitted"))}
+        onClick={() => (local ? void syncLocalCourseStatus(course.slug, "published") : void updateDatabaseCourseStatus(course.slug, "published"))}
       >
         <Send className="size-4" />
-        Submit
+        Publish
       </Button>
     );
   }
@@ -2987,6 +3036,9 @@ export function CourseManager({ initialCourses = [] }: { initialCourses?: Course
                       <BookOpen className="size-4 text-[hsl(var(--primary))]" />
                       {course.title}
                     </span>
+                    <p className="mt-1 text-xs font-medium text-[hsl(var(--muted-foreground))]">
+                      {savedLessonCount(course)} lessons saved
+                    </p>
                   </td>
                   <td className="p-4 text-[hsl(var(--muted-foreground))]">
                     {course.category}

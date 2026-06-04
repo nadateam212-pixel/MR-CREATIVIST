@@ -13,7 +13,7 @@ function slugify(value: string) {
 export async function GET() {
   try {
     await connectMongoDB();
-    const categories = await Course.distinct("category", { status: "published" });
+    const categories = await Course.distinct("category", { status: { $ne: "archived" } });
 
     return apiOk({
       items: categories.sort().map((name) => ({

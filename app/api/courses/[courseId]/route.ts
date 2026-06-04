@@ -3,6 +3,7 @@ import { jsonError, jsonOk, mongoIdOrSlug, readJson, requireMongo, requireRole, 
 import { normalizeCourse, slugify } from "@/lib/platform-db";
 import { courseSchema } from "@/lib/mongo-validations";
 import { studioTrackId } from "@/lib/studio-identity";
+import { compileCoursePublicationPatch } from "@/lib/course-publication";
 
 function normalizedOwner(value?: unknown) {
   return String(value ?? "").trim().toLowerCase();
@@ -21,11 +22,21 @@ function canManageCourse(existing: { instructorId?: unknown; studioId?: unknown;
   return Boolean(ownsById || ownsByStudio || ownsLegacyCourse);
 }
 
+function submittedFields<T extends Record<string, unknown>>(raw: unknown, parsed: T) {
+  const source = raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Record<string, unknown> : {};
+
+  return Object.fromEntries(
+    Object.entries(parsed).filter(([key]) => Object.prototype.hasOwnProperty.call(source, key))
+  ) as Partial<T>;
+}
+
 export async function GET(_: Request, context: { params: Promise<{ courseId: string }> }) {
   try {
     await requireMongo();
     const { courseId } = await context.params;
-    const course = await Course.findOne(mongoIdOrSlug(courseId)).lean();
+    const course = await Course.findOne({ ...mongoIdOrSlug(courseId), status: { $ne: "archived" } })
+      .populate("instructorId", "name email profileImage isVerified")
+      .lean();
 
     if (!course) {
       return jsonOk({ error: "Course not found." }, 404);
@@ -52,8 +63,9 @@ export async function PUT(request: Request, context: { params: Promise<{ courseI
       return jsonOk({ error: "You can only manage courses created by your Studio account." }, 403);
     }
 
-    const body = courseSchema.partial().parse(await readJson(request));
-    const patch = {
+    const rawBody = await readJson(request);
+    const body = submittedFields(rawBody, courseSchema.partial().parse(rawBody));
+    const patch: Record<string, unknown> = {
       ...body,
       ...(isAdmin
         ? {}
@@ -67,8 +79,14 @@ export async function PUT(request: Request, context: { params: Promise<{ courseI
     if (body.slug || body.title) {
       patch.slug = await uniqueSlugFor(Course, body.slug ?? slugify(body.title), existing._id);
     }
+    const mergedCourse = {
+      ...existing.toObject(),
+      ...patch
+    };
+    const publicationPatch = compileCoursePublicationPatch(mergedCourse, String(patch.status ?? existing.status ?? "draft"));
 
-    const course = await Course.findByIdAndUpdate(existing._id, patch, { returnDocument: "after", runValidators: true });
+    const course = await Course.findByIdAndUpdate(existing._id, { ...patch, ...publicationPatch }, { returnDocument: "after", runValidators: true })
+      .populate("instructorId", "name email profileImage isVerified");
 
     return jsonOk(normalizeCourse(course));
   } catch (error) {

@@ -7,11 +7,11 @@ import {
   BookOpen,
   CheckCircle2,
   ClipboardCheck,
+  CreditCard,
   Download,
   FileText,
   GraduationCap,
   Image as ImageIcon,
-  Layers3,
   Lock,
   Pause,
   Play,
@@ -85,6 +85,8 @@ type CourseStructure = {
   level: string;
   category: string;
   certificate: string;
+  pricingType?: string;
+  accessType?: string;
   image?: string;
   outcomes: string[];
   tools: string[];
@@ -248,10 +250,12 @@ function parsePlayerMessage(data: unknown) {
 export function CourseLearningWorkspace({
   course,
   initialProgress,
+  enrolled = true,
   learnerName
 }: {
   course: CourseStructure;
   initialProgress: LearningProgressSnapshot;
+  enrolled?: boolean;
   learnerName: string;
 }) {
   const firstLessonKey = course.flatLessons[0]?.key ?? "";
@@ -281,6 +285,18 @@ export function CourseLearningWorkspace({
   const [mediaSeconds, setMediaSeconds] = useState(0);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [vimeoNonce, setVimeoNonce] = useState(0);
+  const [previewElapsedSeconds, setPreviewElapsedSeconds] = useState(0);
+  const previewSecondsLimit = Math.max(30, Number(process.env.NEXT_PUBLIC_COURSE_PREVIEW_SECONDS ?? 180) || 180);
+  const accessType =
+    course.accessType ??
+    (course.pricingType === "subscription" || course.pricingType === "manual"
+      ? "premium"
+      : course.pricingType === "free"
+        ? "free"
+        : "paid");
+  const previewGateActive = !enrolled && accessType !== "free";
+  const previewBlocked = previewGateActive && previewElapsedSeconds >= previewSecondsLimit;
+  const previewRemainingSeconds = Math.max(0, previewSecondsLimit - previewElapsedSeconds);
 
   const completedSet = useMemo(() => new Set(completedLessonKeys), [completedLessonKeys]);
   const completedPercent = course.totalLessons
@@ -291,6 +307,11 @@ export function CourseLearningWorkspace({
   const activeIndex = course.flatLessons.findIndex((lesson) => lesson.key === activeLesson?.key);
   const previousLesson = activeIndex > 0 ? course.flatLessons[activeIndex - 1] : null;
   const nextLesson = course.flatLessons.find((lesson) => !completedSet.has(lesson.key) && lesson.key !== activeLesson?.key);
+  const upcomingLessons = course.flatLessons
+    .slice(Math.max(activeIndex + 1, 0))
+    .concat(course.flatLessons.slice(0, Math.max(activeIndex, 0)))
+    .filter((lesson) => lesson.key !== activeLesson?.key)
+    .slice(0, 6);
   const effectiveStudySecondsByLesson = {
     ...studySecondsByLesson,
     ...(activeLesson
@@ -323,6 +344,24 @@ export function CourseLearningWorkspace({
     [activeLesson?.key, activeLesson?.type, activeLesson?.videoUrl, vimeoNonce]
   );
 
+  useEffect(() => {
+    if (!previewGateActive || previewBlocked) return undefined;
+
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "hidden") return;
+      setPreviewElapsedSeconds((current) => Math.min(previewSecondsLimit, current + 1));
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [previewBlocked, previewGateActive, previewSecondsLimit]);
+
+  useEffect(() => {
+    if (!previewBlocked) return;
+    videoRef.current?.pause();
+    const timer = window.setTimeout(() => setMediaPlaying(false), 0);
+    return () => window.clearTimeout(timer);
+  }, [previewBlocked]);
+
   function moduleComplete(moduleKey: string, completed = completedSet) {
     const courseModule = course.modules.find((item) => item.key === moduleKey);
 
@@ -342,10 +381,6 @@ export function CourseLearningWorkspace({
     const courseModule = course.modules.find((item) => item.key === moduleKey);
 
     return (courseModule?.lessons ?? []).reduce((total, lesson) => total + Number(lessonSeconds[lesson.key] ?? 0), 0);
-  }
-
-  function moduleStudyReady(moduleKey: string, lessonSeconds = effectiveStudySecondsByLesson) {
-    return moduleStudySeconds(moduleKey, lessonSeconds) >= moduleRequiredSeconds(moduleKey);
   }
 
   function moduleUnlocked(moduleIndex: number, completed = completedSet) {
@@ -414,6 +449,22 @@ export function CourseLearningWorkspace({
     action: LearningProgressSnapshot["events"][number]["action"],
     options: { seconds?: number; score?: number; complete?: boolean } = {}
   ) {
+    if (previewGateActive) {
+      if (previewBlocked || options.complete !== false) {
+        setPreviewElapsedSeconds(previewSecondsLimit);
+        setMessage("Enroll or pay for this course to continue learning and save progress.");
+        toast.message("Enroll to unlock the full course.");
+      }
+
+      return {
+        completedLessonKeys,
+        currentLessonKey: lesson.key,
+        progressPercent,
+        status: "preview",
+        events: []
+      };
+    }
+
     setSavingKey(lesson.key);
     setMessage("");
     const shouldComplete = options.complete !== false;
@@ -491,6 +542,11 @@ export function CourseLearningWorkspace({
   }
 
   async function openLesson(lesson: FlatLesson) {
+    if (previewBlocked) {
+      setMessage("Enroll or pay for this course to continue after the preview.");
+      return;
+    }
+
     if (!lessonUnlocked(lesson.key)) return;
 
     activateLesson(lesson.key);
@@ -518,6 +574,12 @@ export function CourseLearningWorkspace({
 
   async function completeActive(action: LearningProgressSnapshot["events"][number]["action"], score?: number) {
     if (!activeLesson) return;
+    if (previewGateActive) {
+      setPreviewElapsedSeconds(previewSecondsLimit);
+      setMessage("Enroll or pay for this course to complete lessons and save progress.");
+      toast.message("Enroll to unlock progress tracking.");
+      return;
+    }
 
     if (activeLesson.type === "quiz" && action !== "quiz_passed") {
       const nextMessage = "Submit the quiz and score at least 75% to complete this lesson.";
@@ -903,101 +965,101 @@ export function CourseLearningWorkspace({
 
   return (
     <div className="space-y-6">
-      <section className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-        <Card className="overflow-hidden">
-          <div className="grid min-h-72 gap-0 md:grid-cols-[0.85fr_1.15fr]">
-            <div className="relative min-h-56 bg-[hsl(var(--muted))]">
-              {course.image ? (
-                <SafeImage
-                  src={course.image}
-                  fallbackSrc={courseImageForCategory(course.category)}
-                  alt={course.title}
-                  fill
-                  sizes="420px"
-                  className="object-cover"
-                />
-              ) : null}
+      {previewGateActive ? (
+        <div className="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 text-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-semibold">{accessType === "premium" ? "Premium preview" : "Paid course preview"}</p>
+              <p className="mt-1 text-[hsl(var(--muted-foreground))]">
+                {previewBlocked
+                  ? "Preview ended. Enroll or pay to continue the player, resources, quizzes, and certificates."
+                  : `${formatClock(previewRemainingSeconds)} preview remaining before enrollment is required.`}
+              </p>
             </div>
-            <div className="p-6">
-              <div className="flex flex-wrap gap-2">
-                <Badge>{course.level}</Badge>
-                <Badge>{course.category}</Badge>
-                <Badge>{course.certificate}</Badge>
-              </div>
-              <h1 className="mt-4 text-3xl font-semibold tracking-tight">{course.title}</h1>
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">{course.shortDescription}</p>
-              <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                {[
-                  { label: "Lessons", value: course.totalLessons, icon: Layers3 },
-                  { label: "Duration", value: formatMinutes(course.totalMinutes), icon: Timer },
-                  { label: "Instructor", value: course.instructor, icon: GraduationCap }
-                ].map((metric) => (
-                  <div key={metric.label} className="rounded-md border border-[hsl(var(--border))] p-3">
-                    <metric.icon className="mb-2 size-4 text-[hsl(var(--primary))]" />
-                    <p className="text-xs text-[hsl(var(--muted-foreground))]">{metric.label}</p>
-                    <p className="mt-1 text-sm font-semibold">{metric.value}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between gap-3">
-              <CardTitle>Learning record</CardTitle>
-              <p className="text-3xl font-semibold text-[hsl(var(--primary))]">{progressPercent}%</p>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Progress value={progressPercent} />
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-md border border-[hsl(var(--border))] p-3">
-                <p className="text-xs text-[hsl(var(--muted-foreground))]">Completed lessons</p>
-                <p className="mt-1 text-2xl font-semibold">
-                  {course.flatLessons.filter((lesson) => completedSet.has(lesson.key)).length}/{course.totalLessons}
-                </p>
-              </div>
-              <div className="rounded-md border border-[hsl(var(--border))] p-3">
-                <p className="text-xs text-[hsl(var(--muted-foreground))]">Study time saved</p>
-                <p className="mt-1 text-2xl font-semibold">
-                  {formatStudyTime(Object.values(effectiveStudySecondsByLesson).reduce((total, seconds) => total + Number(seconds ?? 0), 0))}
-                </p>
-              </div>
-              <div className="rounded-md border border-[hsl(var(--border))] p-3">
-                <p className="text-xs text-[hsl(var(--muted-foreground))]">Certificate status</p>
-                <p className="mt-1 text-sm font-semibold">
-                  {certificate ? "Issued and verified" : allComplete ? "Generating automatically" : "Locked until completion"}
-                </p>
-              </div>
-            </div>
-            <Button className="mt-5 w-full" onClick={() => void generateCertificate({ openPdf: true })} disabled={!allComplete || savingKey === "certificate"}>
-              <QrCode className="size-4" />
-              {savingKey === "certificate" ? "Generating..." : certificate ? "Open verified certificate" : "Generate verified certificate"}
+            <Button asChild>
+              <Link href={`/courses/${course.slug}/enroll`}>
+                <CreditCard className="size-4" />
+                {accessType === "premium" ? "Join premium" : "Enroll or pay"}
+              </Link>
             </Button>
-            {certificate ? (
-              <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                <Button asChild variant="outline">
-                  <Link href={certificatePdfUrl(certificate, course, learnerName)} target="_blank">
-                    <Award className="size-4" />
-                    View PDF
+          </div>
+        </div>
+      ) : null}
+      {previewBlocked ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/55 p-4 backdrop-blur-sm">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <div className="mb-3 grid size-12 place-items-center rounded-md bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))]">
+                <Lock className="size-6" />
+              </div>
+              <CardTitle>{accessType === "premium" ? "Premium access required" : "Enrollment required"}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+                The preview window has ended. Unlock the full course to continue watching lessons, save progress, use resources, take quizzes, and earn the certificate.
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Button asChild>
+                  <Link href={`/courses/${course.slug}/enroll`}>
+                    <CreditCard className="size-4" />
+                    {accessType === "premium" ? "Join premium" : "Enroll / pay"}
                   </Link>
                 </Button>
                 <Button asChild variant="outline">
-                  <Link href={certificatePdfUrl(certificate, course, learnerName, true)}>
-                    <Download className="size-4" />
-                    Download PDF
-                  </Link>
+                  <Link href={`/courses/${course.slug}`}>Course details</Link>
                 </Button>
               </div>
-            ) : null}
-            {message ? <p className="mt-3 text-sm text-[hsl(var(--muted-foreground))]">{message}</p> : null}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
+      <section className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 shadow-sm">
+        <div className="grid gap-4 lg:grid-cols-[1fr_18rem] lg:items-center">
+          <div>
+            <div className="flex flex-wrap gap-2">
+              <Badge>{course.category}</Badge>
+              <Badge>{course.level}</Badge>
+              <Badge>{course.totalLessons} lessons</Badge>
+              <Badge>{formatMinutes(course.totalMinutes)}</Badge>
+            </div>
+            <h1 className="mt-3 text-2xl font-black tracking-tight sm:text-3xl">{course.title}</h1>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">{course.shortDescription}</p>
+            <p className="mt-3 text-sm font-semibold">
+              {course.instructor} · {certificate ? "Certificate issued" : allComplete ? "Ready for certificate" : "Certificate unlocks after completion"}
+            </p>
+          </div>
+          <div className="rounded-md border border-[hsl(var(--border))] p-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm font-semibold">Progress</span>
+              <span className="text-2xl font-black text-[hsl(var(--primary))]">{progressPercent}%</span>
+            </div>
+            <Progress value={progressPercent} className="mt-3" />
+            <Button className="mt-3 w-full" onClick={() => void generateCertificate({ openPdf: true })} disabled={!allComplete || savingKey === "certificate"}>
+              <QrCode className="size-4" />
+              {savingKey === "certificate" ? "Generating..." : certificate ? "Open certificate" : "Generate certificate"}
+            </Button>
+          </div>
+        </div>
+        {certificate ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button asChild variant="outline" size="sm">
+              <Link href={certificatePdfUrl(certificate, course, learnerName)} target="_blank">
+                <Award className="size-4" />
+                View PDF
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href={certificatePdfUrl(certificate, course, learnerName, true)}>
+                <Download className="size-4" />
+                Download PDF
+              </Link>
+            </Button>
+          </div>
+        ) : null}
+        {message ? <p className="mt-3 text-sm text-[hsl(var(--muted-foreground))]">{message}</p> : null}
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[22rem_1fr_20rem]">
+      <section className="grid gap-5 xl:grid-cols-[20rem_minmax(0,1fr)_18rem]">
         <Card>
           <CardHeader>
             <CardTitle>Chapters</CardTitle>
@@ -1415,38 +1477,64 @@ export function CourseLearningWorkspace({
           </CardContent>
         </Card>
 
-        <div className="grid gap-5">
+        <div className="grid gap-5 xl:sticky xl:top-24 xl:self-start">
           <Card>
             <CardHeader>
-              <CardTitle>Instructor plan</CardTitle>
+              <CardTitle>Up next</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {(course.outcomes.length ? course.outcomes : ["Finish every lesson", "Complete practical checkpoints", "Earn a verified certificate"]).map(
-                (outcome, index) => (
-                  <div key={outcome} className="rounded-md border border-[hsl(var(--border))] p-3">
-                    <Badge>Outcome {index + 1}</Badge>
-                    <p className="mt-2 text-sm font-medium">{outcome}</p>
-                  </div>
-                )
+            <CardContent className="space-y-2">
+              {upcomingLessons.length ? (
+                upcomingLessons.map((lesson) => {
+                  const Icon = lessonIcon(lesson.type);
+                  const unlocked = lessonUnlocked(lesson.key);
+
+                  return (
+                    <button
+                      key={lesson.key}
+                      type="button"
+                      disabled={!unlocked}
+                      onClick={() => void openLesson(lesson)}
+                      className="flex w-full gap-3 rounded-md border border-[hsl(var(--border))] p-2 text-left transition hover:bg-[hsl(var(--muted))]/55 disabled:cursor-not-allowed disabled:opacity-55"
+                    >
+                      <span className="grid size-9 shrink-0 place-items-center rounded-md bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))]">
+                        <Icon className="size-4" />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="line-clamp-2 text-sm font-semibold">{lesson.title}</span>
+                        <span className="mt-1 block text-xs text-[hsl(var(--muted-foreground))]">
+                          {formatMinutes(lesson.durationMinutes)} · {lesson.moduleTitle}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })
+              ) : (
+                <p className="text-sm text-[hsl(var(--muted-foreground))]">You are on the final lesson in this path.</p>
               )}
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>Activity trail</CardTitle>
+              <CardTitle>Resources</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {initialProgress.events.length ? (
-                initialProgress.events.slice(0, 5).map((event, index) => (
-                  <div key={`${event.lessonKey}-${event.createdAt}-${index}`} className="rounded-md border border-[hsl(var(--border))] p-3">
-                    <p className="text-sm font-semibold">{event.lessonTitle ?? "Course activity"}</p>
-                    <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{event.action.replace(/_/g, " ")}</p>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-[hsl(var(--muted-foreground))]">Your saved lesson activity will appear here.</p>
-              )}
+            <CardContent className="grid gap-2">
+              {[...(activeLesson.resources ?? []), ...(course.resources ?? [])].slice(0, 5).map((resource) => (
+                <a
+                  key={`${resource.label}-${resource.url}`}
+                  href={resource.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  download={resource.downloadable ? "" : undefined}
+                  className="rounded-md border border-[hsl(var(--border))] p-3 text-sm font-medium hover:bg-[hsl(var(--muted))]/55"
+                >
+                  <Download className="mb-2 size-4 text-[hsl(var(--primary))]" />
+                  {resource.label}
+                </a>
+              ))}
+              {!(activeLesson.resources?.length || course.resources?.length) ? (
+                <p className="text-sm text-[hsl(var(--muted-foreground))]">No downloads are attached to this lesson yet.</p>
+              ) : null}
             </CardContent>
           </Card>
 
@@ -1454,27 +1542,25 @@ export function CourseLearningWorkspace({
             <CardHeader>
               <div className="flex items-center gap-3">
                 <Users className="size-5 text-[hsl(var(--primary))]" />
-                <CardTitle>Community</CardTitle>
+                <CardTitle>Comments</CardTitle>
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="max-h-64 space-y-2 overflow-y-auto rounded-md border border-[hsl(var(--border))] p-3">
+              <div className="max-h-48 space-y-2 overflow-y-auto rounded-md border border-[hsl(var(--border))] p-3">
                 {communityLoading && communityMessages.length === 0 ? (
-                  <p className="text-sm text-[hsl(var(--muted-foreground))]">Loading community...</p>
+                  <p className="text-sm text-[hsl(var(--muted-foreground))]">Loading comments...</p>
                 ) : null}
-                {communityMessages.map((item) => (
+                {communityMessages.slice(-3).map((item) => (
                   <div key={item.id} className="rounded-md border border-[hsl(var(--border))] p-3 text-sm">
                     <div className="flex items-center justify-between gap-2">
                       <p className="font-semibold">{item.senderName}</p>
                       {item.isInstructor ? <Badge>Instructor</Badge> : null}
                     </div>
-                    <p className="mt-2 whitespace-pre-wrap leading-6 text-[hsl(var(--muted-foreground))]">{item.content}</p>
+                    <p className="mt-2 line-clamp-3 whitespace-pre-wrap leading-6 text-[hsl(var(--muted-foreground))]">{item.content}</p>
                   </div>
                 ))}
                 {!communityLoading && communityMessages.length === 0 ? (
-                  <p className="text-sm text-[hsl(var(--muted-foreground))]">
-                    Students in this course can meet here. The instructor can guide the group.
-                  </p>
+                  <p className="text-sm text-[hsl(var(--muted-foreground))]">Ask a question or leave a note for this course.</p>
                 ) : null}
               </div>
               <textarea
@@ -1485,7 +1571,7 @@ export function CourseLearningWorkspace({
               />
               <Button className="w-full" onClick={() => void sendCommunityMessage()} disabled={communityLoading || !communityDraft.trim()}>
                 <Send className="size-4" />
-                Send to community
+                Send
               </Button>
               {communityError ? <p className="text-sm text-[hsl(var(--destructive))]">{communityError}</p> : null}
             </CardContent>

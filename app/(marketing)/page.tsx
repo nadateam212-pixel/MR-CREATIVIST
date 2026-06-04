@@ -8,6 +8,7 @@ import {
   PlayCircle,
   Sparkles,
   Star,
+  ThumbsUp,
   Users
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,9 @@ type RankedItem = {
   isFeatured?: boolean;
   rating?: number;
   learners?: number;
+  likes?: number;
+  pricingType?: string;
+  accessType?: string;
   downloads?: number;
   completed?: number;
   isVerified?: boolean;
@@ -76,6 +80,18 @@ function freshFeaturedScore(item: RankedItem) {
 
 function formatCompact(value: number) {
   return new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(value);
+}
+
+function accessLabel(item: RankedItem) {
+  const explicit = String(item.accessType ?? item.pricingType ?? "").toLowerCase();
+  if (["premium", "subscription", "manual"].includes(explicit)) return "Premium";
+  if (explicit === "free") return "Free";
+  const numericPrice = Number(String(item.price ?? "").replace(/[^0-9.]/g, ""));
+  return numericPrice > 0 ? "Paid" : "Free";
+}
+
+function courseLikes(item: RankedItem) {
+  return numberValue(item.likes ?? Math.round(numberValue(item.learners) * 0.18 + numberValue(item.rating) * 24));
 }
 
 const fallbackCourses = [
@@ -321,19 +337,26 @@ export default async function HomePage() {
               <Card className="overflow-hidden border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] transition-colors hover:bg-[hsl(var(--muted))]/45">
                 <div className="relative aspect-video">
                   <SafeImage src={course.image} alt={course.title} fill sizes="(min-width: 1280px) 25vw, 50vw" className="object-cover" />
-                  <span className="absolute left-3 top-3 rounded-full border border-white/15 bg-slate-950/75 px-2.5 py-0.5 text-xs font-bold text-white shadow-sm">
+                  <span className="absolute bottom-2 right-2 rounded bg-black/85 px-2 py-1 text-xs font-black text-white">
                     {course.duration}
                   </span>
-                  <span className="absolute right-3 top-3 rounded-full bg-slate-950/75 p-2 text-white">
+                  <span className="absolute left-3 top-3 rounded-full bg-slate-950/75 p-2 text-white">
                     <PlayCircle className="size-4" />
                   </span>
                 </div>
                 <CardContent className="p-4">
-                  <p className="line-clamp-1 font-bold">{course.title}</p>
-                  <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{course.instructor}</p>
+                  <p className="line-clamp-2 min-h-10 font-bold">{course.title}</p>
+                  <p className="mt-1 inline-flex max-w-full items-center gap-1 text-xs text-[hsl(var(--muted-foreground))]">
+                    <span className="truncate">{course.instructor}</span>
+                    {"instructorVerified" in course && course.instructorVerified ? <VerifiedMark label="Verified instructor" className="size-3.5" /> : null}
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-[hsl(var(--muted-foreground))]">
+                    <span>{formatCompact(Number(course.learners ?? 0))} students</span>
+                    <span><ThumbsUp className="mr-1 inline size-3" />{formatCompact(courseLikes(course))} likes</span>
+                  </div>
                   <div className="mt-3 flex items-center justify-between text-xs text-[hsl(var(--muted-foreground))]">
+                    <span className="rounded-md border border-[hsl(var(--primary))]/35 px-2 py-1 font-bold text-[hsl(var(--primary))]">{accessLabel(course)}</span>
                     <span><Star className="mr-1 inline size-3 fill-amber-400 text-amber-400" />{course.rating}</span>
-                    <span>{Number(course.learners ?? 0).toLocaleString()} students</span>
                   </div>
                 </CardContent>
               </Card>

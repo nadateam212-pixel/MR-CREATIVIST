@@ -1,6 +1,6 @@
 import ShopProfile from "@/models/ShopProfile";
 import { shopProfileSchema } from "@/lib/mongo-validations";
-import { jsonError, jsonOk, mongoIdOrSlug, readJson, requireMongo, requireRole, uniqueSlugFor } from "@/lib/mongo-api";
+import { jsonError, jsonOk, mongoIdOrSlug, readJson, requireMongo, requireRole, submittedFields, uniqueSlugFor } from "@/lib/mongo-api";
 import { normalizeShopProfile, slugify } from "@/lib/platform-db";
 
 const shopPatchSchema = shopProfileSchema.partial();
@@ -38,7 +38,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ shopI
       return jsonOk({ error: "You can only manage your own shop." }, 403);
     }
 
-    const body = shopPatchSchema.parse(await readJson(request));
+    const rawBody = await readJson(request);
+    const body = submittedFields(rawBody, shopPatchSchema.parse(rawBody)) as Partial<ReturnType<typeof shopProfileSchema.parse>>;
     const isAdmin = session.user.role === "admin";
     const patch: Record<string, unknown> = {
       ...body,

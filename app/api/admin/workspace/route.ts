@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { auth } from "@/auth";
+import { compileCoursePublicationPatch } from "@/lib/course-publication";
 import connectMongoDB from "@/lib/mongodb";
 import Booking from "@/models/Booking";
 import CertificateCredential from "@/models/CertificateCredential";
@@ -1007,6 +1008,12 @@ export async function PATCH(request: Request) {
 
     if (!Object.keys(patch).length) {
       return Response.json({ error: "No supported action was provided." }, { status: 422 });
+    }
+
+    if (resource === "course") {
+      const existing = await Course.findById(id).lean();
+      if (!existing) return Response.json({ error: "Course not found." }, { status: 404 });
+      Object.assign(patch, compileCoursePublicationPatch({ ...existing, ...patch }, String(patch.status ?? existing.status ?? "draft")));
     }
 
     await Model.findByIdAndUpdate(id, patch, { returnDocument: "after", runValidators: true });

@@ -1,5 +1,5 @@
 import Product from "@/models/Product";
-import { jsonError, jsonOk, mongoIdOrSlug, readJson, requireMongo, requireRole, uniqueSlugFor } from "@/lib/mongo-api";
+import { jsonError, jsonOk, mongoIdOrSlug, readJson, requireMongo, requireRole, submittedFields, uniqueSlugFor } from "@/lib/mongo-api";
 import { normalizeProduct, slugify } from "@/lib/platform-db";
 import { productSchema } from "@/lib/mongo-validations";
 
@@ -32,7 +32,8 @@ export async function PUT(request: Request, context: { params: Promise<{ product
 
     if (!isAdmin && !ownsProduct) return jsonOk({ error: "You can only manage products created by your Studio account." }, 403);
 
-    const body = productSchema.partial().parse(await readJson(request));
+    const rawBody = await readJson(request);
+    const body = submittedFields(rawBody, productSchema.partial().parse(rawBody)) as Partial<ReturnType<typeof productSchema.parse>>;
     const patch = {
       ...body,
       ...(isAdmin ? {} : { status: body.status === "draft" ? "draft" : "published", isVerified: existing.isVerified })

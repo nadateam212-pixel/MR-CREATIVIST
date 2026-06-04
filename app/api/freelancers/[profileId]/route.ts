@@ -1,6 +1,6 @@
 import FreelancerProfile from "@/models/FreelancerProfile";
 import { freelancerProfileSchema } from "@/lib/mongo-validations";
-import { jsonError, jsonOk, mongoIdOrSlug, readJson, requireMongo, requireRole, uniqueSlugFor } from "@/lib/mongo-api";
+import { jsonError, jsonOk, mongoIdOrSlug, readJson, requireMongo, requireRole, submittedFields, uniqueSlugFor } from "@/lib/mongo-api";
 import { normalizeFreelancer, slugify } from "@/lib/platform-db";
 
 export async function GET(_: Request, context: { params: Promise<{ profileId: string }> }) {
@@ -31,7 +31,8 @@ export async function PUT(request: Request, context: { params: Promise<{ profile
     const ownsProfile = existing.userId && String(existing.userId) === String(session.user.id);
     if (!isAdmin && !ownsProfile) return jsonOk({ error: "You can only manage your own freelancer profile." }, 403);
 
-    const body = freelancerProfileSchema.partial().parse(await readJson(request));
+    const rawBody = await readJson(request);
+    const body = submittedFields(rawBody, freelancerProfileSchema.partial().parse(rawBody)) as Partial<ReturnType<typeof freelancerProfileSchema.parse>>;
     const patch = {
       ...body,
       ...(isAdmin ? {} : { status: body.status === "draft" ? "draft" : "published", isVerified: existing.isVerified })

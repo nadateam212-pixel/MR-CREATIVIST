@@ -3,12 +3,13 @@ import { jsonError, jsonOk, parsePagination, readJson, requireMongo, requireRole
 import { normalizeCourse, slugify } from "@/lib/platform-db";
 import { courseSchema } from "@/lib/mongo-validations";
 import { studioTrackId } from "@/lib/studio-identity";
+import { compileCoursePublicationPatch } from "@/lib/course-publication";
 
 export async function GET(request: Request) {
   try {
     await requireMongo();
     const { limit, skip, q } = parsePagination(request);
-    const filter: Record<string, unknown> = { status: "published" };
+    const filter: Record<string, unknown> = { status: { $ne: "archived" } };
 
     if (q) {
       const term = new RegExp(q, "i");
@@ -16,7 +17,12 @@ export async function GET(request: Request) {
     }
 
     const [items, total] = await Promise.all([
-      Course.find(filter).sort({ isFeatured: -1, createdAt: -1 }).skip(skip).limit(limit).lean(),
+      Course.find(filter)
+        .populate("instructorId", "name email profileImage isVerified")
+        .sort({ isFeatured: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
       Course.countDocuments(filter)
     ]);
 
@@ -33,18 +39,24 @@ export async function POST(request: Request) {
 
     const body = courseSchema.parse(await readJson(request));
     const slug = await uniqueSlugFor(Course, body.slug ?? slugify(body.title));
-    const course = await Course.create({
+    const status =
+      session.user.role === "admin"
+        ? body.status
+        : ["draft", "submitted", "published", "unlisted"].includes(body.status)
+          ? body.status
+          : "submitted";
+    const baseCourse = {
       ...body,
       slug,
       studioId: studioTrackId(session.user),
       instructorId: session.user.id,
       instructorName: body.instructorName || session.user.name || session.user.email,
-      status:
-        session.user.role === "admin"
-          ? body.status
-          : ["draft", "submitted", "published", "unlisted"].includes(body.status)
-            ? body.status
-            : "submitted"
+      status
+    };
+    const publicationPatch = compileCoursePublicationPatch(baseCourse, status);
+    const course = await Course.create({
+      ...baseCourse,
+      ...publicationPatch
     });
 
     return jsonOk(normalizeCourse(course), 201);

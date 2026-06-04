@@ -138,8 +138,12 @@ export function PublicAppShell({
   const activityMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    setProfileOpen(false);
-    setActivityOpen(false);
+    const timer = window.setTimeout(() => {
+      setProfileOpen(false);
+      setActivityOpen(false);
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [pathname]);
 
   useEffect(() => {
@@ -173,9 +177,12 @@ export function PublicAppShell({
 
   useEffect(() => {
     if (!user) {
-      setMessageCount(0);
-      setNotificationCount(0);
-      return;
+      const timer = window.setTimeout(() => {
+        setMessageCount(0);
+        setNotificationCount(0);
+      }, 0);
+
+      return () => window.clearTimeout(timer);
     }
 
     let cancelled = false;

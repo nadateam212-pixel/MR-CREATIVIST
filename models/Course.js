@@ -102,6 +102,15 @@ const CourseSchema = new mongoose.Schema(
     modules: [ModuleSchema],
     resources: [CourseResourceSchema],
     reviewNotes: { type: String, maxlength: 2000 },
+    publishedAt: { type: Date },
+    lastCompiledAt: { type: Date },
+    publicationStatus: {
+      type: String,
+      enum: ["draft", "ready", "published", "needs_curriculum", "archived"],
+      default: "draft",
+      index: true
+    },
+    publicationIssues: [{ type: String, maxlength: 240 }],
     status: {
       type: String,
       enum: ["draft", "submitted", "changes_requested", "approved", "published", "unlisted", "archived"],

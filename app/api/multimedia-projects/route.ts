@@ -7,7 +7,7 @@ export async function GET(request: Request) {
   try {
     await requireMongo();
     const { limit, skip, q } = parsePagination(request);
-    const filter: Record<string, unknown> = { status: "published" };
+    const filter: Record<string, unknown> = { status: { $ne: "archived" } };
 
     if (q) {
       const term = new RegExp(q, "i");

@@ -1,8 +1,9 @@
 import Gig from "@/models/Gig";
 import { gigSchema } from "@/lib/mongo-validations";
-import { jsonError, jsonOk, parsePagination, readJson, requireMongo, requireRole, uniqueSlugFor } from "@/lib/mongo-api";
+import { jsonError, jsonOk, parsePagination, readJson, requireAuthenticated, requireMongo, uniqueSlugFor } from "@/lib/mongo-api";
 import { normalizeGig, slugify } from "@/lib/platform-db";
 import { studioTrackId } from "@/lib/studio-identity";
+import { syncFreelancerProfileFromGig } from "@/lib/freelancer-profile-sync";
 
 export async function GET(request: Request) {
   try {
@@ -11,10 +12,10 @@ export async function GET(request: Request) {
     const { limit, skip, q } = parsePagination(request);
     const ownerId = searchParams.get("ownerId");
     const all = searchParams.get("all") === "true";
-    const filter: Record<string, unknown> = { status: "published" };
+    const filter: Record<string, unknown> = { status: { $ne: "archived" } };
 
     if (all || ownerId) {
-      const session = await requireRole(request, ["admin", "freelancer"]);
+      const session = await requireAuthenticated();
       const isAdmin = session.user.role === "admin";
       filter.status = { $ne: "archived" };
       filter.ownerId = isAdmin && ownerId ? ownerId : session.user.id;
@@ -44,7 +45,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     await requireMongo();
-    const session = await requireRole(request, ["admin", "freelancer"]);
+    const session = await requireAuthenticated();
+    if (session.user.accountStatus === "suspended") return jsonOk({ error: "Account is suspended." }, 403);
     const body = gigSchema.parse(await readJson(request));
     const slug = await uniqueSlugFor(Gig, body.slug ?? slugify(body.title));
     const isAdmin = session.user.role === "admin";
@@ -57,6 +59,7 @@ export async function POST(request: Request) {
       status: isAdmin ? body.status : body.status === "draft" ? "draft" : "published",
       isVerified: isAdmin ? body.isVerified : false
     });
+    await syncFreelancerProfileFromGig(gig, session.user);
 
     return jsonOk(normalizeGig(gig), 201);
   } catch (error) {

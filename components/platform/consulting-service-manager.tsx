@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { Archive, CalendarDays, CheckCircle2, Eye, Plus, Save, Send, Sparkles, Trash2 } from "lucide-react";
+import { Archive, CalendarDays, Eye, Plus, Save, Send, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

@@ -18,6 +18,46 @@ function gigLocation(gig: { ownerAddress?: string; ownerCity?: string; ownerCoun
   return [gig.ownerAddress, gig.ownerCity, gig.ownerCountry].filter(Boolean).join(", ") || "Remote";
 }
 
+function stringList(values: Array<string | undefined>) {
+  return values.filter((value): value is string => Boolean(value));
+}
+
+type FreelancerCard = {
+  id?: string;
+  name: string;
+  role: string;
+  specialty: string;
+  location: string;
+  rate: number;
+  rating: number;
+  completed: number;
+  responseHours: number;
+  availability: number;
+  portfolio: number;
+  languages: string[];
+  skills: string[];
+  verified: string[];
+  isVerified: boolean;
+  image: string;
+};
+
+type GigCard = {
+  ownerId?: string;
+  ownerName?: string;
+  ownerAddress?: string;
+  ownerCity?: string;
+  ownerCountry?: string;
+  category?: string;
+  packageName?: string;
+  price?: string | number;
+  rating?: number;
+  orders?: number;
+  tags?: string[];
+  isVerified?: boolean;
+  ownerImage?: string;
+  image?: string;
+};
+
 export default async function FreelancersPage() {
   const [session, freelancers, gigs] = await Promise.all([auth(), getFreelancers(), getGigs()]);
   const currentUser = session?.user;
@@ -50,7 +90,7 @@ export default async function FreelancersPage() {
         ]
       : freelancers;
   const existingFreelancerIds = new Set(freelancerItems.map((freelancer: { id?: unknown }) => String(freelancer.id ?? "")));
-  const derivedGigFreelancers = gigs.reduce((items: any[], gig: any) => {
+  const derivedGigFreelancers = (gigs as GigCard[]).reduce<FreelancerCard[]>((items, gig) => {
     const ownerId = String(gig.ownerId ?? "");
     if (!ownerId || existingFreelancerIds.has(ownerId) || items.some((item) => item.id === ownerId)) return items;
 
@@ -67,7 +107,7 @@ export default async function FreelancersPage() {
       availability: 80,
       portfolio: 70,
       languages: ["ENGLISH"],
-      skills: (gig.tags?.length ? gig.tags : [gig.category, gig.packageName]).filter(Boolean),
+      skills: gig.tags?.length ? gig.tags : stringList([gig.category, gig.packageName]),
       verified: gig.isVerified ? ["Verified account"] : [],
       isVerified: Boolean(gig.isVerified),
       image: gig.ownerImage ?? gig.image ?? "/icons/logo.png"

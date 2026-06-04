@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { BarChart3, BookOpen, CheckCircle2, Copy, Eye, FileText, PlayCircle, Plus, Save, Send, Trash2, Video } from "lucide-react";
 import { toast } from "sonner";
@@ -116,11 +116,31 @@ export function CourseStudioTools({
 }) {
   const [course, setCourse] = useState(initialCourse);
   const [saving, setSaving] = useState("");
-  const localCourse = usePlatformStore((state) => state.createdCourses.find((item) => item.slug === course.slug || item.slug === initialCourse.slug));
-  const localChapters = usePlatformStore((state) => localCourse ? state.courseChapters[localCourse.slug] ?? [] : []);
-  const localLessons = usePlatformStore((state) => localCourse ? state.courseLessons[localCourse.slug] ?? [] : []);
-  const localAssets = usePlatformStore((state) => localCourse ? state.courseAssets.filter((asset) => asset.courseSlug === localCourse.slug) : []);
-  const localQuizzes = usePlatformStore((state) => localCourse ? state.courseQuizzes.filter((quiz) => quiz.courseSlug === localCourse.slug) : []);
+  const createdCourses = usePlatformStore((state) => state.createdCourses);
+  const courseChapters = usePlatformStore((state) => state.courseChapters);
+  const courseLessons = usePlatformStore((state) => state.courseLessons);
+  const courseAssets = usePlatformStore((state) => state.courseAssets);
+  const courseQuizzes = usePlatformStore((state) => state.courseQuizzes);
+  const localCourse = useMemo(
+    () => createdCourses.find((item) => item.slug === course.slug || item.slug === initialCourse.slug),
+    [course.slug, createdCourses, initialCourse.slug]
+  );
+  const localChapters = useMemo(
+    () => (localCourse ? courseChapters[localCourse.slug] ?? [] : []),
+    [courseChapters, localCourse]
+  );
+  const localLessons = useMemo(
+    () => (localCourse ? courseLessons[localCourse.slug] ?? [] : []),
+    [courseLessons, localCourse]
+  );
+  const localAssets = useMemo(
+    () => (localCourse ? courseAssets.filter((asset) => asset.courseSlug === localCourse.slug) : []),
+    [courseAssets, localCourse]
+  );
+  const localQuizzes = useMemo(
+    () => (localCourse ? courseQuizzes.filter((quiz) => quiz.courseSlug === localCourse.slug) : []),
+    [courseQuizzes, localCourse]
+  );
   const [lessonForm, setLessonForm] = useState({
     moduleIndex: "0",
     title: "New lesson",
@@ -167,17 +187,7 @@ export function CourseStudioTools({
     [course.status, localAssets, localChapters, localCourse, localLessons, localQuizzes]
   );
 
-  useEffect(() => {
-    if (course.modules.length || !localRecoveryPayload?.lessonsCount || saving) return;
-
-    const timer = window.setTimeout(() => {
-      void updateCourse(localRecoveryPayload as Partial<CourseRecord>, "Studio lessons recovered and saved to MongoDB.");
-    }, 600);
-
-    return () => window.clearTimeout(timer);
-  }, [course.modules.length, localRecoveryPayload, saving]);
-
-  async function updateCourse(patch: Partial<CourseRecord>, successMessage = "Course saved.") {
+  const updateCourse = useCallback(async (patch: Partial<CourseRecord>, successMessage = "Course saved.") => {
     setSaving("course");
     try {
       const response = await fetch(`/api/courses/${encodeURIComponent(course.id || course.slug)}`, {
@@ -203,7 +213,17 @@ export function CourseStudioTools({
     } finally {
       setSaving("");
     }
-  }
+  }, [course.id, course.slug]);
+
+  useEffect(() => {
+    if (course.modules.length || !localRecoveryPayload?.lessonsCount || saving) return;
+
+    const timer = window.setTimeout(() => {
+      void updateCourse(localRecoveryPayload as Partial<CourseRecord>, "Studio lessons recovered and saved to MongoDB.");
+    }, 600);
+
+    return () => window.clearTimeout(timer);
+  }, [course.modules.length, localRecoveryPayload, saving, updateCourse]);
 
   function saveMetadata(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

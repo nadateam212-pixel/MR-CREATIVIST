@@ -14,11 +14,24 @@ function clean<T>(value: T): T {
   return JSON.parse(JSON.stringify(value));
 }
 
+type CourseLessonPreview = {
+  title?: string;
+  type?: string;
+  videoUrl?: string;
+  video?: { url?: string };
+  embedUrl?: string;
+};
+
+type CourseModulePreview = {
+  title?: string;
+  lessons?: CourseLessonPreview[];
+};
+
 function coursePreviewDetails(course: ReturnType<typeof normalizeCourse>) {
-  const modules = Array.isArray(course.modules) ? course.modules : [];
-  const lessons = modules.flatMap((module: any) =>
+  const modules = Array.isArray(course.modules) ? (course.modules as CourseModulePreview[]) : [];
+  const lessons = modules.flatMap((module) =>
     Array.isArray(module.lessons)
-      ? module.lessons.map((lesson: any) => ({
+      ? module.lessons.map((lesson) => ({
           moduleTitle: module.title,
           title: lesson.title,
           type: lesson.type,

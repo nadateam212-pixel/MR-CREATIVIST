@@ -98,6 +98,15 @@ function readImageAsDataUrl(file: File) {
   });
 }
 
+function savedLessonCount(payload: { lessons?: unknown; lessonsCount?: unknown; modules?: Array<{ lessons?: unknown[] }> }) {
+  const moduleLessons = Array.isArray(payload.modules)
+    ? payload.modules.reduce((total, module) => total + (Array.isArray(module.lessons) ? module.lessons.length : 0), 0)
+    : 0;
+  const reportedLessons = Number(payload.lessons ?? payload.lessonsCount ?? 0);
+
+  return Math.max(moduleLessons, Number.isFinite(reportedLessons) ? reportedLessons : 0);
+}
+
 function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
   return (
     <span className="text-xs font-black uppercase tracking-[0.12em] text-[hsl(var(--muted-foreground))]">
@@ -338,7 +347,7 @@ export function EasyCoursePublisher({ instructorName = "MR Creativist Instructor
     ]);
   }
 
-  function buildPayload(status: "draft" | "submitted" | "unlisted") {
+  function buildPayload(status: "draft" | "submitted" | "published" | "unlisted") {
     const title = basic.title.trim() || "Untitled course";
     const shortDescription =
       basic.shortDescription.trim() || `${title} gives learners a clear, practical path to complete the topic.`;
@@ -413,26 +422,39 @@ export function EasyCoursePublisher({ instructorName = "MR Creativist Instructor
     };
   }
 
-  async function saveCourse(status: "draft" | "submitted" | "unlisted") {
+  async function saveCourse(status: "draft" | "submitted" | "published" | "unlisted") {
     setSaveState("saving");
     setMessage("");
 
     try {
+      const payloadToSave = buildPayload(status);
       const response = await fetch(courseId ? `/api/courses/${courseId}` : "/api/courses", {
         method: courseId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildPayload(status))
+        body: JSON.stringify(payloadToSave)
       });
       const payload = await response.json();
 
       if (!response.ok) {
         throw new Error(payload.error ?? "Course could not be saved.");
       }
+      const expectedLessons = Number(payloadToSave.lessonsCount ?? 0);
+      const persistedLessons = savedLessonCount(payload);
+
+      if (persistedLessons < expectedLessons) {
+        throw new Error(`Publish validation failed: MongoDB saved ${persistedLessons} of ${expectedLessons} lessons. Please try again before leaving this page.`);
+      }
 
       setCourseId(String(payload.id ?? payload._id ?? courseId));
       setPublicSlug(String(payload.slug ?? publicSlug));
       setSaveState("saved");
-      setMessage(status === "submitted" ? "Course submitted for admin review." : "Draft saved.");
+      setMessage(
+        status === "published"
+          ? "Course published to the public catalog."
+          : status === "submitted"
+            ? "Course submitted for admin review."
+            : "Draft saved."
+      );
     } catch (error) {
       setSaveState("error");
       setMessage(error instanceof Error ? error.message : "Course could not be saved.");
@@ -462,6 +484,10 @@ export function EasyCoursePublisher({ instructorName = "MR Creativist Instructor
           <Button type="button" disabled={!checks.reviewReady} onClick={() => void saveCourse("submitted")}>
             <Send className="size-4" />
             Submit Review
+          </Button>
+          <Button type="button" disabled={!checks.reviewReady} onClick={() => void saveCourse("published")}>
+            <Sparkles className="size-4" />
+            Publish
           </Button>
         </div>
       </div>
@@ -911,6 +937,12 @@ export function EasyCoursePublisher({ instructorName = "MR Creativist Instructor
               <Sparkles className="size-4" />
             </Button>
           )}
+          {step === steps.length - 1 ? (
+            <Button type="button" disabled={!checks.reviewReady} onClick={() => void saveCourse("published")}>
+              Publish
+              <Send className="size-4" />
+            </Button>
+          ) : null}
         </div>
       </div>
     </div>

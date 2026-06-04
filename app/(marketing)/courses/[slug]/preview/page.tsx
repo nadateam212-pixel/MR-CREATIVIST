@@ -39,5 +39,5 @@ export default async function CoursePreviewPage({ params }: { params: Promise<{ 
     quizAttempts: {}
   };
 
-  return <CourseLearningWorkspace course={course} initialProgress={initialProgress} learnerName="Guest learner" />;
+  return <CourseLearningWorkspace course={course} initialProgress={initialProgress} enrolled={false} learnerName="Guest learner" />;
 }

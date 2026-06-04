@@ -14,7 +14,7 @@ export async function GET(request: Request) {
       await requireRole(request, ["admin"]);
     }
 
-    const filter: Record<string, unknown> = includeDrafts ? { status: { $ne: "archived" } } : { status: "published" };
+    const filter: Record<string, unknown> = { status: { $ne: "archived" } };
 
     if (q) {
       const term = new RegExp(q, "i");

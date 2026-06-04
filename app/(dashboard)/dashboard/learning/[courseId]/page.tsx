@@ -46,14 +46,11 @@ export default async function CoursePlayerPage({ params }: { params: Promise<{ c
     );
   }
 
-  if (!snapshot.enrolled && !snapshot.isCourseManager) {
-    redirect(`/courses/${course.slug ?? courseId}/enroll`);
-  }
-
   return (
     <CourseLearningWorkspace
       course={course}
       initialProgress={progress as unknown as Parameters<typeof CourseLearningWorkspace>[0]["initialProgress"]}
+      enrolled={Boolean(snapshot.enrolled || snapshot.isCourseManager)}
       learnerName={session.user.name ?? "MR Creativist Learner"}
     />
   );

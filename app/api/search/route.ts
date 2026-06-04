@@ -17,7 +17,7 @@ export async function GET(request: Request) {
   try {
     const q = (new URL(request.url).searchParams.get("q") ?? "").trim().slice(0, 80);
     const term = q ? new RegExp(escapeRegex(q), "i") : null;
-    const publicFilter = { status: "published" };
+    const publicFilter = { status: { $ne: "archived" } };
 
     await connectMongoDB();
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Activity, Download, Eye, RefreshCw, Search, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -86,7 +86,7 @@ export function AdminWorkspaceConsole({
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
 
-  async function loadWorkspace() {
+  const loadWorkspace = useCallback(async () => {
     setError("");
     try {
       const params = new URLSearchParams({ pathname, title, description });
@@ -105,11 +105,13 @@ export function AdminWorkspaceConsole({
       setError(message);
       toast.error(message);
     }
-  }
+  }, [description, pathname, title]);
 
   useEffect(() => {
-    void loadWorkspace();
-  }, [description, pathname, title]);
+    const timer = window.setTimeout(() => void loadWorkspace(), 0);
+
+    return () => window.clearTimeout(timer);
+  }, [loadWorkspace]);
 
   const statuses = useMemo(() => {
     return Array.from(new Set((payload?.rows ?? []).map((row) => row.status))).sort();

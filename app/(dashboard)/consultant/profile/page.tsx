@@ -8,7 +8,28 @@ function cleanJson<T>(value: T): T {
   return JSON.parse(JSON.stringify(value));
 }
 
-function normalizeManagerService(service: any) {
+type ConsultingServiceDocument = {
+  _id?: unknown;
+  id?: unknown;
+  title?: string;
+  slug?: string;
+  expertName?: string;
+  expertTitle?: string;
+  description?: string;
+  hourlyRate?: number;
+  currency?: string;
+  expertise?: string[];
+  languages?: string[];
+  sessionTypes?: { label: string; durationMinutes: number; price?: number }[];
+  availability?: { day: string; slots: string[] }[];
+  heroImage?: string;
+  avatar?: string;
+  status?: string;
+  isVerified?: boolean;
+  rating?: number;
+};
+
+function normalizeManagerService(service: ConsultingServiceDocument) {
   return {
     id: String(service._id ?? service.id ?? service.slug),
     title: service.title ?? "Consulting service",

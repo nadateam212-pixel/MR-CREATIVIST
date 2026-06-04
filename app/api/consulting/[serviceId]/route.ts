@@ -1,5 +1,5 @@
 import ConsultingService from "@/models/ConsultingService";
-import { jsonError, jsonOk, mongoIdOrSlug, readJson, requireMongo, requireRole, uniqueSlugFor } from "@/lib/mongo-api";
+import { jsonError, jsonOk, mongoIdOrSlug, readJson, requireMongo, requireRole, submittedFields, uniqueSlugFor } from "@/lib/mongo-api";
 import { normalizeConsultingService, slugify } from "@/lib/platform-db";
 import { consultingServiceSchema } from "@/lib/mongo-validations";
 
@@ -31,7 +31,8 @@ export async function PUT(request: Request, context: { params: Promise<{ service
     const ownsService = existing.expertId && String(existing.expertId) === String(session.user.id);
     if (!isAdmin && !ownsService) return jsonOk({ error: "You can only manage your own consulting service." }, 403);
 
-    const body = consultingServiceSchema.partial().parse(await readJson(request));
+    const rawBody = await readJson(request);
+    const body = submittedFields(rawBody, consultingServiceSchema.partial().parse(rawBody)) as Partial<ReturnType<typeof consultingServiceSchema.parse>>;
     const patch = {
       ...body,
       ...(isAdmin ? {} : { status: body.status === "draft" ? "draft" : "published", isVerified: existing.isVerified })

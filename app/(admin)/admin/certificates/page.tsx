@@ -15,6 +15,39 @@ function clean<T>(value: T): T {
   return JSON.parse(JSON.stringify(value));
 }
 
+type CertificateRecord = {
+  _id: unknown;
+  courseId?: unknown;
+  learnerName?: string;
+  userEmail?: string;
+  courseTitle?: string;
+  courseSlug?: string;
+  metadata?: { instructor?: string };
+  verificationCode?: string;
+  status?: string;
+  issuedAt?: string;
+  createdAt?: string;
+};
+
+type EnrollmentRecord = {
+  _id: unknown;
+  courseId?: unknown;
+  learnerName?: string;
+  learnerEmail?: string;
+  progressPercent?: number;
+};
+
+type CourseRecord = {
+  _id: unknown;
+  title?: string;
+  slug?: string;
+  instructorName?: string;
+};
+
+function certificateStatus(value?: string): AdminCertificateRow["status"] {
+  return value === "revoked" ? "revoked" : "issued";
+}
+
 export default async function AdminCertificatesPage() {
   await connectMongoDB();
 
@@ -28,7 +61,7 @@ export default async function AdminCertificatesPage() {
         .limit(300)
         .lean()
     ])
-  ) as [Record<string, any>[], Record<string, any>[]];
+  ) as [CertificateRecord[], EnrollmentRecord[]];
 
   const courseIds = Array.from(
     new Set([
@@ -38,7 +71,7 @@ export default async function AdminCertificatesPage() {
   );
   const courses = clean(
     await Course.find({ _id: { $in: courseIds } }).select("_id title slug instructorName duration").lean()
-  ) as Record<string, any>[];
+  ) as CourseRecord[];
   const courseById = new Map(courses.map((course) => [String(course._id), course]));
   const issuedByLearnerCourse = new Set(certificates.map((certificate) => `${certificate.userEmail}:${certificate.courseSlug}`));
 
@@ -48,13 +81,13 @@ export default async function AdminCertificatesPage() {
     return {
       id: String(certificate._id),
       kind: "issued",
-      learnerName: certificate.learnerName,
-      userEmail: certificate.userEmail,
-      courseTitle: certificate.courseTitle,
-      courseSlug: certificate.courseSlug,
-      instructor: certificate.metadata?.instructor ?? course?.instructorName,
+      learnerName: certificate.learnerName ?? "Unknown learner",
+      userEmail: certificate.userEmail ?? "unknown@example.com",
+      courseTitle: certificate.courseTitle ?? course?.title ?? "Untitled course",
+      courseSlug: certificate.courseSlug ?? course?.slug ?? "",
+      instructor: certificate.metadata?.instructor ?? course?.instructorName ?? "MR Creativist Instructor",
       verificationCode: certificate.verificationCode,
-      status: certificate.status ?? "issued",
+      status: certificateStatus(certificate.status),
       issuedAt: certificate.issuedAt ?? certificate.createdAt,
       progressPercent: 100
     };
@@ -64,16 +97,17 @@ export default async function AdminCertificatesPage() {
     .map((enrollment) => {
       const course = courseById.get(String(enrollment.courseId ?? ""));
       const courseSlug = String(course?.slug ?? "");
-      if (!courseSlug || issuedByLearnerCourse.has(`${enrollment.learnerEmail}:${courseSlug}`)) return null;
+      const learnerEmail = enrollment.learnerEmail ?? "";
+      if (!courseSlug || !learnerEmail || issuedByLearnerCourse.has(`${learnerEmail}:${courseSlug}`)) return null;
 
       return {
         id: `eligible:${enrollment._id}`,
         kind: "eligible",
-        learnerName: enrollment.learnerName,
-        userEmail: enrollment.learnerEmail,
+        learnerName: enrollment.learnerName ?? "Unknown learner",
+        userEmail: learnerEmail,
         courseTitle: course?.title ?? "Course not found",
         courseSlug,
-        instructor: course?.instructorName,
+        instructor: course?.instructorName ?? "MR Creativist Instructor",
         status: "eligible" as const,
         enrollmentId: String(enrollment._id),
         progressPercent: Number(enrollment.progressPercent ?? 100)

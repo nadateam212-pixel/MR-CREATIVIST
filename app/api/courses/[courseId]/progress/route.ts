@@ -37,20 +37,6 @@ const progressSchema = z.object({
 
 const completionActions = new Set(["read", "watched", "completed", "quiz_passed", "assignment_submitted", "downloaded"]);
 
-function studySecondsByLesson(events: { lessonKey?: string; seconds?: number }[] = []) {
-  const totals = new Map<string, number>();
-
-  for (const event of events) {
-    const lessonKey = String(event.lessonKey ?? "");
-    const seconds = Math.max(0, Number(event.seconds ?? 0));
-
-    if (!lessonKey || !seconds) continue;
-    totals.set(lessonKey, (totals.get(lessonKey) ?? 0) + seconds);
-  }
-
-  return Object.fromEntries(totals.entries());
-}
-
 function previousModulesReady(
   structure: ReturnType<typeof buildCourseStructure>,
   moduleIndex: number,

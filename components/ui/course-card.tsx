@@ -1,12 +1,36 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { PriceDisplay } from "@/components/ui/price-display";
-import { RatingStars } from "@/components/ui/rating-stars";
 import { SafeImage } from "@/components/ui/safe-image";
+import { VerifiedMark } from "@/components/ui/verified-mark";
+import { isFreePrice } from "@/lib/currency";
 import { courseImageForCategory } from "@/lib/course-media";
 
-export function CourseCard({ course }: { course: { title: string; slug: string; level: string; category?: string; price: string; rating: number; image: string } }) {
+function accessLabel(course: { price: string; accessType?: string; pricingType?: string }) {
+  const explicit = course.accessType || course.pricingType;
+  if (explicit === "premium" || explicit === "subscription" || explicit === "manual") return "Premium";
+  if (explicit === "free" || isFreePrice(course.price)) return "Free";
+  return "Paid";
+}
+
+export function CourseCard({
+  course
+}: {
+  course: {
+    title: string;
+    slug: string;
+    level: string;
+    category?: string;
+    price: string;
+    rating: number;
+    image: string;
+    duration?: string;
+    instructor?: string;
+    instructorVerified?: boolean;
+    accessType?: string;
+    pricingType?: string;
+  };
+}) {
   return (
     <Link href={`/courses/${course.slug}`}>
       <Card className="h-full overflow-hidden transition-transform hover:-translate-y-1">
@@ -19,12 +43,24 @@ export function CourseCard({ course }: { course: { title: string; slug: string; 
             sizes="(min-width: 768px) 33vw, 100vw"
             className="object-cover"
           />
+          {course.duration ? (
+            <span className="absolute bottom-2 right-2 rounded bg-black/85 px-2 py-1 text-xs font-black text-white">
+              {course.duration}
+            </span>
+          ) : null}
         </div>
         <CardContent className="space-y-3 p-4">
-          <Badge>{course.level}</Badge>
-          <h3 className="text-lg font-semibold">{course.title}</h3>
-          <RatingStars value={course.rating} />
-          <PriceDisplay price={course.price} />
+          <h3 className="line-clamp-2 text-lg font-semibold">{course.title}</h3>
+          {course.instructor ? (
+            <p className="inline-flex max-w-full items-center gap-1 text-sm font-medium text-[hsl(var(--muted-foreground))]">
+              <span className="truncate">{course.instructor}</span>
+              {course.instructorVerified ? <VerifiedMark label="Verified instructor" className="size-3.5" /> : null}
+            </p>
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            <Badge>{accessLabel(course)}</Badge>
+            <Badge>{course.level}</Badge>
+          </div>
         </CardContent>
       </Card>
     </Link>

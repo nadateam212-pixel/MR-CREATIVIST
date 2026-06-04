@@ -1,7 +1,8 @@
 import Gig from "@/models/Gig";
 import { gigSchema } from "@/lib/mongo-validations";
-import { jsonError, jsonOk, mongoIdOrSlug, readJson, requireMongo, requireRole, uniqueSlugFor } from "@/lib/mongo-api";
+import { jsonError, jsonOk, mongoIdOrSlug, readJson, requireAuthenticated, requireMongo, submittedFields, uniqueSlugFor } from "@/lib/mongo-api";
 import { normalizeGig, slugify } from "@/lib/platform-db";
+import { syncFreelancerProfileFromGig } from "@/lib/freelancer-profile-sync";
 
 export async function GET(_: Request, context: { params: Promise<{ gigId: string }> }) {
   try {
@@ -22,7 +23,8 @@ export async function GET(_: Request, context: { params: Promise<{ gigId: string
 export async function PUT(request: Request, context: { params: Promise<{ gigId: string }> }) {
   try {
     await requireMongo();
-    const session = await requireRole(request, ["admin", "freelancer"]);
+    const session = await requireAuthenticated();
+    if (session.user.accountStatus === "suspended") return jsonOk({ error: "Account is suspended." }, 403);
     const { gigId } = await context.params;
     const existing = await Gig.findOne(mongoIdOrSlug(gigId));
 
@@ -32,7 +34,8 @@ export async function PUT(request: Request, context: { params: Promise<{ gigId: 
     const ownsGig = existing.ownerId && String(existing.ownerId) === String(session.user.id);
     if (!isAdmin && !ownsGig) return jsonOk({ error: "You can only manage gigs created by your Studio account." }, 403);
 
-    const body = gigSchema.partial().parse(await readJson(request));
+    const rawBody = await readJson(request);
+    const body = submittedFields(rawBody, gigSchema.partial().parse(rawBody)) as Partial<ReturnType<typeof gigSchema.parse>>;
     const patch: Record<string, unknown> = {
       ...body,
       ...(isAdmin ? {} : { status: body.status === "draft" ? "draft" : "published", isVerified: existing.isVerified })
@@ -44,6 +47,7 @@ export async function PUT(request: Request, context: { params: Promise<{ gigId: 
 
     const gig = await Gig.findByIdAndUpdate(existing._id, patch, { returnDocument: "after", runValidators: true })
       .populate("ownerId", "name email phone profileImage isVerified");
+    await syncFreelancerProfileFromGig(gig, session.user);
 
     return jsonOk(normalizeGig(gig));
   } catch (error) {
@@ -54,7 +58,8 @@ export async function PUT(request: Request, context: { params: Promise<{ gigId: 
 export async function DELETE(request: Request, context: { params: Promise<{ gigId: string }> }) {
   try {
     await requireMongo();
-    const session = await requireRole(request, ["admin", "freelancer"]);
+    const session = await requireAuthenticated();
+    if (session.user.accountStatus === "suspended") return jsonOk({ error: "Account is suspended." }, 403);
     const { gigId } = await context.params;
     const existing = await Gig.findOne(mongoIdOrSlug(gigId));
 

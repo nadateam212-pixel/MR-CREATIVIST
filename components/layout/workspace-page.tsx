@@ -39,32 +39,6 @@ function slugify(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "") || "workspace";
 }
 
-function buildInitialRecords(title: string, tags: string[]) {
-  const now = new Date();
-  return tags.slice(0, 5).map((tag, index) => {
-    const date = new Date(now);
-    date.setDate(now.getDate() - index);
-
-    return {
-      id: `${slugify(tag)}-${index}`,
-      name: `${tag} workflow`,
-      status: index === 0 ? "Needs review" : index === 1 ? "In progress" : "Ready",
-      updatedAt: date.toISOString()
-    };
-  }).concat(
-    tags.length
-      ? []
-      : [
-          {
-            id: `${slugify(title)}-default`,
-            name: `${title} workflow`,
-            status: "Needs review",
-            updatedAt: now.toISOString()
-          }
-        ]
-  );
-}
-
 function statusTone(status: string) {
   const normalized = status.toLowerCase();
   if (normalized.includes("ready") || normalized.includes("approved")) {
