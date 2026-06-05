@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Award,
@@ -8,17 +8,21 @@ import {
   CheckCircle2,
   Clock,
   Download,
+  Heart,
   Layers3,
+  MessageCircle,
   PlayCircle,
+  Share2,
   Star,
   Video
 } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SafeImage } from "@/components/ui/safe-image";
 import { VerifiedMark } from "@/components/ui/verified-mark";
-import { isFreePrice } from "@/lib/currency";
+import { accessBadgeClass, accessLabel, courseAccessType } from "@/lib/access-styles";
 import { courseImageForCategory, normalizeCourseImage, titleFromCourseSlug } from "@/lib/course-media";
 import { videoSourceForUrl } from "@/lib/video-sources";
 import { usePlatformStore } from "@/hooks/use-platform-store";
@@ -52,6 +56,9 @@ type CoursePreview = {
   pricingType?: string;
   accessType?: string;
   likes?: number;
+  shareCount?: number;
+  commentCount?: number;
+  replyCount?: number;
 };
 
 type CourseResourcePreview = {
@@ -100,6 +107,15 @@ type CurriculumModule = {
   }>;
 };
 
+type CourseEngagement = {
+  likes: number;
+  liked: boolean;
+  shareCount: number;
+  comments: number;
+  replies: number;
+  commentCount: number;
+};
+
 function fallbackCourseToPreview(slug: string): CoursePreview {
   const title = titleFromCourseSlug(slug);
 
@@ -139,11 +155,7 @@ function compactCount(value: number) {
   );
 }
 
-function embeddedPreviewClass(provider: string) {
-  if (provider === "youtube") return "absolute inset-x-0 -top-[14%] h-[128%] w-full border-0";
-  if (provider === "vimeo") return "absolute inset-x-0 -top-[10%] h-[120%] w-full border-0";
-  if (provider === "google-drive") return "absolute inset-x-0 -top-12 h-[calc(100%+6rem)] w-full border-0";
-
+function embeddedPreviewClass() {
   return "absolute inset-0 h-full w-full border-0";
 }
 
@@ -195,19 +207,6 @@ function formatLessonMinutes(minutes: number) {
   return rest ? `${hours}h ${rest}m` : `${hours}h`;
 }
 
-function courseAccessType(course: Pick<CoursePreview, "accessType" | "pricingType" | "price">) {
-  const explicit = course.accessType || course.pricingType;
-  if (explicit === "premium" || explicit === "subscription" || explicit === "manual") return "premium";
-  if (explicit === "free" || isFreePrice(course.price)) return "free";
-  return "paid";
-}
-
-function accessLabel(accessType: string) {
-  if (accessType === "premium") return "Premium";
-  if (accessType === "free") return "Free";
-  return "Paid";
-}
-
 function CoursePreviewPlayer({
   title,
   url,
@@ -230,35 +229,35 @@ function CoursePreviewPlayer({
         controls
         controlsList="nodownload noremoteplayback"
         disablePictureInPicture
-        className="h-full min-h-[28rem] w-full bg-black object-cover lg:min-h-[32rem]"
+        className="aspect-video w-full bg-black object-contain"
       />
     );
   }
 
   if (source.isIframe) {
     return (
-      <div className="relative h-full min-h-[28rem] w-full overflow-hidden bg-black lg:min-h-[32rem]">
+      <div className="relative aspect-video w-full overflow-hidden bg-black">
         <iframe
           src={source.embedUrl}
           title="Course preview video"
           allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
           allowFullScreen
           referrerPolicy="strict-origin-when-cross-origin"
-          className={embeddedPreviewClass(source.provider)}
+          className={embeddedPreviewClass()}
         />
       </div>
     );
   }
 
   return (
-    <div className="relative min-h-[28rem] lg:min-h-[32rem]">
+    <div className="relative aspect-video bg-black">
       <SafeImage
         src={poster}
         fallbackSrc={courseImageForCategory("Course")}
         alt={title}
         fill
         sizes="(min-width: 1024px) 45vw, 100vw"
-        className="object-cover"
+        className="object-contain"
         priority
       />
     </div>
@@ -346,23 +345,128 @@ export function CourseDetailExperience({
     ? "Continue learning"
     : freeCourse
       ? "Start free course"
-      : accessType === "premium"
-        ? "Start premium preview"
-        : "Start paid preview";
+      : "Start learning";
+  const commentHref = enrolled ? `/dashboard/learning/${course.slug}#comments` : `/courses/${course.slug}/preview#comments`;
+  const [engagement, setEngagement] = useState<CourseEngagement>({
+    likes: Number(course.likes ?? 0),
+    liked: false,
+    shareCount: Number(course.shareCount ?? 0),
+    comments: Math.max(0, Number(course.commentCount ?? 0) - Number(course.replyCount ?? 0)),
+    replies: Number(course.replyCount ?? 0),
+    commentCount: Number(course.commentCount ?? 0)
+  });
+  const [engagementLoading, setEngagementLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadEngagement() {
+      try {
+        const response = await fetch(`/api/courses/${encodeURIComponent(course.slug)}/engagement`, { cache: "no-store" });
+        const data = await response.json();
+        if (!response.ok || data.error) throw new Error(data.error ?? "Course engagement could not load.");
+        if (!cancelled) setEngagement(data);
+      } catch {
+        // Keep the initial course counts if the public engagement endpoint is temporarily unavailable.
+      }
+    }
+
+    void loadEngagement();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [course.slug]);
+
+  async function toggleCourseLike() {
+    let previous: CourseEngagement | null = null;
+    setEngagementLoading(true);
+    setEngagement((current) => {
+      previous = current;
+      const liked = !current.liked;
+      const likes = Math.max(0, Number(current.likes ?? 0) + (liked ? 1 : -1));
+
+      return { ...current, liked, likes };
+    });
+
+    try {
+      const response = await fetch(`/api/courses/${encodeURIComponent(course.slug)}/engagement`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "toggle_like" })
+      });
+      const data = await response.json();
+
+      if (!response.ok || data.error) throw new Error(data.error ?? "Like could not be saved.");
+      setEngagement(data);
+    } catch {
+      if (previous) setEngagement(previous);
+    } finally {
+      setEngagementLoading(false);
+    }
+  }
+
+  async function shareCourse() {
+    const href = typeof window === "undefined" ? `/courses/${course.slug}` : `${window.location.origin}/courses/${course.slug}`;
+    const nav: (Navigator & { share?: (data: ShareData) => Promise<void> }) | null =
+      typeof window === "undefined" ? null : window.navigator;
+
+    try {
+      if (nav?.share) {
+        await nav.share({ title: course.title, text: course.description, url: href });
+      } else if (nav?.clipboard) {
+        await nav.clipboard.writeText(href);
+        toast.success("Course link copied.");
+      }
+
+      const response = await fetch(`/api/courses/${encodeURIComponent(course.slug)}/engagement`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "share" })
+      });
+      const data = await response.json();
+      if (response.ok && !data.error) setEngagement(data);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      toast.error("Share could not be completed.");
+    }
+  }
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="space-y-5">
           <Card className="overflow-hidden">
-            <div className="min-h-[24rem] bg-black lg:min-h-[34rem]">
+            <div className="bg-black">
               <CoursePreviewPlayer title={course.title} url={previewVideoUrl} poster={course.image} />
+            </div>
+            <div className="flex flex-wrap items-center gap-2 border-b border-[hsl(var(--border))] bg-[hsl(var(--card))] p-3 sm:justify-end">
+              <Button
+                type="button"
+                size="sm"
+                variant={engagement.liked ? "default" : "outline"}
+                onClick={() => void toggleCourseLike()}
+                disabled={engagementLoading}
+              >
+                <Heart className={`size-4 ${engagement.liked ? "fill-current" : ""}`} />
+                {compactCount(engagement.likes)}
+              </Button>
+              <Button asChild size="sm" variant="outline">
+                <Link href={commentHref}>
+                  <MessageCircle className="size-4" />
+                  {compactCount(engagement.commentCount || engagement.comments + engagement.replies)} comments
+                </Link>
+              </Button>
+              <Button type="button" size="sm" variant="outline" onClick={() => void shareCourse()}>
+                <Share2 className="size-4" />
+                Share{engagement.shareCount ? ` ${compactCount(engagement.shareCount)}` : ""}
+              </Button>
             </div>
             <CardContent className="space-y-5 p-5 lg:p-6">
               <div className="flex flex-wrap gap-2">
                 <Badge>{course.category}</Badge>
                 <Badge>{course.level}</Badge>
-                <Badge className="border-[hsl(var(--primary))] text-[hsl(var(--primary))]">{accessText}</Badge>
+                <Badge className={accessBadgeClass(accessType)}>{accessText}</Badge>
                 {course.status ? <Badge>{course.status}</Badge> : null}
               </div>
 
@@ -380,11 +484,6 @@ export function CourseDetailExperience({
                       {learningLabel}
                     </Link>
                   </Button>
-                  {!freeCourse && !enrolled ? (
-                    <Button asChild variant="outline">
-                      <Link href={`/courses/${course.slug}/enroll`}>Enroll or pay</Link>
-                    </Button>
-                  ) : null}
                 </div>
               </div>
 

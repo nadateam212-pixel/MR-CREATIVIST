@@ -2,6 +2,7 @@ import BlogPost from "@/models/BlogPost";
 import { blogPostSchema } from "@/lib/mongo-validations";
 import { jsonError, jsonOk, mongoIdOrSlug, readJson, requireMongo, requireRole, uniqueSlugFor } from "@/lib/mongo-api";
 import { normalizeBlogPost, slugify } from "@/lib/platform-db";
+import { revalidatePublicContent } from "@/lib/public-revalidation";
 
 const blogPatchSchema = blogPostSchema.partial();
 
@@ -47,6 +48,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ postI
       returnDocument: "after",
       runValidators: true
     });
+    revalidatePublicContent("blog", existing.slug);
+    revalidatePublicContent("blog", post?.slug);
 
     return jsonOk(normalizeBlogPost(post));
   } catch (error) {
@@ -66,6 +69,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ post
     );
 
     if (!post) return jsonOk({ error: "Blog post not found." }, 404);
+    revalidatePublicContent("blog", post.slug);
 
     return jsonOk({ ok: true, item: normalizeBlogPost(post) });
   } catch (error) {

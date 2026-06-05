@@ -4,6 +4,7 @@ import { normalizeCourse, slugify } from "@/lib/platform-db";
 import { courseSchema } from "@/lib/mongo-validations";
 import { studioTrackId } from "@/lib/studio-identity";
 import { compileCoursePublicationPatch } from "@/lib/course-publication";
+import { revalidatePublicContent } from "@/lib/public-revalidation";
 
 export async function GET(request: Request) {
   try {
@@ -58,6 +59,7 @@ export async function POST(request: Request) {
       ...baseCourse,
       ...publicationPatch
     });
+    revalidatePublicContent("course", course.slug);
 
     return jsonOk(normalizeCourse(course), 201);
   } catch (error) {

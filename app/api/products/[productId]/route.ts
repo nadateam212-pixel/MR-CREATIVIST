@@ -2,6 +2,7 @@ import Product from "@/models/Product";
 import { jsonError, jsonOk, mongoIdOrSlug, readJson, requireMongo, requireRole, submittedFields, uniqueSlugFor } from "@/lib/mongo-api";
 import { normalizeProduct, slugify } from "@/lib/platform-db";
 import { productSchema } from "@/lib/mongo-validations";
+import { revalidatePublicContent } from "@/lib/public-revalidation";
 
 export async function GET(_: Request, context: { params: Promise<{ productId: string }> }) {
   try {
@@ -44,6 +45,8 @@ export async function PUT(request: Request, context: { params: Promise<{ product
 
     const product = await Product.findByIdAndUpdate(existing._id, patch, { returnDocument: "after", runValidators: true })
       .populate("sellerId", "name email phone profileImage isVerified");
+    revalidatePublicContent("product", existing.slug);
+    revalidatePublicContent("product", product?.slug);
 
     return jsonOk(normalizeProduct(product));
   } catch (error) {
@@ -66,11 +69,13 @@ export async function DELETE(request: Request, context: { params: Promise<{ prod
 
     if (isAdmin && new URL(request.url).searchParams.get("hard") === "1") {
       await Product.findByIdAndDelete(existing._id);
+      revalidatePublicContent("product", existing.slug);
       return jsonOk({ ok: true, deleted: true });
     }
 
     const product = await Product.findByIdAndUpdate(existing._id, { status: "archived" }, { returnDocument: "after" })
       .populate("sellerId", "name email phone profileImage isVerified");
+    revalidatePublicContent("product", existing.slug);
 
     return jsonOk({ ok: true, item: normalizeProduct(product) });
   } catch (error) {

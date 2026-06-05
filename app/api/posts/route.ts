@@ -2,6 +2,7 @@ import BlogPost from "@/models/BlogPost";
 import { blogPostSchema } from "@/lib/mongo-validations";
 import { jsonError, jsonOk, parsePagination, readJson, requireMongo, requireRole, uniqueSlugFor } from "@/lib/mongo-api";
 import { normalizeBlogPost, slugify } from "@/lib/platform-db";
+import { revalidatePublicContent } from "@/lib/public-revalidation";
 
 export async function GET(request: Request) {
   try {
@@ -50,6 +51,7 @@ export async function POST(request: Request) {
       authorName: session.user.name ?? "MR Creativist Admin",
       authorEmail: session.user.email ?? "admin@mrcreativist.com"
     });
+    revalidatePublicContent("blog", post.slug);
 
     return jsonOk(normalizeBlogPost(post), 201);
   } catch (error) {

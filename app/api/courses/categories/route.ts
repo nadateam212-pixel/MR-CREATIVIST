@@ -1,4 +1,5 @@
 import { apiError, apiOk } from "@/lib/api";
+import { courseCategories } from "@/lib/course-categories";
 import connectMongoDB from "@/lib/mongodb";
 import Course from "@/models/Course";
 
@@ -16,7 +17,7 @@ export async function GET() {
     const categories = await Course.distinct("category", { status: { $ne: "archived" } });
 
     return apiOk({
-      items: categories.sort().map((name) => ({
+      items: Array.from(new Set([...courseCategories, ...categories].filter(Boolean))).sort().map((name) => ({
         id: slugify(name),
         name,
         slug: slugify(name),

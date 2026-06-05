@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { PriceDisplay } from "@/components/ui/price-display";
+import { courseCategories } from "@/lib/course-categories";
 import { normalizedExternalVideoUrl } from "@/lib/video-sources";
 import { buildStudioCoursePayload } from "@/lib/course-studio-sync";
 import { usePlatformStore } from "@/hooks/use-platform-store";
@@ -359,7 +360,11 @@ export function CourseStudioTools({
               </label>
               <label className="grid gap-2 text-sm font-semibold">
                 Category
-                <Input value={editForm.category} onChange={(event) => setEditForm((current) => ({ ...current, category: event.target.value }))} />
+                <select value={editForm.category} onChange={(event) => setEditForm((current) => ({ ...current, category: event.target.value }))} className="h-10 rounded-md border border-[hsl(var(--border))] bg-transparent px-3">
+                  {Array.from(new Set([editForm.category, ...courseCategories].filter(Boolean))).map((category) => (
+                    <option key={category}>{category}</option>
+                  ))}
+                </select>
               </label>
               <label className="grid gap-2 text-sm font-semibold">
                 Level

@@ -2,6 +2,7 @@ import Gig from "@/models/Gig";
 import { gigSchema } from "@/lib/mongo-validations";
 import { jsonError, jsonOk, mongoIdOrSlug, readJson, requireAuthenticated, requireMongo, submittedFields, uniqueSlugFor } from "@/lib/mongo-api";
 import { normalizeGig, slugify } from "@/lib/platform-db";
+import { revalidatePublicContent } from "@/lib/public-revalidation";
 import { syncFreelancerProfileFromGig } from "@/lib/freelancer-profile-sync";
 
 export async function GET(_: Request, context: { params: Promise<{ gigId: string }> }) {
@@ -48,6 +49,8 @@ export async function PUT(request: Request, context: { params: Promise<{ gigId: 
     const gig = await Gig.findByIdAndUpdate(existing._id, patch, { returnDocument: "after", runValidators: true })
       .populate("ownerId", "name email phone profileImage isVerified");
     await syncFreelancerProfileFromGig(gig, session.user);
+    revalidatePublicContent("gig", existing.slug);
+    revalidatePublicContent("gig", gig?.slug);
 
     return jsonOk(normalizeGig(gig));
   } catch (error) {
@@ -71,11 +74,13 @@ export async function DELETE(request: Request, context: { params: Promise<{ gigI
 
     if (isAdmin && new URL(request.url).searchParams.get("hard") === "1") {
       await Gig.findByIdAndDelete(existing._id);
+      revalidatePublicContent("gig", existing.slug);
       return jsonOk({ ok: true, deleted: true });
     }
 
     const gig = await Gig.findByIdAndUpdate(existing._id, { status: "archived" }, { returnDocument: "after" })
       .populate("ownerId", "name email phone profileImage isVerified");
+    revalidatePublicContent("gig", existing.slug);
 
     return jsonOk({ ok: true, item: normalizeGig(gig) });
   } catch (error) {

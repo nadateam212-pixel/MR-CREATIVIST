@@ -26,6 +26,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { courseCategories } from "@/lib/course-categories";
 import { googleDriveFileIdFromUrl, normalizedExternalVideoUrl } from "@/lib/video-sources";
 import { cn } from "@/lib/utils";
 
@@ -558,7 +559,7 @@ export function EasyCoursePublisher({ instructorName = "MR Creativist Instructor
                 <label className="grid gap-2">
                   <FieldLabel required>Category</FieldLabel>
                   <select value={basic.category} onChange={(event) => updateBasic("category", event.target.value)} className="h-10 rounded-md border border-[hsl(var(--border))] bg-transparent px-3">
-                    {["AI and Education", "Coding", "Video Editing", "Marketing", "Business", "Design", "Freelancing"].map((item) => (
+                    {courseCategories.map((item) => (
                       <option key={item}>{item}</option>
                     ))}
                   </select>

@@ -2,6 +2,7 @@ import Gig from "@/models/Gig";
 import { gigSchema } from "@/lib/mongo-validations";
 import { jsonError, jsonOk, parsePagination, readJson, requireAuthenticated, requireMongo, uniqueSlugFor } from "@/lib/mongo-api";
 import { normalizeGig, slugify } from "@/lib/platform-db";
+import { revalidatePublicContent } from "@/lib/public-revalidation";
 import { studioTrackId } from "@/lib/studio-identity";
 import { syncFreelancerProfileFromGig } from "@/lib/freelancer-profile-sync";
 
@@ -60,6 +61,7 @@ export async function POST(request: Request) {
       isVerified: isAdmin ? body.isVerified : false
     });
     await syncFreelancerProfileFromGig(gig, session.user);
+    revalidatePublicContent("gig", gig.slug);
 
     return jsonOk(normalizeGig(gig), 201);
   } catch (error) {

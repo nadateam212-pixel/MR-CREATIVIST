@@ -2,6 +2,7 @@ import JobPost from "@/models/JobPost";
 import { jobPostSchema } from "@/lib/mongo-validations";
 import { jsonError, jsonOk, parsePagination, readJson, requireMongo, requireRole, uniqueSlugFor } from "@/lib/mongo-api";
 import { normalizeJobPost, slugify } from "@/lib/platform-db";
+import { revalidatePublicContent } from "@/lib/public-revalidation";
 
 export async function GET(request: Request) {
   try {
@@ -44,6 +45,7 @@ export async function POST(request: Request) {
       postedById: session.user.id,
       postedByName: session.user.name ?? session.user.email
     });
+    revalidatePublicContent("job", job.slug);
 
     return jsonOk(normalizeJobPost(job), 201);
   } catch (error) {

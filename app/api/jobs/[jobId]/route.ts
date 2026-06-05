@@ -2,6 +2,7 @@ import JobPost from "@/models/JobPost";
 import { jobPostSchema } from "@/lib/mongo-validations";
 import { jsonError, jsonOk, mongoIdOrSlug, readJson, requireMongo, requireRole, uniqueSlugFor } from "@/lib/mongo-api";
 import { normalizeJobPost, slugify } from "@/lib/platform-db";
+import { revalidatePublicContent } from "@/lib/public-revalidation";
 
 const jobPatchSchema = jobPostSchema.partial();
 
@@ -39,6 +40,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ jobId
       returnDocument: "after",
       runValidators: true
     });
+    revalidatePublicContent("job", existing.slug);
+    revalidatePublicContent("job", job?.slug);
 
     return jsonOk(normalizeJobPost(job));
   } catch (error) {
@@ -54,6 +57,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ jobI
     const job = await JobPost.findOneAndUpdate(mongoIdOrSlug(jobId), { status: "archived" }, { returnDocument: "after" });
 
     if (!job) return jsonOk({ error: "Job not found." }, 404);
+    revalidatePublicContent("job", job.slug);
 
     return jsonOk({ ok: true, item: normalizeJobPost(job) });
   } catch (error) {

@@ -1,23 +1,27 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Award,
   BookOpen,
   CheckCircle2,
   ClipboardCheck,
+  CornerDownRight,
   CreditCard,
   Download,
   FileText,
   GraduationCap,
+  Heart,
   Image as ImageIcon,
   Lock,
+  MessageCircle,
   Pause,
   Play,
   QrCode,
   RotateCcw,
   Send,
+  Share2,
   Sparkles,
   SkipBack,
   SkipForward,
@@ -87,6 +91,10 @@ type CourseStructure = {
   certificate: string;
   pricingType?: string;
   accessType?: string;
+  likes?: number;
+  shareCount?: number;
+  commentCount?: number;
+  replyCount?: number;
   image?: string;
   outcomes: string[];
   tools: string[];
@@ -151,12 +159,26 @@ type QuizResult = {
 
 type CommunityMessage = {
   id: string;
+  parentId?: string | null;
   senderId: string;
   senderName: string;
   senderRole?: string;
   content: string;
+  likes?: number;
+  liked?: boolean;
+  replies?: CommunityMessage[];
+  replyCount?: number;
   isInstructor?: boolean;
   createdAt?: string;
+};
+
+type CourseEngagement = {
+  likes: number;
+  liked: boolean;
+  shareCount: number;
+  comments: number;
+  replies: number;
+  commentCount: number;
 };
 
 function embeddedVideoClass() {
@@ -187,6 +209,45 @@ function formatStudyTime(seconds: number) {
 
   if (hours > 0) return rest ? `${hours}h ${rest}m` : `${hours}h`;
   return `${minutes}m`;
+}
+
+function compactCount(value: number) {
+  return new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(Math.max(0, value));
+}
+
+function communityTotal(items: CommunityMessage[]) {
+  return items.reduce((total, item) => total + 1 + (item.replies?.length ?? 0), 0);
+}
+
+function updateCommunityLike(items: CommunityMessage[], messageId: string, liked: boolean, likes: number): CommunityMessage[] {
+  return items.map((item) => {
+    if (item.id === messageId) return { ...item, liked, likes };
+
+    return {
+      ...item,
+      replies: item.replies?.length ? updateCommunityLike(item.replies, messageId, liked, likes) : item.replies
+    };
+  });
+}
+
+function findCommunityMessage(items: CommunityMessage[], messageId: string): CommunityMessage | null {
+  for (const item of items) {
+    if (item.id === messageId) return item;
+    const reply = item.replies?.find((replyItem) => replyItem.id === messageId);
+    if (reply) return reply;
+  }
+
+  return null;
+}
+
+function optimisticCommunityLike(items: CommunityMessage[], messageId: string) {
+  const target = findCommunityMessage(items, messageId);
+  if (!target) return items;
+
+  const liked = !Boolean(target.liked);
+  const likes = Math.max(0, Number(target.likes ?? 0) + (liked ? 1 : -1));
+
+  return updateCommunityLike(items, messageId, liked, likes);
 }
 
 function lessonIcon(type: string) {
@@ -275,11 +336,26 @@ export function CourseLearningWorkspace({
   const [activeStudySeconds, setActiveStudySeconds] = useState(0);
   const [communityMessages, setCommunityMessages] = useState<CommunityMessage[]>([]);
   const [communityDraft, setCommunityDraft] = useState("");
+  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
+  const [replyingTo, setReplyingTo] = useState("");
   const [communityLoading, setCommunityLoading] = useState(false);
   const [communityError, setCommunityError] = useState("");
+  const [communityActionKey, setCommunityActionKey] = useState("");
+  const [engagement, setEngagement] = useState<CourseEngagement>({
+    likes: Number(course.likes ?? 0),
+    liked: false,
+    shareCount: Number(course.shareCount ?? 0),
+    comments: Math.max(0, Number(course.commentCount ?? 0) - Number(course.replyCount ?? 0)),
+    replies: Number(course.replyCount ?? 0),
+    commentCount: Number(course.commentCount ?? 0)
+  });
+  const [engagementLoading, setEngagementLoading] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const vimeoRef = useRef<HTMLIFrameElement | null>(null);
   const youtubeRef = useRef<HTMLIFrameElement | null>(null);
+  const commentsSectionRef = useRef<HTMLDivElement | null>(null);
+  const communityInputRef = useRef<HTMLTextAreaElement | null>(null);
   const studyDeltaRef = useRef(0);
   const [mediaPlaying, setMediaPlaying] = useState(false);
   const [mediaSeconds, setMediaSeconds] = useState(0);
@@ -296,7 +372,6 @@ export function CourseLearningWorkspace({
         : "paid");
   const previewGateActive = !enrolled && accessType !== "free";
   const previewBlocked = previewGateActive && previewElapsedSeconds >= previewSecondsLimit;
-  const previewRemainingSeconds = Math.max(0, previewSecondsLimit - previewElapsedSeconds);
 
   const completedSet = useMemo(() => new Set(completedLessonKeys), [completedLessonKeys]);
   const completedPercent = course.totalLessons
@@ -343,6 +418,22 @@ export function CourseLearningWorkspace({
     },
     [activeLesson?.key, activeLesson?.type, activeLesson?.videoUrl, vimeoNonce]
   );
+  const stopMedia = useCallback(() => {
+    videoRef.current?.pause();
+    if (activeVideoSource.provider === "youtube") {
+      youtubeRef.current?.contentWindow?.postMessage(
+        JSON.stringify({ event: "command", func: "pauseVideo", args: [] }),
+        "https://www.youtube-nocookie.com"
+      );
+    } else if (activeVideoSource.provider === "vimeo") {
+      vimeoRef.current?.contentWindow?.postMessage(
+        JSON.stringify({ method: "pause" }),
+        "https://player.vimeo.com"
+      );
+    } else if (iframeRef.current && activeVideoSource.embedUrl) {
+      iframeRef.current.src = activeVideoSource.embedUrl;
+    }
+  }, [activeVideoSource.embedUrl, activeVideoSource.provider]);
 
   useEffect(() => {
     if (!previewGateActive || previewBlocked) return undefined;
@@ -357,10 +448,10 @@ export function CourseLearningWorkspace({
 
   useEffect(() => {
     if (!previewBlocked) return;
-    videoRef.current?.pause();
+    stopMedia();
     const timer = window.setTimeout(() => setMediaPlaying(false), 0);
     return () => window.clearTimeout(timer);
-  }, [previewBlocked]);
+  }, [previewBlocked, stopMedia]);
 
   function moduleComplete(moduleKey: string, completed = completedSet) {
     const courseModule = course.modules.find((item) => item.key === moduleKey);
@@ -885,8 +976,24 @@ export function CourseLearningWorkspace({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allComplete, certificate, savingKey]);
 
-  async function loadCommunity() {
-    setCommunityLoading(true);
+  async function loadEngagement() {
+    try {
+      const response = await fetch(`/api/courses/${encodeURIComponent(course.slug)}/engagement`, { cache: "no-store" });
+      const data = await response.json();
+
+      if (!response.ok || data.error) throw new Error(data.error ?? "Course engagement could not load.");
+      setEngagement(data);
+    } catch {
+      setEngagement((current) => ({
+        ...current,
+        likes: Number(course.likes ?? current.likes),
+        shareCount: Number(course.shareCount ?? current.shareCount)
+      }));
+    }
+  }
+
+  async function loadCommunity(options: { silent?: boolean } = {}) {
+    if (!options.silent) setCommunityLoading(true);
     setCommunityError("");
 
     try {
@@ -898,13 +1005,77 @@ export function CourseLearningWorkspace({
     } catch (error) {
       setCommunityError(error instanceof Error ? error.message : "Community could not load.");
     } finally {
-      setCommunityLoading(false);
+      if (!options.silent) setCommunityLoading(false);
     }
   }
 
-  async function sendCommunityMessage() {
-    if (!communityDraft.trim()) return;
+  function focusCommunityComposer() {
+    commentsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => communityInputRef.current?.focus(), 300);
+  }
 
+  async function toggleCourseLike() {
+    let previous: CourseEngagement | null = null;
+    setEngagementLoading(true);
+    setEngagement((current) => {
+      previous = current;
+      const liked = !current.liked;
+      const likes = Math.max(0, Number(current.likes ?? 0) + (liked ? 1 : -1));
+
+      return { ...current, liked, likes };
+    });
+
+    try {
+      const response = await fetch(`/api/courses/${encodeURIComponent(course.slug)}/engagement`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "toggle_like" })
+      });
+      const data = await response.json();
+
+      if (!response.ok || data.error) throw new Error(data.error ?? "Like could not be saved.");
+      setEngagement(data);
+    } catch {
+      if (previous) setEngagement(previous);
+    } finally {
+      setEngagementLoading(false);
+    }
+  }
+
+  async function shareCourse() {
+    const href =
+      typeof window === "undefined"
+        ? `/courses/${course.slug}`
+        : `${window.location.origin}/courses/${course.slug}`;
+    const nav: (Navigator & { share?: (data: ShareData) => Promise<void> }) | null =
+      typeof window === "undefined" ? null : window.navigator;
+
+    try {
+      if (nav?.share) {
+        await nav.share({ title: course.title, text: course.shortDescription, url: href });
+      } else if (nav?.clipboard) {
+        await nav.clipboard.writeText(href);
+        toast.success("Course link copied.");
+      }
+
+      const response = await fetch(`/api/courses/${encodeURIComponent(course.slug)}/engagement`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "share" })
+      });
+      const data = await response.json();
+      if (response.ok && !data.error) setEngagement(data);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      toast.error("Share could not be completed.");
+    }
+  }
+
+  async function sendCommunityMessage(parentId?: string) {
+    const content = parentId ? replyDrafts[parentId]?.trim() : communityDraft.trim();
+    if (!content) return;
+
+    setCommunityActionKey(parentId ? `reply:${parentId}` : "comment");
     setCommunityLoading(true);
     setCommunityError("");
 
@@ -912,30 +1083,68 @@ export function CourseLearningWorkspace({
       const response = await fetch(`/api/courses/${encodeURIComponent(course.slug)}/community`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: communityDraft.trim() })
+        body: JSON.stringify({ content, parentId })
       });
       const data = await response.json();
 
       if (!response.ok || data.error) throw new Error(data.error ?? "Message could not be sent.");
 
-      setCommunityMessages((current) => [...current, data]);
-      setCommunityDraft("");
-      toast.success("Community message sent.");
+      if (parentId) {
+        setReplyDrafts((current) => {
+          const next = { ...current };
+          delete next[parentId];
+          return next;
+        });
+        setReplyingTo("");
+        toast.success("Reply posted.");
+      } else {
+        setCommunityDraft("");
+        toast.success("Comment posted.");
+      }
+      await Promise.all([loadCommunity({ silent: true }), loadEngagement()]);
     } catch (error) {
       const nextMessage = error instanceof Error ? error.message : "Message could not be sent.";
       setCommunityError(nextMessage);
       toast.error(nextMessage);
     } finally {
       setCommunityLoading(false);
+      setCommunityActionKey("");
+    }
+  }
+
+  async function toggleCommunityLike(messageId: string) {
+    let previous: CommunityMessage[] | null = null;
+    setCommunityActionKey(`like:${messageId}`);
+    setCommunityMessages((current) => {
+      previous = current;
+      return optimisticCommunityLike(current, messageId);
+    });
+
+    try {
+      const response = await fetch(`/api/courses/${encodeURIComponent(course.slug)}/community`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "toggle_like", messageId })
+      });
+      const data = await response.json();
+
+      if (!response.ok || data.error) throw new Error(data.error ?? "Comment like could not be saved.");
+      setCommunityMessages((current) => updateCommunityLike(current, data.id, data.liked, data.likes));
+    } catch {
+      if (previous) setCommunityMessages(previous);
+    } finally {
+      setCommunityActionKey("");
     }
   }
 
   useEffect(() => {
     const initialLoad = window.setTimeout(() => {
       void loadCommunity();
+      void loadEngagement();
     }, 0);
     const timer = window.setInterval(() => {
-      void loadCommunity();
+      void loadCommunity({ silent: true });
+      void loadEngagement();
     }, 30000);
 
     return () => {
@@ -964,27 +1173,7 @@ export function CourseLearningWorkspace({
   }
 
   return (
-    <div className="space-y-6">
-      {previewGateActive ? (
-        <div className="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 text-sm">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="font-semibold">{accessType === "premium" ? "Premium preview" : "Paid course preview"}</p>
-              <p className="mt-1 text-[hsl(var(--muted-foreground))]">
-                {previewBlocked
-                  ? "Preview ended. Enroll or pay to continue the player, resources, quizzes, and certificates."
-                  : `${formatClock(previewRemainingSeconds)} preview remaining before enrollment is required.`}
-              </p>
-            </div>
-            <Button asChild>
-              <Link href={`/courses/${course.slug}/enroll`}>
-                <CreditCard className="size-4" />
-                {accessType === "premium" ? "Join premium" : "Enroll or pay"}
-              </Link>
-            </Button>
-          </div>
-        </div>
-      ) : null}
+    <div className="space-y-4">
       {previewBlocked ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/55 p-4 backdrop-blur-sm">
           <Card className="w-full max-w-md">
@@ -1002,7 +1191,7 @@ export function CourseLearningWorkspace({
                 <Button asChild>
                   <Link href={`/courses/${course.slug}/enroll`}>
                     <CreditCard className="size-4" />
-                    {accessType === "premium" ? "Join premium" : "Enroll / pay"}
+                    Enroll or pay
                   </Link>
                 </Button>
                 <Button asChild variant="outline">
@@ -1013,9 +1202,9 @@ export function CourseLearningWorkspace({
           </Card>
         </div>
       ) : null}
-      <section className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 shadow-sm">
-        <div className="grid gap-4 lg:grid-cols-[1fr_18rem] lg:items-center">
-          <div>
+      <section className="hidden">
+        <div className="w-full max-w-xs">
+          <div className="hidden">
             <div className="flex flex-wrap gap-2">
               <Badge>{course.category}</Badge>
               <Badge>{course.level}</Badge>
@@ -1028,7 +1217,7 @@ export function CourseLearningWorkspace({
               {course.instructor} · {certificate ? "Certificate issued" : allComplete ? "Ready for certificate" : "Certificate unlocks after completion"}
             </p>
           </div>
-          <div className="rounded-md border border-[hsl(var(--border))] p-3">
+          <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 shadow-sm">
             <div className="flex items-center justify-between gap-3">
               <span className="text-sm font-semibold">Progress</span>
               <span className="text-2xl font-black text-[hsl(var(--primary))]">{progressPercent}%</span>
@@ -1041,7 +1230,7 @@ export function CourseLearningWorkspace({
           </div>
         </div>
         {certificate ? (
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="hidden">
             <Button asChild variant="outline" size="sm">
               <Link href={certificatePdfUrl(certificate, course, learnerName)} target="_blank">
                 <Award className="size-4" />
@@ -1056,10 +1245,10 @@ export function CourseLearningWorkspace({
             </Button>
           </div>
         ) : null}
-        {message ? <p className="mt-3 text-sm text-[hsl(var(--muted-foreground))]">{message}</p> : null}
+        {message ? <p className="max-w-xs text-sm text-[hsl(var(--muted-foreground))]">{message}</p> : null}
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[20rem_minmax(0,1fr)_18rem]">
+      <section className="grid gap-5 xl:grid-cols-[17rem_minmax(0,1fr)_17rem] 2xl:grid-cols-[18rem_minmax(0,1fr)_18rem]">
         <Card>
           <CardHeader>
             <CardTitle>Chapters</CardTitle>
@@ -1151,7 +1340,7 @@ export function CourseLearningWorkspace({
             </div>
           </CardHeader>
           <CardContent className="space-y-5">
-            <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] p-5">
+            <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] p-3 sm:p-4">
               {activeLesson.type === "video" ? (
                 <div className="space-y-4">
                   {activeVideoSource.provider === "direct" ? (
@@ -1161,23 +1350,21 @@ export function CourseLearningWorkspace({
                       controls
                       controlsList="nodownload noremoteplayback"
                       disablePictureInPicture
-                      className="aspect-video min-h-[18rem] w-full rounded-md bg-black object-contain lg:min-h-[32rem]"
+                      className="aspect-video w-full rounded-md bg-black object-contain"
                       onPlay={() => void persistLesson(activeLesson, "played", { complete: false })}
                       onPause={() => setMediaPlaying(false)}
                       onTimeUpdate={(event) => setMediaSeconds(event.currentTarget.currentTime)}
                       onEnded={() => void completeActive("watched")}
                     />
                   ) : activeVideoSource.isIframe ? (
-                    <div className="relative aspect-video min-h-[18rem] w-full overflow-hidden rounded-md border border-[hsl(var(--border))] bg-black lg:min-h-[32rem]">
+                    <div className="relative aspect-video w-full overflow-hidden rounded-md border border-[hsl(var(--border))] bg-black">
                       <iframe
                         key={activeVideoSource.embedUrl}
-                        ref={
-                          activeVideoSource.provider === "vimeo"
-                            ? vimeoRef
-                            : activeVideoSource.provider === "youtube"
-                              ? youtubeRef
-                              : undefined
-                        }
+                        ref={(node) => {
+                          iframeRef.current = node;
+                          if (activeVideoSource.provider === "vimeo") vimeoRef.current = node;
+                          if (activeVideoSource.provider === "youtube") youtubeRef.current = node;
+                        }}
                         src={activeVideoSource.embedUrl}
                         title="Course video player"
                         allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
@@ -1187,7 +1374,7 @@ export function CourseLearningWorkspace({
                       />
                     </div>
                   ) : (
-                    <div className="flex aspect-video min-h-[18rem] flex-col items-center justify-center rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--muted))] p-6 text-center lg:min-h-[32rem]">
+                    <div className="flex aspect-video flex-col items-center justify-center rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--muted))] p-6 text-center">
                       <Play className="mb-4 size-10 text-[hsl(var(--primary))]" />
                       <h2 className="text-lg font-semibold">Video lesson</h2>
                       <p className="mt-2 max-w-lg text-sm text-[hsl(var(--muted-foreground))]">
@@ -1195,6 +1382,29 @@ export function CourseLearningWorkspace({
                       </p>
                     </div>
                   )}
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-3">
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={engagement.liked ? "default" : "outline"}
+                        onClick={() => void toggleCourseLike()}
+                        disabled={engagementLoading}
+                      >
+                        <Heart className={`size-4 ${engagement.liked ? "fill-current" : ""}`} />
+                        {compactCount(engagement.likes)}
+                      </Button>
+                      <Button type="button" size="sm" variant="outline" onClick={focusCommunityComposer}>
+                        <MessageCircle className="size-4" />
+                        {compactCount(communityTotal(communityMessages) || engagement.commentCount || engagement.comments + engagement.replies)} comments
+                      </Button>
+                      <Button type="button" size="sm" variant="outline" onClick={() => void shareCourse()}>
+                        <Share2 className="size-4" />
+                        Share{engagement.shareCount ? ` ${compactCount(engagement.shareCount)}` : ""}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-[hsl(var(--muted-foreground))]">Like, share, or ask below the lesson.</p>
+                  </div>
                   <div className="grid gap-2 rounded-md border border-[hsl(var(--border))] p-3 sm:grid-cols-[auto_1fr_auto] sm:items-center">
                     <div className="flex flex-wrap gap-2">
                       <Button size="sm" variant="outline" onClick={() => previousLesson && void openLesson(previousLesson)} disabled={!previousLesson}>
@@ -1449,6 +1659,147 @@ export function CourseLearningWorkspace({
               ) : null}
             </div>
 
+            <div
+              id="comments"
+              ref={commentsSectionRef}
+              className="scroll-mt-24 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <span className="grid size-10 shrink-0 place-items-center rounded-md bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))]">
+                    <Users className="size-5" />
+                  </span>
+                  <div>
+                    <h2 className="text-lg font-semibold">Course discussion</h2>
+                    <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
+                      Ask questions, reply to learners, and keep notes connected to this course.
+                    </p>
+                  </div>
+                </div>
+                <Badge>{compactCount(communityTotal(communityMessages) || engagement.commentCount || engagement.comments + engagement.replies)} comments</Badge>
+              </div>
+
+              <div className="mt-4 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] p-3">
+                <textarea
+                  ref={communityInputRef}
+                  value={communityDraft}
+                  onChange={(event) => setCommunityDraft(event.target.value)}
+                  placeholder="Ask a question or share what you learned..."
+                  className="min-h-24 w-full resize-y rounded-md border border-[hsl(var(--border))] bg-transparent p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
+                />
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-xs text-[hsl(var(--muted-foreground))]">Be clear, helpful, and respectful to the course community.</p>
+                  <Button
+                    onClick={() => void sendCommunityMessage()}
+                    disabled={communityLoading || !communityDraft.trim() || communityActionKey === "comment"}
+                  >
+                    <Send className="size-4" />
+                    {communityActionKey === "comment" ? "Posting..." : "Post comment"}
+                  </Button>
+                </div>
+              </div>
+
+              {communityError ? <p className="mt-3 text-sm text-[hsl(var(--destructive))]">{communityError}</p> : null}
+
+              <div className="mt-4 space-y-3">
+                {communityLoading && communityMessages.length === 0 ? (
+                  <p className="rounded-md border border-[hsl(var(--border))] p-4 text-sm text-[hsl(var(--muted-foreground))]">
+                    Loading discussion...
+                  </p>
+                ) : null}
+                {communityMessages.map((item) => (
+                  <div key={item.id} className="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="font-semibold">{item.senderName}</p>
+                        <p className="text-xs text-[hsl(var(--muted-foreground))]">
+                          {item.createdAt ? new Date(item.createdAt).toLocaleString() : "Just now"}
+                        </p>
+                      </div>
+                      {item.isInstructor ? <Badge>Instructor</Badge> : null}
+                    </div>
+                    <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-[hsl(var(--muted-foreground))]">{item.content}</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={item.liked ? "default" : "outline"}
+                        onClick={() => void toggleCommunityLike(item.id)}
+                        disabled={communityActionKey === `like:${item.id}`}
+                      >
+                        <Heart className={`size-4 ${item.liked ? "fill-current" : ""}`} />
+                        {compactCount(item.likes ?? 0)}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setReplyingTo((current) => (current === item.id ? "" : item.id))}
+                      >
+                        <CornerDownRight className="size-4" />
+                        Reply
+                      </Button>
+                    </div>
+
+                    {replyingTo === item.id ? (
+                      <div className="mt-3 rounded-md border border-[hsl(var(--border))] p-3">
+                        <textarea
+                          value={replyDrafts[item.id] ?? ""}
+                          onChange={(event) => setReplyDrafts((current) => ({ ...current, [item.id]: event.target.value }))}
+                          placeholder={`Reply to ${item.senderName}...`}
+                          className="min-h-20 w-full resize-y rounded-md border border-[hsl(var(--border))] bg-transparent p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
+                        />
+                        <div className="mt-3 flex justify-end gap-2">
+                          <Button type="button" size="sm" variant="outline" onClick={() => setReplyingTo("")}>
+                            Cancel
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => void sendCommunityMessage(item.id)}
+                            disabled={communityLoading || !replyDrafts[item.id]?.trim() || communityActionKey === `reply:${item.id}`}
+                          >
+                            <Send className="size-4" />
+                            {communityActionKey === `reply:${item.id}` ? "Replying..." : "Reply"}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {item.replies?.length ? (
+                      <div className="mt-4 space-y-2 border-l border-[hsl(var(--border))] pl-3">
+                        {item.replies.map((reply) => (
+                          <div key={reply.id} className="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <p className="text-sm font-semibold">{reply.senderName}</p>
+                              {reply.isInstructor ? <Badge>Instructor</Badge> : null}
+                            </div>
+                            <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[hsl(var(--muted-foreground))]">{reply.content}</p>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant={reply.liked ? "default" : "outline"}
+                              className="mt-2"
+                              onClick={() => void toggleCommunityLike(reply.id)}
+                              disabled={communityActionKey === `like:${reply.id}`}
+                            >
+                              <Heart className={`size-4 ${reply.liked ? "fill-current" : ""}`} />
+                              {compactCount(reply.likes ?? 0)}
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+                {!communityLoading && communityMessages.length === 0 ? (
+                  <p className="rounded-md border border-dashed border-[hsl(var(--border))] p-4 text-sm text-[hsl(var(--muted-foreground))]">
+                    No comments yet. Start the discussion with a question, note, or useful lesson takeaway.
+                  </p>
+                ) : null}
+              </div>
+            </div>
+
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-sm text-[hsl(var(--muted-foreground))]">
                 {completedSet.has(activeLesson.key) ? "Completed" : "In progress"} - {activeLesson.moduleTitle} -{" "}
@@ -1478,6 +1829,43 @@ export function CourseLearningWorkspace({
         </Card>
 
         <div className="grid gap-5 xl:sticky xl:top-24 xl:self-start">
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between gap-3">
+                <CardTitle className="text-base">Progress</CardTitle>
+                <span className="text-2xl font-black text-[hsl(var(--primary))]">{progressPercent}%</span>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Progress value={progressPercent} />
+              <Button
+                className="w-full"
+                onClick={() => void generateCertificate({ openPdf: true })}
+                disabled={!allComplete || savingKey === "certificate"}
+              >
+                <QrCode className="size-4" />
+                {savingKey === "certificate" ? "Generating..." : certificate ? "Open certificate" : "Generate certificate"}
+              </Button>
+              {certificate ? (
+                <div className="grid gap-2">
+                  <Button asChild variant="outline" size="sm">
+                    <Link href={certificatePdfUrl(certificate, course, learnerName)} target="_blank">
+                      <Award className="size-4" />
+                      View PDF
+                    </Link>
+                  </Button>
+                  <Button asChild variant="outline" size="sm">
+                    <Link href={certificatePdfUrl(certificate, course, learnerName, true)}>
+                      <Download className="size-4" />
+                      Download PDF
+                    </Link>
+                  </Button>
+                </div>
+              ) : null}
+              {message ? <p className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">{message}</p> : null}
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>Up next</CardTitle>
@@ -1535,45 +1923,6 @@ export function CourseLearningWorkspace({
               {!(activeLesson.resources?.length || course.resources?.length) ? (
                 <p className="text-sm text-[hsl(var(--muted-foreground))]">No downloads are attached to this lesson yet.</p>
               ) : null}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <Users className="size-5 text-[hsl(var(--primary))]" />
-                <CardTitle>Comments</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="max-h-48 space-y-2 overflow-y-auto rounded-md border border-[hsl(var(--border))] p-3">
-                {communityLoading && communityMessages.length === 0 ? (
-                  <p className="text-sm text-[hsl(var(--muted-foreground))]">Loading comments...</p>
-                ) : null}
-                {communityMessages.slice(-3).map((item) => (
-                  <div key={item.id} className="rounded-md border border-[hsl(var(--border))] p-3 text-sm">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="font-semibold">{item.senderName}</p>
-                      {item.isInstructor ? <Badge>Instructor</Badge> : null}
-                    </div>
-                    <p className="mt-2 line-clamp-3 whitespace-pre-wrap leading-6 text-[hsl(var(--muted-foreground))]">{item.content}</p>
-                  </div>
-                ))}
-                {!communityLoading && communityMessages.length === 0 ? (
-                  <p className="text-sm text-[hsl(var(--muted-foreground))]">Ask a question or leave a note for this course.</p>
-                ) : null}
-              </div>
-              <textarea
-                value={communityDraft}
-                onChange={(event) => setCommunityDraft(event.target.value)}
-                placeholder="Ask the course community..."
-                className="min-h-20 w-full rounded-md border border-[hsl(var(--border))] bg-transparent p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
-              />
-              <Button className="w-full" onClick={() => void sendCommunityMessage()} disabled={communityLoading || !communityDraft.trim()}>
-                <Send className="size-4" />
-                Send
-              </Button>
-              {communityError ? <p className="text-sm text-[hsl(var(--destructive))]">{communityError}</p> : null}
             </CardContent>
           </Card>
         </div>

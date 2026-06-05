@@ -2,6 +2,7 @@ import ConsultingService from "@/models/ConsultingService";
 import { jsonError, jsonOk, mongoIdOrSlug, readJson, requireMongo, requireRole, submittedFields, uniqueSlugFor } from "@/lib/mongo-api";
 import { normalizeConsultingService, slugify } from "@/lib/platform-db";
 import { consultingServiceSchema } from "@/lib/mongo-validations";
+import { revalidatePublicContent } from "@/lib/public-revalidation";
 
 export async function GET(_: Request, context: { params: Promise<{ serviceId: string }> }) {
   try {
@@ -43,6 +44,8 @@ export async function PUT(request: Request, context: { params: Promise<{ service
 
     const service = await ConsultingService.findByIdAndUpdate(existing._id, patch, { returnDocument: "after", runValidators: true })
       .populate("expertId", "name email phone profileImage isVerified");
+    revalidatePublicContent("consulting", existing.slug);
+    revalidatePublicContent("consulting", service?.slug);
 
     return jsonOk(normalizeConsultingService(service));
   } catch (error) {
@@ -65,11 +68,13 @@ export async function DELETE(request: Request, context: { params: Promise<{ serv
 
     if (isAdmin && new URL(request.url).searchParams.get("hard") === "1") {
       await ConsultingService.findByIdAndDelete(existing._id);
+      revalidatePublicContent("consulting", existing.slug);
       return jsonOk({ ok: true, deleted: true });
     }
 
     const service = await ConsultingService.findByIdAndUpdate(existing._id, { status: "archived" }, { returnDocument: "after" })
       .populate("expertId", "name email phone profileImage isVerified");
+    revalidatePublicContent("consulting", existing.slug);
 
     return jsonOk({ ok: true, item: normalizeConsultingService(service) });
   } catch (error) {

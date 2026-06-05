@@ -3,15 +3,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { SafeImage } from "@/components/ui/safe-image";
 import { VerifiedMark } from "@/components/ui/verified-mark";
-import { isFreePrice } from "@/lib/currency";
+import { accessBadgeClass, accessLabel, courseAccessType } from "@/lib/access-styles";
 import { courseImageForCategory } from "@/lib/course-media";
-
-function accessLabel(course: { price: string; accessType?: string; pricingType?: string }) {
-  const explicit = course.accessType || course.pricingType;
-  if (explicit === "premium" || explicit === "subscription" || explicit === "manual") return "Premium";
-  if (explicit === "free" || isFreePrice(course.price)) return "Free";
-  return "Paid";
-}
 
 export function CourseCard({
   course
@@ -31,6 +24,8 @@ export function CourseCard({
     pricingType?: string;
   };
 }) {
+  const accessType = courseAccessType(course);
+
   return (
     <Link href={`/courses/${course.slug}`}>
       <Card className="h-full overflow-hidden transition-transform hover:-translate-y-1">
@@ -58,7 +53,7 @@ export function CourseCard({
             </p>
           ) : null}
           <div className="flex flex-wrap gap-2">
-            <Badge>{accessLabel(course)}</Badge>
+            <Badge className={accessBadgeClass(accessType)}>{accessLabel(accessType)}</Badge>
             <Badge>{course.level}</Badge>
           </div>
         </CardContent>

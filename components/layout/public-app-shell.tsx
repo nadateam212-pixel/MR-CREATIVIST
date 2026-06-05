@@ -18,7 +18,6 @@ import {
   Headphones,
   Home,
   LayoutDashboard,
-  LogOut,
   MessageSquare,
   Newspaper,
   Search,
@@ -29,7 +28,7 @@ import {
   User,
   Users
 } from "lucide-react";
-import { logoutAction } from "@/app/(dashboard)/actions";
+import { LogoutButton } from "@/components/auth/logout-button";
 import { LanguageCurrencySettings } from "@/components/layout/language-currency-settings";
 import { MarketingFooter } from "@/components/layout/marketing-footer";
 import { ModeToggle } from "@/components/mode-toggle";
@@ -381,12 +380,15 @@ export function PublicAppShell({
                           {item.label}
                         </Link>
                       ))}
-                      <form action={logoutAction} className="mt-1 border-t border-[hsl(var(--border))] pt-1">
-                        <button type="submit" onClick={() => setProfileOpen(false)} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-red-300 hover:bg-red-500/10">
-                          <LogOut className="size-4" />
+                      <div className="mt-1 border-t border-[hsl(var(--border))] pt-1">
+                        <LogoutButton
+                          variant="ghost"
+                          onBeforeLogout={() => setProfileOpen(false)}
+                          className="h-auto w-full justify-start px-3 py-2 text-sm font-semibold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive))]/10"
+                        >
                           Logout
-                        </button>
-                      </form>
+                        </LogoutButton>
+                      </div>
                     </div>
                   ) : null}
                 </div>

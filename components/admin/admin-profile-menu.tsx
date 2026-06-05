@@ -8,13 +8,12 @@ import {
   Bell,
   ChevronDown,
   Home,
-  LogOut,
   Settings,
   ShieldCheck,
   UserRound,
   Users
 } from "lucide-react";
-import { logoutAction } from "@/app/(dashboard)/actions";
+import { LogoutButton } from "@/components/auth/logout-button";
 import { cn } from "@/lib/utils";
 
 const menuItems = [
@@ -129,16 +128,14 @@ export function AdminProfileMenu({ user }: { user: Session["user"] }) {
             })}
           </div>
 
-          <form action={logoutAction} className="border-t border-[hsl(var(--border))] p-2">
-            <button
-              type="submit"
+          <div className="border-t border-[hsl(var(--border))] p-2">
+            <LogoutButton
+              variant="ghost"
+              onBeforeLogout={() => setOpen(false)}
               role="menuitem"
-              className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm font-semibold text-[hsl(var(--destructive))] transition-colors hover:bg-[hsl(var(--destructive))]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
-            >
-              <LogOut className="size-4" />
-              Log out
-            </button>
-          </form>
+              className="h-auto w-full gap-3 px-3 py-2.5 text-left text-sm font-semibold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive))]/10"
+            />
+          </div>
         </div>
       ) : null}
     </div>

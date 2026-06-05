@@ -20,7 +20,6 @@ import {
   Headphones,
   Home,
   LayoutDashboard,
-  LogOut,
   MessageSquare,
   Newspaper,
   Package,
@@ -34,7 +33,7 @@ import {
   Users,
   Wallet
 } from "lucide-react";
-import { logoutAction } from "@/app/(dashboard)/actions";
+import { LogoutButton } from "@/components/auth/logout-button";
 import { Button } from "@/components/ui/button";
 import { ModeToggle } from "@/components/mode-toggle";
 import { SidebarNav } from "@/components/layout/sidebar-nav";
@@ -251,12 +250,7 @@ function AccountProfileMenu({ user }: { user: Session["user"] }) {
               <span>Theme</span>
               <ModeToggle />
             </div>
-            <form action={logoutAction}>
-              <Button type="submit" variant="outline" className="w-full justify-start" onClick={() => setOpen(false)}>
-                <LogOut className="size-4" />
-                Log out
-              </Button>
-            </form>
+            <LogoutButton className="w-full" onBeforeLogout={() => setOpen(false)} />
           </div>
         </div>
       ) : null}
@@ -326,11 +320,9 @@ export function DashboardShell({ children, user }: { children: React.ReactNode; 
               <NavGroup key={group.title} title={group.title} items={group.items} />
             ))}
           </div>
-          <form action={logoutAction} className="border-t border-[hsl(var(--border))] p-4">
-            <Button type="submit" variant="outline" className="w-full">
-              Log out
-            </Button>
-          </form>
+          <div className="border-t border-[hsl(var(--border))] p-4">
+            <LogoutButton className="w-full justify-center" />
+          </div>
         </div>
       </aside>
 
@@ -369,11 +361,7 @@ export function DashboardShell({ children, user }: { children: React.ReactNode; 
             </Button>
             <ModeToggle />
             <AccountProfileMenu user={user} />
-            <form action={logoutAction} className="lg:hidden">
-              <Button type="submit" variant="outline" size="sm">
-                Log out
-              </Button>
-            </form>
+            <LogoutButton size="sm" className="lg:hidden" />
           </div>
         </header>
         <div className="border-b border-[hsl(var(--border))] p-3 lg:hidden">

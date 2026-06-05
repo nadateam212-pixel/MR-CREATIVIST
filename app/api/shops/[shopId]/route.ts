@@ -2,6 +2,7 @@ import ShopProfile from "@/models/ShopProfile";
 import { shopProfileSchema } from "@/lib/mongo-validations";
 import { jsonError, jsonOk, mongoIdOrSlug, readJson, requireMongo, requireRole, submittedFields, uniqueSlugFor } from "@/lib/mongo-api";
 import { normalizeShopProfile, slugify } from "@/lib/platform-db";
+import { revalidatePublicContent } from "@/lib/public-revalidation";
 
 const shopPatchSchema = shopProfileSchema.partial();
 
@@ -54,6 +55,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ shopI
       returnDocument: "after",
       runValidators: true
     }).populate("ownerId", "name email phone profileImage isVerified");
+    revalidatePublicContent("shop", existing.slug);
+    revalidatePublicContent("shop", shop?.slug);
 
     return jsonOk(normalizeShopProfile(shop));
   } catch (error) {
@@ -75,11 +78,13 @@ export async function DELETE(request: Request, context: { params: Promise<{ shop
 
     if (session.user.role === "admin" && new URL(request.url).searchParams.get("hard") === "1") {
       await ShopProfile.findByIdAndDelete(existing._id);
+      revalidatePublicContent("shop", existing.slug);
       return jsonOk({ ok: true, deleted: true });
     }
 
     const shop = await ShopProfile.findByIdAndUpdate(existing._id, { status: "archived" }, { returnDocument: "after" })
       .populate("ownerId", "name email phone profileImage isVerified");
+    revalidatePublicContent("shop", existing.slug);
 
     return jsonOk({ ok: true, item: normalizeShopProfile(shop) });
   } catch (error) {

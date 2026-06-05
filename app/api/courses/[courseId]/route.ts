@@ -4,6 +4,7 @@ import { normalizeCourse, slugify } from "@/lib/platform-db";
 import { courseSchema } from "@/lib/mongo-validations";
 import { studioTrackId } from "@/lib/studio-identity";
 import { compileCoursePublicationPatch } from "@/lib/course-publication";
+import { revalidatePublicContent } from "@/lib/public-revalidation";
 
 function normalizedOwner(value?: unknown) {
   return String(value ?? "").trim().toLowerCase();
@@ -87,6 +88,8 @@ export async function PUT(request: Request, context: { params: Promise<{ courseI
 
     const course = await Course.findByIdAndUpdate(existing._id, { ...patch, ...publicationPatch }, { returnDocument: "after", runValidators: true })
       .populate("instructorId", "name email profileImage isVerified");
+    revalidatePublicContent("course", existing.slug);
+    revalidatePublicContent("course", course?.slug);
 
     return jsonOk(normalizeCourse(course));
   } catch (error) {
@@ -115,10 +118,12 @@ export async function DELETE(request: Request, context: { params: Promise<{ cour
 
     if (isAdmin && new URL(request.url).searchParams.get("hard") === "1") {
       await Course.findByIdAndDelete(existing._id);
+      revalidatePublicContent("course", existing.slug);
       return jsonOk({ ok: true, deleted: true });
     }
 
     const course = await Course.findByIdAndUpdate(existing._id, { status: "archived" }, { returnDocument: "after" });
+    revalidatePublicContent("course", existing.slug);
 
     return jsonOk({ ok: true, item: normalizeCourse(course) });
   } catch (error) {

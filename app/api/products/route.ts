@@ -2,6 +2,7 @@ import Product from "@/models/Product";
 import { jsonError, jsonOk, parsePagination, readJson, requireMongo, requireRole, uniqueSlugFor } from "@/lib/mongo-api";
 import { normalizeProduct, slugify } from "@/lib/platform-db";
 import { productSchema } from "@/lib/mongo-validations";
+import { revalidatePublicContent } from "@/lib/public-revalidation";
 import { studioTrackId } from "@/lib/studio-identity";
 
 export async function GET(request: Request) {
@@ -47,6 +48,7 @@ export async function POST(request: Request) {
       status: session.user.role === "admin" ? body.status : body.status === "draft" ? "draft" : "published",
       isVerified: session.user.role === "admin" ? body.isVerified : false
     });
+    revalidatePublicContent("product", product.slug);
 
     return jsonOk(normalizeProduct(product), 201);
   } catch (error) {

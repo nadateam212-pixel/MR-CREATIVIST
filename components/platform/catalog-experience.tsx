@@ -28,7 +28,9 @@ import { Input } from "@/components/ui/input";
 import { PriceDisplay } from "@/components/ui/price-display";
 import { SafeImage } from "@/components/ui/safe-image";
 import { VerifiedMark } from "@/components/ui/verified-mark";
-import { convertMoney, isFreePrice, parseMoney } from "@/lib/currency";
+import { accessBadgeClass, accessLabel, courseAccessType } from "@/lib/access-styles";
+import { courseCategories } from "@/lib/course-categories";
+import { convertMoney, parseMoney } from "@/lib/currency";
 import { courseImageForCategory } from "@/lib/course-media";
 import { useI18n } from "@/hooks/use-i18n";
 import { usePlatformStore } from "@/hooks/use-platform-store";
@@ -83,21 +85,7 @@ const courseFilterChips = [
   "Premium",
   "Paid",
   "Free",
-  "AI",
-  "Business",
-  "Marketing",
-  "Design",
-  "Programming",
-  "UI/UX",
-  "Video Editing",
-  "Data Science",
-  "Finance",
-  "E-commerce",
-  "Photography",
-  "Music",
-  "Language",
-  "Health",
-  "Personal Development"
+  ...courseCategories
 ];
 
 function compactCount(value: number) {
@@ -105,19 +93,6 @@ function compactCount(value: number) {
     notation: "compact",
     maximumFractionDigits: 1
   }).format(Math.max(0, value));
-}
-
-function courseAccessType(course: Pick<CatalogCourse, "accessType" | "pricingType" | "price">) {
-  const explicit = course.accessType || course.pricingType;
-  if (explicit === "premium" || explicit === "subscription" || explicit === "manual") return "premium";
-  if (explicit === "free" || isFreePrice(course.price)) return "free";
-  return "paid";
-}
-
-function accessLabel(accessType: string) {
-  if (accessType === "premium") return "Premium";
-  if (accessType === "free") return "Free";
-  return "Paid";
 }
 
 function estimatedLikes(course: Pick<CatalogCourse, "likes" | "learners" | "rating">) {
@@ -414,16 +389,14 @@ export function CatalogExperience({
                         </span>
                       </div>
                       <div className="flex items-center justify-between gap-3">
-                        <Badge className="border-[hsl(var(--primary))] text-[hsl(var(--primary))]">{accessText}</Badge>
+                        <Badge className={accessBadgeClass(accessType)}>{accessText}</Badge>
                         <Button size="sm" disabled={pendingAction === course.slug} onClick={() => handleStartCourse(course)}>
                           {enrolled ? <CheckCircle2 className="size-4" /> : <PlayCircle className="size-4" />}
                           {pendingAction === course.slug
                             ? t("commerce.saving")
                             : enrolled
                               ? t("commerce.enrolled")
-                              : accessType === "free"
-                                ? "Start learning"
-                                : "Start preview"}
+                              : "Start learning"}
                         </Button>
                       </div>
                     </CardContent>

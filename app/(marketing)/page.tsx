@@ -16,6 +16,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { LocalizedPrice } from "@/components/platform/localized-price";
 import { SafeImage } from "@/components/ui/safe-image";
 import { VerifiedMark } from "@/components/ui/verified-mark";
+import { accessBadgeClass } from "@/lib/access-styles";
 import { brand } from "@/lib/brand";
 import { getCourses, getFreelancers, getJobPosts, getProducts, getShopProfiles } from "@/lib/platform-db";
 
@@ -355,7 +356,7 @@ export default async function HomePage() {
                     <span><ThumbsUp className="mr-1 inline size-3" />{formatCompact(courseLikes(course))} likes</span>
                   </div>
                   <div className="mt-3 flex items-center justify-between text-xs text-[hsl(var(--muted-foreground))]">
-                    <span className="rounded-md border border-[hsl(var(--primary))]/35 px-2 py-1 font-bold text-[hsl(var(--primary))]">{accessLabel(course)}</span>
+                    <span className={`rounded-md border px-2 py-1 font-bold ${accessBadgeClass(accessLabel(course).toLowerCase())}`}>{accessLabel(course)}</span>
                     <span><Star className="mr-1 inline size-3 fill-amber-400 text-amber-400" />{course.rating}</span>
                   </div>
                 </CardContent>
