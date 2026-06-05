@@ -113,7 +113,7 @@ export function AdminPaymentsConsole({ initialSnapshot }: AdminPaymentsConsolePr
   const [type, setType] = useState(initialSnapshot.filters.type ?? "all");
   const [search, setSearch] = useState(initialSnapshot.filters.search ?? "");
   const [recipientEmail, setRecipientEmail] = useState("");
-  const [mobilePhone, setMobilePhone] = useState("0780000000");
+  const [mobilePhone, setMobilePhone] = useState("");
   const [amount, setAmount] = useState("5000");
   const [reason, setReason] = useState("MR Creativist payout");
   const [providerBalance, setProviderBalance] = useState("");
@@ -320,7 +320,7 @@ export function AdminPaymentsConsole({ initialSnapshot }: AdminPaymentsConsolePr
             <Input value={recipientEmail} onChange={(event) => setRecipientEmail(event.target.value)} placeholder="recipient@email.com" inputMode="email" />
             <div className="relative">
               <Smartphone className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" />
-              <Input className="pl-9" value={mobilePhone} onChange={(event) => setMobilePhone(event.target.value)} inputMode="tel" />
+              <Input className="pl-9" value={mobilePhone} onChange={(event) => setMobilePhone(event.target.value)} inputMode="tel" placeholder="MTN number" />
             </div>
             <Input value={amount} onChange={(event) => setAmount(event.target.value)} inputMode="decimal" />
             <Input value={reason} onChange={(event) => setReason(event.target.value)} />

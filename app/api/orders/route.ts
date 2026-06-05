@@ -34,6 +34,9 @@ export async function POST(request: Request) {
       201
     );
   } catch (error) {
-    return jsonError(error);
+    return Response.json(
+      { error: error instanceof Error ? error.message : "Order could not be processed." },
+      { status: 422 }
+    );
   }
 }

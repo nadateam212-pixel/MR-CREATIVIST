@@ -33,7 +33,7 @@ export function CheckoutWorkbench({ mode = "cart", products = [] }: { mode?: "ca
   const [coupon, setCoupon] = useState("CREATOR15");
   const [paymentMethod, setPaymentMethod] = useState<CheckoutPaymentMethod>("mtn_momo");
   const [paymentDetails, setPaymentDetails] = useState<CheckoutPaymentDetails>({
-    mobilePhone: "0788888888",
+    mobilePhone: "",
     paypalEmail: "",
     cardNumber: "",
     cardName: "",

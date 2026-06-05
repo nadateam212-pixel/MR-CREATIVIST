@@ -1,5 +1,5 @@
 import { auth } from "@/auth";
-import { jsonError, jsonOk, readJson } from "@/lib/mongo-api";
+import { jsonOk, readJson } from "@/lib/mongo-api";
 import { processCourseCheckout } from "@/lib/payment-checkout";
 
 export async function POST(request: Request) {
@@ -9,6 +9,9 @@ export async function POST(request: Request) {
 
     return jsonOk(result, 201);
   } catch (error) {
-    return jsonError(error);
+    return Response.json(
+      { error: error instanceof Error ? error.message : "Course payment could not be processed." },
+      { status: 422 }
+    );
   }
 }

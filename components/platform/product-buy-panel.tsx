@@ -26,7 +26,7 @@ export function ProductBuyPanel({ product }: { product: BuyProduct }) {
   const [buyer, setBuyer] = useState({ name: "", email: "" });
   const [paymentMethod, setPaymentMethod] = useState<CheckoutPaymentMethod>("mtn_momo");
   const [paymentDetails, setPaymentDetails] = useState<CheckoutPaymentDetails>({
-    mobilePhone: "0788888888",
+    mobilePhone: "",
     paypalEmail: "",
     cardNumber: "",
     cardName: "",
@@ -91,7 +91,7 @@ export function ProductBuyPanel({ product }: { product: BuyProduct }) {
 
       if (payload.approvalUrl) {
         setStatus("Redirecting to PayPal...");
-        window.location.href = payload.approvalUrl;
+        globalThis.location.assign(payload.approvalUrl);
         return;
       }
 

@@ -80,8 +80,8 @@ export function WalletWorkbench({ initialSnapshot, initialError = "" }: WalletWo
   const [depositAmount, setDepositAmount] = useState("5000");
   const [withdrawAmount, setWithdrawAmount] = useState("2000");
   const [transferAmount, setTransferAmount] = useState("1000");
-  const [depositPhone, setDepositPhone] = useState("0780000000");
-  const [withdrawPhone, setWithdrawPhone] = useState("0780000000");
+  const [depositPhone, setDepositPhone] = useState("");
+  const [withdrawPhone, setWithdrawPhone] = useState("");
   const [recipient, setRecipient] = useState("seller@mrcreativist.local");
   const [status, setStatus] = useState(initialError);
   const [busy, setBusy] = useState("");
@@ -235,6 +235,7 @@ export function WalletWorkbench({ initialSnapshot, initialError = "" }: WalletWo
                 value={depositPhone}
                 onChange={(event) => setDepositPhone(event.target.value)}
                 inputMode="tel"
+                placeholder="MTN number"
                 aria-label="MTN Mobile Money deposit phone"
               />
             </div>
@@ -271,6 +272,7 @@ export function WalletWorkbench({ initialSnapshot, initialError = "" }: WalletWo
                 value={withdrawPhone}
                 onChange={(event) => setWithdrawPhone(event.target.value)}
                 inputMode="tel"
+                placeholder="MTN number"
                 aria-label="MTN Mobile Money withdrawal phone"
               />
             </div>

@@ -32,7 +32,7 @@ export function CourseEnrollmentPanel({ slug, course }: { slug: string; course?:
   const [coupon, setCoupon] = useState("LEARN10");
   const [paymentMethod, setPaymentMethod] = useState<CheckoutPaymentMethod>("mtn_momo");
   const [paymentDetails, setPaymentDetails] = useState<CheckoutPaymentDetails>({
-    mobilePhone: "0788888888",
+    mobilePhone: "",
     paypalEmail: "",
     cardNumber: "",
     cardName: "",
@@ -135,7 +135,7 @@ export function CourseEnrollmentPanel({ slug, course }: { slug: string; course?:
 
       if (payload.approvalUrl) {
         setStatus("Redirecting to PayPal...");
-        window.location.href = payload.approvalUrl;
+        globalThis.location.assign(payload.approvalUrl);
         return;
       }
 

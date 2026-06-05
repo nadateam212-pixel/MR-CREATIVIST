@@ -34,6 +34,66 @@ export type IntouchStatusInput = {
 const paymentRequestSuccessCodes = new Set(["1000"]);
 const completedPaymentCodes = new Set(["01"]);
 const completedDepositCodes = new Set(["2001"]);
+const successfulResponseCodes = new Set([
+  ...paymentRequestSuccessCodes,
+  ...completedPaymentCodes,
+  ...completedDepositCodes
+]);
+
+const responseCodeDescriptions: Record<string, string> = {
+  "01": "Transaction successful.",
+  "1000": "Transaction pending. Waiting for subscriber approval.",
+  "2001": "Deposit request successful.",
+  "0002": "Missing username information.",
+  "0003": "Missing password information.",
+  "0004": "Missing date information.",
+  "0005": "Invalid IntouchPay password.",
+  "0006": "User does not have an IntouchPay account.",
+  "0007": "No such IntouchPay user.",
+  "0008": "Failed to authenticate with IntouchPay.",
+  "1002": "Mobile number is not registered on mobile money.",
+  "1005": "Failed due to insufficient funds.",
+  "1008": "General failure from IntouchPay.",
+  "1100": "Number is not supported on this Mobile Money network.",
+  "1101": "Service ID not recognized.",
+  "1102": "Invalid mobile phone number.",
+  "1103": "Payment above allowed maximum.",
+  "1104": "Payment below allowed minimum.",
+  "1105": "Network not supported.",
+  "1106": "Operation not permitted.",
+  "1107": "Payment account not configured.",
+  "1108": "Insufficient IntouchPay account balance.",
+  "1110": "Duplicate remit ID.",
+  "1200": "Invalid number.",
+  "1300": "Failed to complete transaction.",
+  "2000": "General failure from IntouchPay.",
+  "2003": "Transaction not allowed.",
+  "2100": "Amount should be greater than zero.",
+  "2102": "Subscriber could not be identified.",
+  "2105": "Non-existent mobile account.",
+  "2106": "Own mobile account provided.",
+  "2107": "Invalid amount format.",
+  "2108": "Insufficient funds on source account.",
+  "2109": "Daily limit exceeded.",
+  "2110": "Source account is not active.",
+  "2111": "Mobile account is not active.",
+  "2200": "Amount below minimum.",
+  "2300": "Amount above maximum.",
+  "2400": "Duplicate transaction ID.",
+  "2500": "IntouchPay service failure.",
+  "2510": "Service temporarily unavailable.",
+  "2518": "Could not perform operation.",
+  "2520": "Incorrect account password.",
+  "2522": "Invalid amount.",
+  "2525": "Resource is not active.",
+  "2600": "Network failure or request timed out.",
+  "2700": "Failed to complete transaction.",
+  "2800": "Deposit channel failure.",
+  "3000": "Missing transaction ID information.",
+  "3100": "Transaction does not exist.",
+  "3200": "Missing request transaction ID information.",
+  "403": "IntouchPay rejected this server IP address."
+};
 
 function stripSlashes(value: string) {
   return value.replace(/\/+$/, "");
@@ -101,6 +161,12 @@ function asString(value: unknown) {
   return String(value ?? "").trim();
 }
 
+function truthy(value: unknown) {
+  if (value === true) return true;
+  const normalized = asString(value).toLowerCase();
+  return ["true", "1", "yes", "ok", "success", "successful", "successfull"].includes(normalized);
+}
+
 function field(payload: IntouchPayload, ...keys: string[]) {
   for (const key of keys) {
     const direct = payload[key];
@@ -120,12 +186,14 @@ function nestedPayload(payload: IntouchPayload): IntouchPayload {
 function normalizeResponse(payload: IntouchPayload, raw: string): IntouchResponse {
   const data = nestedPayload(payload);
   const code = asString(field(data, "responsecode", "code", "statuscode", "statusCode"));
+  const detail = asString(field(data, "message", "detail", "error", "error_description", "statusdesc", "description", "desc", "status"));
   const message =
-    asString(field(data, "message", "status", "statusdesc", "description", "desc")) ||
+    detail ||
+    (code && responseCodeDescriptions[code]) ||
     (code ? `IntouchPay response ${code}` : "IntouchPay response received.");
 
   return {
-    ok: Boolean(code && (paymentRequestSuccessCodes.has(code) || completedPaymentCodes.has(code) || completedDepositCodes.has(code))),
+    ok: truthy(field(data, "success")) || Boolean(code && successfulResponseCodes.has(code)),
     code,
     message,
     data,
@@ -146,16 +214,31 @@ async function readIntouchResponse(response: Response): Promise<IntouchResponse>
   const normalized = normalizeResponse(payload, raw);
 
   if (!response.ok && !normalized.code) {
+    const code = String(response.status);
     return {
       ok: false,
-      code: String(response.status),
-      message: normalized.message || `IntouchPay HTTP ${response.status}`,
+      code,
+      message: explainIntouchFailure(normalized.message, code),
       data: normalized.data,
       raw
     };
   }
 
-  return normalized;
+  return {
+    ...normalized,
+    message: explainIntouchFailure(normalized.message, normalized.code)
+  };
+}
+
+function explainIntouchFailure(message: string, code?: string) {
+  const fallback = (code && responseCodeDescriptions[code]) || message;
+  const ipMatch = message.match(/IP\s+([0-9a-f:.]+)\s+is\s+Not\s+Allowed\s+to\s+Perform\s+this\s+Operation/i);
+
+  if (ipMatch) {
+    return `IntouchPay rejected server IP ${ipMatch[1]}. Ask IntouchPay to whitelist this IP for the MR Creativist account, or deploy from an already-approved server.`;
+  }
+
+  return fallback || "IntouchPay response received.";
 }
 
 async function postForm(path: string, fields: Record<string, string>) {

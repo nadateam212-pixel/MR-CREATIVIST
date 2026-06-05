@@ -69,7 +69,7 @@ export function PaymentMethodSelector({ value, onChange, details, onDetailsChang
       {value === "mtn_momo" ? (
         <div className="relative">
           <Smartphone className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" />
-          <Input className="pl-9" value={details.mobilePhone} onChange={(event) => update({ mobilePhone: event.target.value })} inputMode="tel" placeholder="0788888888" />
+          <Input className="pl-9" value={details.mobilePhone} onChange={(event) => update({ mobilePhone: event.target.value })} inputMode="tel" placeholder="MTN number" />
         </div>
       ) : null}
 
