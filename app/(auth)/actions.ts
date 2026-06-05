@@ -9,6 +9,7 @@ import connectMongoDB from "@/lib/mongodb";
 import { createAndSendPasswordReset, resetPasswordWithToken } from "@/lib/password-reset";
 import { rateLimit } from "@/lib/rate-limit";
 import { forgotPasswordSchema, loginSchema, registerSchema, resetPasswordSchema } from "@/lib/validations";
+import { sendWelcomeEmail } from "@/lib/welcome-email";
 import User from "@/models/User";
 
 export type FormState = {
@@ -150,6 +151,7 @@ export async function registerAction(_state: FormState, formData: FormData): Pro
     userId: String(user._id),
     name: user.name
   });
+  await sendWelcomeEmail(user.email, user.name);
 
   await signIn("credentials", {
     email: user.email,

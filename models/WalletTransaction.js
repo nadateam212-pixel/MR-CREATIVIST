@@ -21,6 +21,7 @@ const WalletTransactionSchema = new mongoose.Schema(
         "freelance_earning",
         "referral_earning",
         "payout",
+        "admin_payout",
         "admin_adjustment"
       ],
       required: true,
@@ -34,17 +35,22 @@ const WalletTransactionSchema = new mongoose.Schema(
     description: { type: String, required: true, trim: true, maxlength: 280 },
     referenceType: {
       type: String,
-      enum: ["manual", "order", "enrollment", "booking", "contract", "referral", "withdrawal", "transfer", "workspace"],
+      enum: ["manual", "order", "enrollment", "booking", "contract", "referral", "withdrawal", "transfer", "workspace", "intouchpay", "admin_payment"],
       default: "manual",
       index: true
     },
     referenceId: { type: String, trim: true, index: true },
+    requestTransactionId: { type: String, trim: true, index: true },
+    providerTransactionId: { type: String, trim: true, index: true },
+    providerReference: { type: String, trim: true, index: true },
+    mobilePhone: { type: String, trim: true },
     metadata: { type: mongoose.Schema.Types.Mixed, default: {} }
   },
   { timestamps: true }
 );
 
 WalletTransactionSchema.index({ userEmail: 1, createdAt: -1 });
+WalletTransactionSchema.index({ referenceType: 1, requestTransactionId: 1 });
 WalletTransactionSchema.index(
   { userEmail: 1, type: 1, referenceType: 1, referenceId: 1 },
   {

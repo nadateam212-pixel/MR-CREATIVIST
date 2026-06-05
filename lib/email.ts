@@ -17,20 +17,45 @@ export type EmailDeliveryResult = {
 };
 
 function getFromAddress() {
+  const mailFromAddress = env("MAIL_FROM_ADDRESS");
+  const mailFromName = env("MAIL_FROM_NAME");
+  const mailFrom = mailFromAddress ? `${mailFromName || brand.name} <${mailFromAddress}>` : "";
+
   return (
     env("EMAIL_FROM") ||
     env("RESEND_FROM_EMAIL") ||
     env("SMTP_FROM_EMAIL") ||
+    mailFrom ||
     `${brand.name} <onboarding@resend.dev>`
   );
 }
 
+function getSmtpHost() {
+  return env("SMTP_HOST") || env("MAIL_HOST");
+}
+
 function getSmtpPort() {
-  return envNumber("SMTP_PORT", 587);
+  return envNumber("SMTP_PORT", envNumber("MAIL_PORT", 587));
+}
+
+function getSmtpUser() {
+  return env("SMTP_USER") || env("MAIL_USERNAME");
+}
+
+function getSmtpPassword() {
+  return env("SMTP_PASSWORD") || env("MAIL_PASSWORD");
+}
+
+function getSmtpSecure() {
+  const encryption = env("MAIL_ENCRYPTION").toLowerCase();
+  if (encryption === "ssl") return true;
+  if (encryption === "tls") return false;
+
+  return envBoolean("SMTP_SECURE", false);
 }
 
 function isSmtpConfigured() {
-  return Boolean(env("SMTP_HOST") && env("SMTP_USER") && env("SMTP_PASSWORD"));
+  return Boolean(getSmtpHost() && getSmtpUser() && getSmtpPassword());
 }
 
 function getEmailSetupMessage() {
@@ -71,12 +96,12 @@ async function sendWithSmtp({ to, subject, text, html }: EmailInput): Promise<Em
   try {
     const port = getSmtpPort();
     const transporter = nodemailer.createTransport({
-      host: env("SMTP_HOST"),
+      host: getSmtpHost(),
       port,
-      secure: envBoolean("SMTP_SECURE", false) || port === 465,
+      secure: getSmtpSecure() || port === 465,
       auth: {
-        user: env("SMTP_USER"),
-        pass: env("SMTP_PASSWORD")
+        user: getSmtpUser(),
+        pass: getSmtpPassword()
       }
     });
 

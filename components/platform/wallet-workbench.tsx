@@ -10,6 +10,7 @@ import {
   RefreshCw,
   Send,
   ShieldCheck,
+  Smartphone,
   Wallet
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +31,9 @@ type WalletTransaction = {
   status: string;
   description: string;
   counterpartyEmail?: string;
+  requestTransactionId?: string;
+  providerReference?: string;
+  mobilePhone?: string;
   balanceAfter?: number;
   createdAt?: string;
 };
@@ -53,7 +57,7 @@ const fallbackSnapshot: WalletSnapshot = {
   pendingBalance: 0,
   totalEarned: 0,
   totalWithdrawn: 0,
-  currency: "USD",
+  currency: "FRW",
   transactions: []
 };
 
@@ -73,9 +77,11 @@ function transactionLabel(value: string) {
 export function WalletWorkbench({ initialSnapshot, initialError = "" }: WalletWorkbenchProps) {
   const [wallet, setWallet] = useState<WalletSnapshot>(initialSnapshot ?? fallbackSnapshot);
   const [databaseReady, setDatabaseReady] = useState(Boolean(initialSnapshot) || !initialError);
-  const [depositAmount, setDepositAmount] = useState("100");
-  const [withdrawAmount, setWithdrawAmount] = useState("50");
-  const [transferAmount, setTransferAmount] = useState("25");
+  const [depositAmount, setDepositAmount] = useState("5000");
+  const [withdrawAmount, setWithdrawAmount] = useState("2000");
+  const [transferAmount, setTransferAmount] = useState("1000");
+  const [depositPhone, setDepositPhone] = useState("0780000000");
+  const [withdrawPhone, setWithdrawPhone] = useState("0780000000");
   const [recipient, setRecipient] = useState("seller@mrcreativist.local");
   const [status, setStatus] = useState(initialError);
   const [busy, setBusy] = useState("");
@@ -137,7 +143,7 @@ export function WalletWorkbench({ initialSnapshot, initialError = "" }: WalletWo
 
       setWallet(payload);
       setDatabaseReady(true);
-      setStatus(`${action} recorded in wallet ledger.`);
+      setStatus(action === "deposit" ? "Deposit request sent. Confirm the MTN Mobile Money prompt." : `${action} recorded in wallet ledger.`);
     } catch {
       setDatabaseReady(false);
       setStatus("Transaction failed. Check the server log.");
@@ -217,14 +223,34 @@ export function WalletWorkbench({ initialSnapshot, initialError = "" }: WalletWo
           <CardHeader>
             <div className="flex items-center gap-3">
               <CreditCard className="size-5 text-[hsl(var(--primary))]" />
-              <CardTitle>Deposit</CardTitle>
+              <CardTitle>Receive</CardTitle>
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Input value={depositAmount} onChange={(event) => setDepositAmount(event.target.value)} inputMode="decimal" />
-            <Button className="w-full" disabled={busy === "deposit"} onClick={() => void runWalletAction("deposit", parseMoney(depositAmount))}>
+            <Input value={depositAmount} onChange={(event) => setDepositAmount(event.target.value)} inputMode="decimal" aria-label="Deposit amount in FRW" />
+            <div className="relative">
+              <Smartphone className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" />
+              <Input
+                className="pl-9"
+                value={depositPhone}
+                onChange={(event) => setDepositPhone(event.target.value)}
+                inputMode="tel"
+                aria-label="MTN Mobile Money deposit phone"
+              />
+            </div>
+            <Button
+              className="w-full"
+              disabled={busy === "deposit"}
+              onClick={() =>
+                void runWalletAction("deposit", parseMoney(depositAmount), {
+                  currency: "FRW",
+                  mobilePhone: depositPhone,
+                  paymentMethod: "intouch_mtn_momo"
+                })
+              }
+            >
               <ArrowDownToLine className="size-4" />
-              Deposit funds
+              Request MTN deposit
             </Button>
           </CardContent>
         </Card>
@@ -237,10 +263,30 @@ export function WalletWorkbench({ initialSnapshot, initialError = "" }: WalletWo
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Input value={withdrawAmount} onChange={(event) => setWithdrawAmount(event.target.value)} inputMode="decimal" />
-            <Button className="w-full" variant="outline" disabled={busy === "withdraw"} onClick={() => void runWalletAction("withdraw", parseMoney(withdrawAmount))}>
+            <Input value={withdrawAmount} onChange={(event) => setWithdrawAmount(event.target.value)} inputMode="decimal" aria-label="Withdrawal amount in FRW" />
+            <div className="relative">
+              <Smartphone className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" />
+              <Input
+                className="pl-9"
+                value={withdrawPhone}
+                onChange={(event) => setWithdrawPhone(event.target.value)}
+                inputMode="tel"
+                aria-label="MTN Mobile Money withdrawal phone"
+              />
+            </div>
+            <Button
+              className="w-full"
+              variant="outline"
+              disabled={busy === "withdraw"}
+              onClick={() =>
+                void runWalletAction("withdraw", parseMoney(withdrawAmount), {
+                  currency: "FRW",
+                  mobilePhone: withdrawPhone
+                })
+              }
+            >
               <ArrowUpFromLine className="size-4" />
-              Request payout
+              Send to MTN
             </Button>
           </CardContent>
         </Card>
@@ -259,7 +305,7 @@ export function WalletWorkbench({ initialSnapshot, initialError = "" }: WalletWo
               className="w-full"
               variant="outline"
               disabled={busy === "transfer"}
-              onClick={() => void runWalletAction("transfer", parseMoney(transferAmount), { recipientEmail: recipient })}
+              onClick={() => void runWalletAction("transfer", parseMoney(transferAmount), { recipientEmail: recipient, currency: wallet.currency })}
             >
               <Send className="size-4" />
               Transfer
@@ -281,12 +327,13 @@ export function WalletWorkbench({ initialSnapshot, initialError = "" }: WalletWo
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[52rem] text-left text-sm">
+            <table className="w-full min-w-[60rem] text-left text-sm">
               <thead className="border-b border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))]">
                 <tr>
                   <th className="py-3 font-medium">Type</th>
                   <th className="py-3 font-medium">Description</th>
                   <th className="py-3 font-medium">Counterparty</th>
+                  <th className="py-3 font-medium">Reference</th>
                   <th className="py-3 font-medium">Status</th>
                   <th className="py-3 text-right font-medium">Amount</th>
                 </tr>
@@ -297,7 +344,10 @@ export function WalletWorkbench({ initialSnapshot, initialError = "" }: WalletWo
                     <tr key={transaction.id}>
                       <td className="py-3 font-medium capitalize">{transactionLabel(transaction.type)}</td>
                       <td className="py-3 text-[hsl(var(--muted-foreground))]">{transaction.description}</td>
-                      <td className="py-3 text-[hsl(var(--muted-foreground))]">{transaction.counterpartyEmail ?? "-"}</td>
+                      <td className="py-3 text-[hsl(var(--muted-foreground))]">{transaction.counterpartyEmail ?? transaction.mobilePhone ?? "-"}</td>
+                      <td className="py-3 text-xs text-[hsl(var(--muted-foreground))]">
+                        {transaction.providerReference ?? transaction.requestTransactionId ?? "-"}
+                      </td>
                       <td className="py-3">
                         <Badge>
                           <ShieldCheck className="mr-1 size-3" />
@@ -311,7 +361,7 @@ export function WalletWorkbench({ initialSnapshot, initialError = "" }: WalletWo
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-[hsl(var(--muted-foreground))]">
+                    <td colSpan={6} className="py-8 text-center text-[hsl(var(--muted-foreground))]">
                       No wallet transactions yet. Deposit, earn, transfer, or request a payout to create the first ledger entry.
                     </td>
                   </tr>

@@ -7,6 +7,7 @@ import { verifyAuthOtp, type AuthOtpPurpose } from "@/lib/auth-otp";
 import { firebaseConfig } from "@/lib/firebase-config";
 import { env } from "@/lib/env";
 import { getSiteUrl } from "@/lib/site-url";
+import { sendWelcomeEmail } from "@/lib/welcome-email";
 import User from "@/models/User";
 import type { PlatformRole } from "@/types";
 
@@ -123,6 +124,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         await connectMongoDB();
 
+        const existingUser = await User.exists({ email });
         const user = await User.findOneAndUpdate(
           { email },
           {
@@ -136,6 +138,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         ).lean();
 
         if (!user || user.accountStatus === "suspended") return null;
+        if (!existingUser) await sendWelcomeEmail(user.email, user.name);
 
         return serializeUser(user);
       }

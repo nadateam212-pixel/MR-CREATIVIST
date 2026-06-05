@@ -51,17 +51,17 @@ export const platformHighlights = [
 ];
 
 export const walletSnapshot = {
-  balance: 428,
-  pendingBalance: 64,
-  totalEarned: 1860,
-  totalWithdrawn: 936,
-  currency: "USD",
+  balance: 428000,
+  pendingBalance: 64000,
+  totalEarned: 1860000,
+  totalWithdrawn: 936000,
+  currency: "FRW",
   limits: {
-    minimumWithdrawal: 20,
-    dailyTransfer: 1200,
-    verificationRequiredAbove: 500
+    minimumWithdrawal: 2000,
+    dailyTransfer: 2000000,
+    verificationRequiredAbove: 500000
   },
-  methods: ["Card deposit", "Mobile money", "Bank transfer", "PayPal", "Wallet transfer"]
+  methods: ["MTN Mobile Money", "Email wallet transfer", "Admin payout", "Provider callback"]
 };
 
 export const certificateTemplates = [
