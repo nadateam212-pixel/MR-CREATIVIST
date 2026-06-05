@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SafeImage } from "@/components/ui/safe-image";
 import { VerifiedMark } from "@/components/ui/verified-mark";
+import { ProtectedVideoOverlays } from "@/components/platform/protected-video-overlays";
 import { accessBadgeClass, accessLabel, courseAccessType } from "@/lib/access-styles";
 import { courseImageForCategory, normalizeCourseImage, titleFromCourseSlug } from "@/lib/course-media";
 import { videoSourceForUrl } from "@/lib/video-sources";
@@ -291,24 +292,6 @@ function CoursePreviewPlayer({
     );
   }
 
-  function driveShield() {
-    if (source.provider !== "google-drive") return null;
-
-    return (
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex h-14 items-start justify-between bg-gradient-to-b from-black/90 via-black/55 to-transparent p-2">
-        <span className="inline-flex items-center gap-2 rounded bg-black/70 px-2 py-1 text-xs font-semibold text-white shadow">
-          <span className="relative size-5 overflow-hidden rounded">
-            <SafeImage src="/icons/logo.png" alt="" fill sizes="20px" className="object-contain" />
-          </span>
-          <span className="hidden sm:inline">MR Creativist</span>
-        </span>
-        <span className="grid size-10 place-items-center rounded-md bg-white/95 text-[hsl(var(--primary))] shadow-lg ring-1 ring-black/10">
-          <Download className="size-5" />
-        </span>
-      </div>
-    );
-  }
-
   if (source.provider === "direct") {
     return (
       <div className="relative aspect-video w-full overflow-hidden bg-black">
@@ -351,9 +334,10 @@ function CoursePreviewPlayer({
           allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
           allowFullScreen
           referrerPolicy="strict-origin-when-cross-origin"
+          sandbox="allow-same-origin allow-scripts allow-presentation"
           className={embeddedPreviewClass()}
         />
-        {driveShield()}
+        <ProtectedVideoOverlays />
         {paywallOverlay()}
       </div>
     );

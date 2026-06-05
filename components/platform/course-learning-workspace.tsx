@@ -35,6 +35,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { SafeImage } from "@/components/ui/safe-image";
+import { ProtectedVideoOverlays } from "@/components/platform/protected-video-overlays";
 import { courseImageForCategory } from "@/lib/course-media";
 import { videoSourceForUrl } from "@/lib/video-sources";
 
@@ -1540,21 +1541,10 @@ export function CourseLearningWorkspace({
                         allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
                         allowFullScreen
                         referrerPolicy="strict-origin-when-cross-origin"
+                        sandbox="allow-same-origin allow-scripts allow-presentation"
                         className={embeddedVideoClass()}
                       />
-                      {activeVideoSource.provider === "google-drive" ? (
-                        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex h-14 items-start justify-between bg-gradient-to-b from-black/90 via-black/55 to-transparent p-2">
-                          <span className="inline-flex items-center gap-2 rounded bg-black/70 px-2 py-1 text-xs font-semibold text-white shadow">
-                            <span className="relative size-5 overflow-hidden rounded">
-                              <SafeImage src="/icons/logo.png" alt="" fill sizes="20px" className="object-contain" />
-                            </span>
-                            <span className="hidden sm:inline">MR Creativist</span>
-                          </span>
-                          <span className="grid size-10 place-items-center rounded-md bg-white/95 text-[hsl(var(--primary))] shadow-lg ring-1 ring-black/10">
-                            <Download className="size-5" />
-                          </span>
-                        </div>
-                      ) : null}
+                      <ProtectedVideoOverlays />
                     </div>
                   ) : (
                     <div className="flex aspect-video flex-col items-center justify-center rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--muted))] p-6 text-center">
