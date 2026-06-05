@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { env, envNumber } from "@/lib/env";
+import { env, envBoolean, envNumber } from "@/lib/env";
 import { absoluteUrl } from "@/lib/site-url";
 
 type IntouchPayload = Record<string, unknown>;
@@ -113,6 +113,14 @@ function intouchConfig() {
   };
 }
 
+function intouchProxyConfig() {
+  return {
+    enabled: envBoolean("INTOUCH_USE_PROXY", false),
+    url: stripSlashes(env("INTOUCH_PROXY_URL")),
+    secret: env("INTOUCH_PROXY_SECRET")
+  };
+}
+
 function assertConfig() {
   const config = intouchConfig();
   const missing = [
@@ -122,8 +130,26 @@ function assertConfig() {
   ].filter(([, value]) => !value);
 
   if (missing.length) {
-    throw new Error(`IntouchPay is not configured. Missing ${missing.map(([name]) => name).join(", ")}.`);
+    throw new Error(
+      `IntouchPay is not configured. Missing ${missing.map(([name]) => name).join(", ")}.`
+    );
   }
+
+  return config;
+}
+
+function assertProxyConfig() {
+  const config = intouchProxyConfig();
+
+  if (!config.enabled) return null;
+  if (!config.url)
+    throw new Error(
+      "INTOUCH_PROXY_URL is required when INTOUCH_USE_PROXY=true."
+    );
+  if (!config.secret)
+    throw new Error(
+      "INTOUCH_PROXY_SECRET is required when INTOUCH_USE_PROXY=true."
+    );
 
   return config;
 }
@@ -141,8 +167,16 @@ function timestampUtc(date = new Date()) {
   ].join("");
 }
 
-function passwordHash(username: string, accountNo: string, partnerPassword: string, timestamp: string) {
-  return crypto.createHash("sha256").update(`${username}${accountNo}${partnerPassword}${timestamp}`).digest("hex");
+function passwordHash(
+  username: string,
+  accountNo: string,
+  partnerPassword: string,
+  timestamp: string
+) {
+  return crypto
+    .createHash("sha256")
+    .update(`${username}${accountNo}${partnerPassword}${timestamp}`)
+    .digest("hex");
 }
 
 function signedFields() {
@@ -153,7 +187,12 @@ function signedFields() {
     username: config.username,
     timestamp,
     accountno: config.accountNo,
-    password: passwordHash(config.username, config.accountNo, config.partnerPassword, timestamp)
+    password: passwordHash(
+      config.username,
+      config.accountNo,
+      config.partnerPassword,
+      timestamp
+    )
   };
 }
 
@@ -164,7 +203,15 @@ function asString(value: unknown) {
 function truthy(value: unknown) {
   if (value === true) return true;
   const normalized = asString(value).toLowerCase();
-  return ["true", "1", "yes", "ok", "success", "successful", "successfull"].includes(normalized);
+  return [
+    "true",
+    "1",
+    "yes",
+    "ok",
+    "success",
+    "successful",
+    "successfull"
+  ].includes(normalized);
 }
 
 function field(payload: IntouchPayload, ...keys: string[]) {
@@ -183,17 +230,40 @@ function nestedPayload(payload: IntouchPayload): IntouchPayload {
     : payload;
 }
 
-function normalizeResponse(payload: IntouchPayload, raw: string): IntouchResponse {
+function normalizeResponse(
+  payload: IntouchPayload,
+  raw: string
+): IntouchResponse {
   const data = nestedPayload(payload);
-  const code = asString(field(data, "responsecode", "code", "statuscode", "statusCode"));
-  const detail = asString(field(data, "message", "detail", "error", "error_description", "statusdesc", "description", "desc", "status"));
+  const code = asString(
+    field(data, "responsecode", "code", "statuscode", "statusCode")
+  );
+  const detail = asString(
+    field(
+      data,
+      "message",
+      "detail",
+      "error",
+      "error_description",
+      "statusdesc",
+      "description",
+      "desc",
+      "status"
+    )
+  );
   const message =
     detail ||
     (code && responseCodeDescriptions[code]) ||
     (code ? `IntouchPay response ${code}` : "IntouchPay response received.");
 
   return {
-    ok: truthy(field(data, "success")) || Boolean(code && successfulResponseCodes.has(code)),
+    ok:
+      truthy(field(data, "success")) ||
+      Boolean(code && successfulResponseCodes.has(code)) ||
+      (Number(field(data, "proxy_http_status")) === 200 &&
+        (field(data, "balance", "availablebalance", "availableBalance") !==
+          undefined ||
+          !code)),
     code,
     message,
     data,
@@ -201,7 +271,9 @@ function normalizeResponse(payload: IntouchPayload, raw: string): IntouchRespons
   };
 }
 
-async function readIntouchResponse(response: Response): Promise<IntouchResponse> {
+async function readIntouchResponse(
+  response: Response
+): Promise<IntouchResponse> {
   const raw = await response.text();
   let payload: IntouchPayload = {};
 
@@ -232,7 +304,9 @@ async function readIntouchResponse(response: Response): Promise<IntouchResponse>
 
 function explainIntouchFailure(message: string, code?: string) {
   const fallback = (code && responseCodeDescriptions[code]) || message;
-  const ipMatch = message.match(/IP\s+([0-9a-f:.]+)\s+is\s+Not\s+Allowed\s+to\s+Perform\s+this\s+Operation/i);
+  const ipMatch = message.match(
+    /IP\s+([0-9a-f:.]+)\s+is\s+Not\s+Allowed\s+to\s+Perform\s+this\s+Operation/i
+  );
 
   if (ipMatch) {
     return `IntouchPay rejected server IP ${ipMatch[1]}. Ask IntouchPay to whitelist this IP for the MR Creativist account, or deploy from an already-approved server.`;
@@ -279,8 +353,38 @@ async function postJson(path: string, fields: Record<string, string>) {
   }
 }
 
+async function postProxy(action: string, fields: Record<string, string>) {
+  const config = assertProxyConfig();
+  if (!config) return null;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(),
+    envNumber("INTOUCH_TIMEOUT_MS", 20_000)
+  );
+
+  try {
+    const response = await fetch(config.url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-intouch-proxy-secret": config.secret
+      },
+      body: JSON.stringify({ action, ...fields }),
+      signal: controller.signal
+    });
+
+    return readIntouchResponse(response);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export function getIntouchCallbackUrl() {
-  return env("INTOUCH_CALLBACK_URL") || absoluteUrl(env("INTOUCH_CALLBACK_PATH", "/api/intouchpay/callback"));
+  return (
+    env("INTOUCH_CALLBACK_URL") ||
+    absoluteUrl(env("INTOUCH_CALLBACK_PATH", "/api/intouchpay/callback"))
+  );
 }
 
 export function createIntouchRequestId(prefix = "MRC") {
@@ -314,53 +418,76 @@ export function isDepositCompleted(response: IntouchResponse) {
 
 export function callbackCode(payload: IntouchPayload) {
   const data = nestedPayload(payload);
-  return asString(field(data, "responsecode", "code", "statuscode", "statusCode"));
+  return asString(
+    field(data, "responsecode", "code", "statuscode", "statusCode")
+  );
 }
 
 export function callbackRequestTransactionId(payload: IntouchPayload) {
   const data = nestedPayload(payload);
-  return asString(field(data, "requesttransactionid", "requestTransactionId", "request_transaction_id"));
+  return asString(
+    field(
+      data,
+      "requesttransactionid",
+      "requestTransactionId",
+      "request_transaction_id"
+    )
+  );
 }
 
 export function callbackProviderTransactionId(payload: IntouchPayload) {
   const data = nestedPayload(payload);
-  return asString(field(data, "transactionid", "transactionId", "transaction_id"));
+  return asString(
+    field(data, "transactionid", "transactionId", "transaction_id")
+  );
 }
 
 export function callbackReferenceNo(payload: IntouchPayload) {
   const data = nestedPayload(payload);
-  return asString(field(data, "referenceno", "referenceNo", "referenceid", "referenceId"));
+  return asString(
+    field(data, "referenceno", "referenceNo", "referenceid", "referenceId")
+  );
 }
 
 export function callbackStatusMessage(payload: IntouchPayload) {
   const data = nestedPayload(payload);
-  return asString(field(data, "status", "statusdesc", "message", "description"));
+  return asString(
+    field(data, "status", "statusdesc", "message", "description")
+  );
 }
 
 export async function requestIntouchPayment(input: IntouchPaymentInput) {
   const mobilePhone = formatRwandaMobilePhone(input.mobilePhone);
-  if (!mobilePhone) throw new Error("A valid MTN Mobile Money phone number is required.");
+  if (!mobilePhone)
+    throw new Error("A valid MTN Mobile Money phone number is required.");
 
-  const requestTransactionId = input.requestTransactionId || createIntouchRequestId("MRC-RCV");
-  const fields = {
-    ...signedFields(),
+  const requestTransactionId =
+    input.requestTransactionId || createIntouchRequestId("MRC-RCV");
+  const proxyFields = {
     amount: String(Math.round(Number(input.amount))),
     mobilephone: mobilePhone,
     requesttransactionid: requestTransactionId,
     callbackurl: input.callbackUrl || getIntouchCallbackUrl()
   };
+  const proxyResponse = await postProxy("requestpayment", proxyFields);
+  if (proxyResponse)
+    return { ...proxyResponse, requestTransactionId, mobilePhone };
 
-  const response = await postForm("/api/requestpayment/", fields);
+  const response = await postForm("/api/requestpayment/", {
+    ...signedFields(),
+    ...proxyFields
+  });
   return { ...response, requestTransactionId, mobilePhone };
 }
 
 export async function requestIntouchDeposit(input: IntouchDepositInput) {
   const mobilePhone = formatRwandaMobilePhone(input.mobilePhone);
-  if (!mobilePhone) throw new Error("A valid MTN Mobile Money phone number is required.");
+  if (!mobilePhone)
+    throw new Error("A valid MTN Mobile Money phone number is required.");
 
-  const requestTransactionId = input.requestTransactionId || createIntouchRequestId("MRC-SND");
-  const fields = {
-    ...signedFields(),
+  const requestTransactionId =
+    input.requestTransactionId || createIntouchRequestId("MRC-SND");
+  const proxyFields = {
     amount: String(Math.round(Number(input.amount))),
     withdrawcharge: "1",
     reason: input.reason || "MR Creativist payout",
@@ -368,26 +495,60 @@ export async function requestIntouchDeposit(input: IntouchDepositInput) {
     mobilephone: mobilePhone,
     requesttransactionid: requestTransactionId
   };
+  const proxyResponse = await postProxy("requestdeposit", proxyFields);
+  if (proxyResponse)
+    return { ...proxyResponse, requestTransactionId, mobilePhone };
 
-  const response = await postForm("/api/requestdeposit/", fields);
+  const response = await postForm("/api/requestdeposit/", {
+    ...signedFields(),
+    ...proxyFields
+  });
   return { ...response, requestTransactionId, mobilePhone };
 }
 
 export async function getIntouchTransactionStatus(input: IntouchStatusInput) {
   if (!input.requestTransactionId && !input.transactionId) {
-    throw new Error("A request transaction ID or provider transaction ID is required.");
+    throw new Error(
+      "A request transaction ID or provider transaction ID is required."
+    );
   }
+
+  const proxyFields = {
+    requesttransactionid: input.requestTransactionId ?? "",
+    transactionid: input.transactionId ?? ""
+  };
+  const proxyResponse = await postProxy("gettransactionstatus", proxyFields);
+  if (proxyResponse) return proxyResponse;
 
   return postJson("/api/gettransactionstatus/", {
     ...signedFields(),
-    requesttransactionid: input.requestTransactionId ?? "",
-    transactionid: input.transactionId ?? ""
+    ...proxyFields
   });
 }
 
 export async function getIntouchBalance() {
-  const response = await postForm("/api/getbalance/", signedFields());
-  const balance = Number(field(response.data, "balance", "availablebalance", "availableBalance") ?? 0);
+  const proxyResponse = await postProxy("getbalance", {});
+  if (proxyResponse) {
+    const balance = Number(
+      field(
+        proxyResponse.data,
+        "balance",
+        "availablebalance",
+        "availableBalance"
+      ) ?? 0
+    );
+
+    return {
+      ...proxyResponse,
+      balance: Number.isFinite(balance) ? balance : 0
+    };
+  }
+
+  const fields = signedFields();
+  const response = await postForm("/api/getbalance/", fields);
+  const balance = Number(
+    field(response.data, "balance", "availablebalance", "availableBalance") ?? 0
+  );
 
   return {
     ...response,

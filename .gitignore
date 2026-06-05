@@ -1,5 +1,6 @@
 .env
 .env*.local
+.intouch-proxy-secret.local
 .next
 node_modules
 coverage
