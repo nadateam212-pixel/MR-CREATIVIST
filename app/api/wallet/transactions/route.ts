@@ -1,5 +1,5 @@
 import { auth } from "@/auth";
-import { friendlyMongoError } from "@/lib/mongodb";
+import { friendlyMongoError, isMongoConnectionError } from "@/lib/mongodb";
 import { getWalletSnapshot, handleWalletAction } from "@/lib/platform-ledger";
 import { parseJson } from "@/lib/resource-api";
 
@@ -24,6 +24,6 @@ export async function POST(request: Request) {
     const snapshot = await handleWalletAction(session.user, body);
     return Response.json({ items: snapshot.transactions, total: snapshot.transactions.length, wallet: snapshot }, { status: 201 });
   } catch (error) {
-    return Response.json({ error: friendlyMongoError(error), degraded: true }, { status: 422 });
+    return Response.json({ error: friendlyMongoError(error), degraded: isMongoConnectionError(error) }, { status: 422 });
   }
 }

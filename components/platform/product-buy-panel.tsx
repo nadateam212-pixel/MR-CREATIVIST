@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CreditCard, PackageCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { convertMoney, formatConvertedAmount, parseMoney } from "@/lib/currency";
+import { PaymentMethodSelector, type CheckoutPaymentDetails, type CheckoutPaymentMethod } from "@/components/platform/payment-method-selector";
 import { useI18n } from "@/hooks/use-i18n";
 import { useUserPreferences } from "@/hooks/use-user-preferences";
 
@@ -23,17 +24,54 @@ type BuyProduct = {
 export function ProductBuyPanel({ product }: { product: BuyProduct }) {
   const [quantity, setQuantity] = useState(1);
   const [buyer, setBuyer] = useState({ name: "", email: "" });
-  const [paymentMethod, setPaymentMethod] = useState("Wallet");
+  const [paymentMethod, setPaymentMethod] = useState<CheckoutPaymentMethod>("mtn_momo");
+  const [paymentDetails, setPaymentDetails] = useState<CheckoutPaymentDetails>({
+    mobilePhone: "0788888888",
+    paypalEmail: "",
+    cardNumber: "",
+    cardName: "",
+    cardExpiry: "",
+    cardCvc: ""
+  });
+  const [walletBalanceFrw, setWalletBalanceFrw] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
   const [status, setStatus] = useState("");
   const preferences = useUserPreferences();
   const { t } = useI18n();
   const parsedPrice = parseMoney(product.price);
   const unitPriceUsd = parsedPrice ? convertMoney(parsedPrice.amount, parsedPrice.currency, "USD", preferences.usdToFrw) : 0;
   const total = unitPriceUsd * quantity;
+  const displayFrw = (amount: number) => formatConvertedAmount(amount, "FRW", preferences.currency, preferences.usdToFrw);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadWallet() {
+      try {
+        const response = await fetch("/api/wallet", { cache: "no-store" });
+        const payload = await response.json();
+        if (active && response.ok) setWalletBalanceFrw(Number(payload.balance ?? 0));
+      } catch {
+        if (active) setWalletBalanceFrw(0);
+      }
+    }
+
+    void loadWallet();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function submitOrder(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setStatus("Saving order...");
+    if (paymentMethod === "stripe") {
+      setStatus("Stripe card payments are coming soon. Choose MTN MoMo, PayPal, or Wallet.");
+      toast.error("Stripe card payments are coming soon.");
+      return;
+    }
+
+    setSubmitting(true);
+    setStatus("Processing payment...");
 
     try {
       const response = await fetch("/api/orders", {
@@ -43,6 +81,7 @@ export function ProductBuyPanel({ product }: { product: BuyProduct }) {
           buyerName: buyer.name,
           buyerEmail: buyer.email,
           paymentMethod,
+          paymentDetails,
           items: [{ productId: product.id ?? product.slug, quantity }]
         })
       });
@@ -50,12 +89,20 @@ export function ProductBuyPanel({ product }: { product: BuyProduct }) {
 
       if (!response.ok) throw new Error(payload.error ?? "Order failed.");
 
-      setStatus("Order saved. Check your email for fulfillment details.");
-      toast.success("Order saved successfully.");
+      if (payload.approvalUrl) {
+        setStatus("Redirecting to PayPal...");
+        window.location.href = payload.approvalUrl;
+        return;
+      }
+
+      setStatus(payload.message ?? "Order saved. Check your email for fulfillment details.");
+      toast.success(payload.message ?? "Order saved successfully.");
     } catch (error) {
       const nextMessage = error instanceof Error ? error.message : "Order failed.";
       setStatus(nextMessage);
       toast.error(nextMessage);
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -83,23 +130,21 @@ export function ProductBuyPanel({ product }: { product: BuyProduct }) {
             <Input required placeholder="Full name" value={buyer.name} onChange={(event) => setBuyer((current) => ({ ...current, name: event.target.value }))} />
             <Input required type="email" placeholder="Email address" value={buyer.email} onChange={(event) => setBuyer((current) => ({ ...current, email: event.target.value }))} />
             <Input min={1} type="number" value={quantity} onChange={(event) => setQuantity(Math.max(1, Number(event.target.value)))} />
-            <select
+            <PaymentMethodSelector
               value={paymentMethod}
-              onChange={(event) => setPaymentMethod(event.target.value)}
-              className="h-10 rounded-md border border-[hsl(var(--border))] bg-transparent px-3 text-sm"
-            >
-              {["Wallet", "Stripe card", "PayPal", "Mobile money", "Bank transfer"].map((method) => (
-                <option key={method}>{method}</option>
-              ))}
-            </select>
+              onChange={setPaymentMethod}
+              details={paymentDetails}
+              onDetailsChange={setPaymentDetails}
+              walletBalance={displayFrw(walletBalanceFrw)}
+            />
             <div className="flex justify-between border-t border-[hsl(var(--border))] pt-4 font-semibold">
               <span>{t("commerce.total")}</span>
               <span>{formatConvertedAmount(total, "USD", preferences.currency, preferences.usdToFrw)}</span>
             </div>
             {status ? <p className="text-sm font-medium text-[hsl(var(--primary))]">{status}</p> : null}
-            <Button type="submit">
+            <Button type="submit" disabled={submitting}>
               <CreditCard className="size-4" />
-              Pay securely
+              {submitting ? "Processing..." : "Pay securely"}
             </Button>
           </form>
         </CardContent>

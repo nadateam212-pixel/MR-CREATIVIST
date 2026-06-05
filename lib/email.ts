@@ -8,6 +8,11 @@ type EmailInput = {
   subject: string;
   text: string;
   html?: string;
+  attachments?: Array<{
+    filename: string;
+    content: Buffer | string;
+    contentType?: string;
+  }>;
 };
 
 export type EmailDeliveryResult = {
@@ -92,7 +97,7 @@ async function sendWithResend({ to, subject, text, html }: EmailInput): Promise<
   }
 }
 
-async function sendWithSmtp({ to, subject, text, html }: EmailInput): Promise<EmailDeliveryResult> {
+async function sendWithSmtp({ to, subject, text, html, attachments }: EmailInput): Promise<EmailDeliveryResult> {
   try {
     const port = getSmtpPort();
     const transporter = nodemailer.createTransport({
@@ -110,7 +115,8 @@ async function sendWithSmtp({ to, subject, text, html }: EmailInput): Promise<Em
       to,
       subject,
       text,
-      html
+      html,
+      attachments
     });
 
     return { ok: true, provider: "smtp", message: "Email sent with SMTP." };
@@ -141,7 +147,7 @@ export function getEmailDeliveryStatus() {
 }
 
 export async function sendEmail(input: EmailInput): Promise<EmailDeliveryResult> {
-  if (env("RESEND_API_KEY")) {
+  if (env("RESEND_API_KEY") && !input.attachments?.length) {
     const resendResult = await sendWithResend(input);
     if (resendResult.ok || !isSmtpConfigured()) return resendResult;
   }

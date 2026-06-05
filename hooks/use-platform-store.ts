@@ -434,14 +434,9 @@ export const usePlatformStore = create<PlatformState>()(
       template: "Professional"
     }
   ],
-  walletBalance: 428,
-  pendingBalance: 64,
-  walletTransactions: [
-    createTransaction("COURSE_EARNING", 129, "Course sale released to wallet"),
-    createTransaction("REFERRAL_EARNING", 24, "Referral conversion commission"),
-    createTransaction("WITHDRAWAL", -250, "Mobile money withdrawal request", "pending"),
-    createTransaction("PRODUCT_EARNING", 89, "Digital product sale")
-  ],
+  walletBalance: 0,
+  pendingBalance: 0,
+  walletTransactions: [],
   createdCourses: [],
   createdProducts: [],
   createdGigs: [],
@@ -490,11 +485,7 @@ export const usePlatformStore = create<PlatformState>()(
       studentCourseRecords: {
         ...state.studentCourseRecords,
         [slug]: createDefaultStudents(slug, seededChapters)
-      },
-      walletTransactions:
-        course.status === "published"
-          ? [createTransaction("COURSE_EARNING", 0, `Published course: ${course.title}`), ...state.walletTransactions]
-          : state.walletTransactions
+      }
     }));
 
     return slug;
@@ -908,11 +899,7 @@ export const usePlatformStore = create<PlatformState>()(
           updatedAt: timestamp
         },
         ...state.createdProducts
-      ],
-      walletTransactions:
-        product.status === "published"
-          ? [createTransaction("PRODUCT_EARNING", 0, `Published product: ${product.name}`), ...state.walletTransactions]
-          : state.walletTransactions
+      ]
     }));
 
     return slug;
@@ -958,11 +945,7 @@ export const usePlatformStore = create<PlatformState>()(
           updatedAt: timestamp
         },
         ...state.createdGigs
-      ],
-      walletTransactions:
-        gig.status === "published"
-          ? [createTransaction("PRODUCT_EARNING", 0, `Published gig: ${gig.title}`), ...state.walletTransactions]
-          : state.walletTransactions
+      ]
     }));
 
     return slug;
@@ -1087,6 +1070,17 @@ export const usePlatformStore = create<PlatformState>()(
     }),
     {
       name: "mr-creativist-platform-store",
+      version: 2,
+      migrate: (persistedState) => {
+        const state = persistedState as Partial<PlatformState>;
+
+        return {
+          ...state,
+          walletBalance: 0,
+          pendingBalance: 0,
+          walletTransactions: []
+        } as PlatformState;
+      },
       partialize: (state) => ({
         cartCount: state.cartCount,
         cartItems: state.cartItems,

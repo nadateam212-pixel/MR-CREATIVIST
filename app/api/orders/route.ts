@@ -1,19 +1,7 @@
+import { auth } from "@/auth";
 import Order from "@/models/Order";
-import Product from "@/models/Product";
-import User from "@/models/User";
-import { orderSchema } from "@/lib/mongo-validations";
-import { jsonError, jsonOk, mongoIdOrSlug, parsePagination, readJson, requireMongo } from "@/lib/mongo-api";
-
-async function productAllowsCheckout(product: { sellerId?: unknown }) {
-  const sellerId =
-    product.sellerId && typeof product.sellerId === "object" && "_id" in product.sellerId
-      ? product.sellerId._id
-      : product.sellerId;
-  if (!sellerId) return false;
-
-  const verifiedSeller = await User.exists({ _id: sellerId, isVerified: true });
-  return Boolean(verifiedSeller);
-}
+import { jsonError, jsonOk, parsePagination, readJson, requireMongo } from "@/lib/mongo-api";
+import { processProductCheckout } from "@/lib/payment-checkout";
 
 export async function GET(request: Request) {
   try {
@@ -32,50 +20,19 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    await requireMongo();
-    const body = orderSchema.parse(await readJson(request));
-    const orderItems = [];
+    const session = await auth();
+    const result = await processProductCheckout(session, await readJson(request));
 
-    for (const item of body.items) {
-      const product = await Product.findOne(mongoIdOrSlug(item.productId)).lean();
-      if (!product) return jsonOk({ error: `Product not found: ${item.productId}` }, 404);
-      if (product.status !== "published") return jsonOk({ error: `Product is not available for checkout: ${product.name}` }, 403);
-      if (!(await productAllowsCheckout(product))) {
-        return jsonOk({ error: `${product.name} is not verified for online checkout yet. Contact the seller directly.` }, 403);
-      }
-
-      orderItems.push({
-        productId: product._id,
-        name: product.name,
-        slug: product.slug,
-        quantity: item.quantity,
-        unitPrice: product.price
-      });
-    }
-
-    const subtotal = orderItems.reduce((total, item) => total + item.unitPrice * item.quantity, 0);
-    const total = Math.max(0, subtotal - body.discount + body.tax);
-    const order = await Order.create({
-      buyerName: body.buyerName,
-      buyerEmail: body.buyerEmail,
-      items: orderItems,
-      subtotal,
-      discount: body.discount,
-      tax: body.tax,
-      total,
-      paymentMethod: body.paymentMethod,
-      status: "paid"
-    });
-
-    await Promise.all(
-      orderItems.map((item) =>
-        Product.findByIdAndUpdate(item.productId, {
-          $inc: { stock: -item.quantity, downloads: item.quantity }
-        })
-      )
+    return jsonOk(
+      {
+        item: result.order,
+        transaction: result.transaction,
+        status: result.status,
+        approvalUrl: result.approvalUrl,
+        message: result.message
+      },
+      201
     );
-
-    return jsonOk({ item: order, message: "Order saved." }, 201);
   } catch (error) {
     return jsonError(error);
   }

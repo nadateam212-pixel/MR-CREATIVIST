@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { CheckCircle2, CreditCard, Download, MessageSquare, Minus, PackageCheck, Plus, ShieldCheck, ShoppingCart, Tag, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { PriceDisplay } from "@/components/ui/price-display";
 import { convertMoney, formatConvertedAmount, parseMoney } from "@/lib/currency";
+import { PaymentMethodSelector, type CheckoutPaymentDetails, type CheckoutPaymentMethod } from "@/components/platform/payment-method-selector";
 import { useI18n } from "@/hooks/use-i18n";
 import { usePlatformStore } from "@/hooks/use-platform-store";
 import { useUserPreferences } from "@/hooks/use-user-preferences";
@@ -29,17 +31,27 @@ type CheckoutProduct = {
 
 export function CheckoutWorkbench({ mode = "cart", products = [] }: { mode?: "cart" | "checkout"; products?: CheckoutProduct[] }) {
   const [coupon, setCoupon] = useState("CREATOR15");
-  const [paymentMethod, setPaymentMethod] = useState("Wallet");
+  const [paymentMethod, setPaymentMethod] = useState<CheckoutPaymentMethod>("mtn_momo");
+  const [paymentDetails, setPaymentDetails] = useState<CheckoutPaymentDetails>({
+    mobilePhone: "0788888888",
+    paypalEmail: "",
+    cardNumber: "",
+    cardName: "",
+    cardExpiry: "",
+    cardCvc: ""
+  });
+  const [buyer, setBuyer] = useState({ name: "", email: "" });
+  const [walletBalanceFrw, setWalletBalanceFrw] = useState(0);
   const [orderComplete, setOrderComplete] = useState(false);
   const [orderStatus, setOrderStatus] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const { data: session } = useSession();
   const preferences = useUserPreferences();
   const { t } = useI18n();
   const cartItems = usePlatformStore((state) => state.cartItems);
   const addToCart = usePlatformStore((state) => state.addToCart);
   const updateCartQuantity = usePlatformStore((state) => state.updateCartQuantity);
   const clearCart = usePlatformStore((state) => state.clearCart);
-  const purchase = usePlatformStore((state) => state.purchase);
-  const walletBalance = usePlatformStore((state) => state.walletBalance);
   const createdProducts = usePlatformStore((state) => state.createdProducts);
   const marketplaceProducts = useMemo(
     () => [...products, ...createdProducts.filter((product) => product.status === "published")],
@@ -65,8 +77,30 @@ export function CheckoutWorkbench({ mode = "cart", products = [] }: { mode?: "ca
   const total = Math.max(0, subtotal - discount + tax);
   const suggestedProducts = useMemo(() => marketplaceProducts.slice(0, 3), [marketplaceProducts]);
   const displayMoney = (amount: number) => formatConvertedAmount(amount, "USD", preferences.currency, preferences.usdToFrw);
+  const displayFrw = (amount: number) => formatConvertedAmount(amount, "FRW", preferences.currency, preferences.usdToFrw);
   const canCheckoutProduct = (product: CheckoutProduct) => Boolean(product.isVerified || product.sellerVerified);
   const unverifiedCartProducts = cartProducts.filter((product) => !canCheckoutProduct(product));
+  const buyerName = buyer.name || session?.user?.name || "";
+  const buyerEmail = buyer.email || session?.user?.email || "";
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadWallet() {
+      try {
+        const response = await fetch("/api/wallet", { cache: "no-store" });
+        const payload = await response.json();
+        if (active && response.ok) setWalletBalanceFrw(Number(payload.balance ?? 0));
+      } catch {
+        if (active) setWalletBalanceFrw(0);
+      }
+    }
+
+    void loadWallet();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function completeOrder() {
     if (unverifiedCartProducts.length) {
@@ -76,6 +110,21 @@ export function CheckoutWorkbench({ mode = "cart", products = [] }: { mode?: "ca
       return;
     }
 
+    if (!buyerName.trim() || !buyerEmail.trim()) {
+      const message = "Enter customer name and email before checkout.";
+      setOrderStatus(message);
+      toast.error(message);
+      return;
+    }
+
+    if (paymentMethod === "stripe") {
+      const message = "Stripe card payments are coming soon. Choose MTN MoMo, PayPal, or Wallet.";
+      setOrderStatus(message);
+      toast.error(message);
+      return;
+    }
+
+    setSubmitting(true);
     setOrderStatus("Saving order...");
 
     try {
@@ -83,11 +132,14 @@ export function CheckoutWorkbench({ mode = "cart", products = [] }: { mode?: "ca
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          buyerName: "Guest buyer",
-          buyerEmail: "buyer@example.com",
+          buyerName,
+          buyerEmail,
           paymentMethod,
+          paymentDetails,
           discount,
+          discountCurrency: "USD",
           tax,
+          taxCurrency: "USD",
           items: cartProducts.map((product) => ({
             productId: "id" in product && product.id ? product.id : product.slug,
             quantity: product.quantity
@@ -99,19 +151,25 @@ export function CheckoutWorkbench({ mode = "cart", products = [] }: { mode?: "ca
         const payload = await response.json().catch(() => ({}));
         throw new Error(payload.error ?? "Order could not be saved.");
       }
+      const payload = await response.json();
 
-      setOrderStatus("Order saved.");
-      toast.success("Order saved successfully.");
+      if (payload.approvalUrl) {
+        setOrderStatus("Redirecting to PayPal...");
+        globalThis.location.assign(payload.approvalUrl);
+        return;
+      }
+
+      setOrderStatus(payload.message ?? "Order saved.");
+      toast.success(payload.message ?? "Order saved successfully.");
+      clearCart();
+      setOrderComplete(true);
     } catch (error) {
       const nextMessage = error instanceof Error ? error.message : "Order completed on this device. Please try again if it does not appear in your orders.";
       setOrderStatus(nextMessage);
       toast.error(nextMessage);
+    } finally {
+      setSubmitting(false);
     }
-
-    purchase(total, `Marketplace checkout by ${paymentMethod}`);
-    clearCart();
-    setOrderComplete(true);
-    toast.success("Checkout completed.");
   }
 
   return (
@@ -247,45 +305,31 @@ export function CheckoutWorkbench({ mode = "cart", products = [] }: { mode?: "ca
               </div>
             </div>
 
-            <div className="grid gap-2">
-              <label className="text-sm font-medium" htmlFor="payment">
-                Payment method
-              </label>
-              <select
-                id="payment"
+            <div className="grid gap-3">
+              <p className="text-sm font-medium">Payment method</p>
+              <PaymentMethodSelector
                 value={paymentMethod}
-                onChange={(event) => setPaymentMethod(event.target.value)}
-                className="h-10 rounded-md border border-[hsl(var(--border))] bg-transparent px-3 text-sm"
-              >
-                {["Wallet", "Stripe card", "PayPal", "Mobile money", "Bank transfer"].map((method) => (
-                  <option key={method}>{method}</option>
-                ))}
-              </select>
-              <p className="text-xs text-[hsl(var(--muted-foreground))]">
-                {t("commerce.walletBalance")}: {displayMoney(walletBalance)}
-              </p>
+                onChange={setPaymentMethod}
+                details={paymentDetails}
+                onDetailsChange={setPaymentDetails}
+                walletBalance={displayFrw(walletBalanceFrw)}
+              />
             </div>
 
-            {mode === "checkout" ? (
-              <Button className="w-full" disabled={total <= 0 || cartProducts.length === 0 || unverifiedCartProducts.length > 0} onClick={completeOrder}>
-                <CreditCard className="size-4" />
-                Pay securely
-              </Button>
-            ) : (
-              cartProducts.length > 0 && unverifiedCartProducts.length === 0 ? (
-                <Button asChild className="w-full">
-                  <Link href="/marketplace/checkout">
-                    <ShieldCheck className="size-4" />
-                    Proceed to checkout
-                  </Link>
-                </Button>
-              ) : (
-                <Button className="w-full" disabled>
-                  <ShieldCheck className="size-4" />
-                  Proceed to checkout
-                </Button>
-              )
-            )}
+            <div className="grid gap-2">
+              <p className="text-sm font-medium">Customer</p>
+              <Input value={buyerName} onChange={(event) => setBuyer((current) => ({ ...current, name: event.target.value }))} placeholder="Full name" />
+              <Input value={buyerEmail} onChange={(event) => setBuyer((current) => ({ ...current, email: event.target.value }))} inputMode="email" placeholder="Email address" />
+            </div>
+
+            <Button
+              className="w-full"
+              disabled={submitting || total <= 0 || cartProducts.length === 0 || unverifiedCartProducts.length > 0 || paymentMethod === "stripe"}
+              onClick={completeOrder}
+            >
+              {mode === "checkout" ? <CreditCard className="size-4" /> : <ShieldCheck className="size-4" />}
+              {submitting ? "Processing..." : mode === "checkout" ? "Pay securely" : "Proceed to checkout"}
+            </Button>
           </CardContent>
         </Card>
       </section>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { convertMoney, formatConvertedAmount, isFreePrice, parseMoney } from "@/lib/currency";
 import { titleFromCourseSlug } from "@/lib/course-media";
+import { PaymentMethodSelector, type CheckoutPaymentDetails, type CheckoutPaymentMethod } from "@/components/platform/payment-method-selector";
 import { useI18n } from "@/hooks/use-i18n";
 import { usePlatformStore } from "@/hooks/use-platform-store";
 import { useUserPreferences } from "@/hooks/use-user-preferences";
@@ -29,15 +30,22 @@ export function CourseEnrollmentPanel({ slug, course }: { slug: string; course?:
   const router = useRouter();
   const { data: session } = useSession();
   const [coupon, setCoupon] = useState("LEARN10");
-  const [paymentMethod, setPaymentMethod] = useState("Wallet");
+  const [paymentMethod, setPaymentMethod] = useState<CheckoutPaymentMethod>("mtn_momo");
+  const [paymentDetails, setPaymentDetails] = useState<CheckoutPaymentDetails>({
+    mobilePhone: "0788888888",
+    paypalEmail: "",
+    cardNumber: "",
+    cardName: "",
+    cardExpiry: "",
+    cardCvc: ""
+  });
   const [complete, setComplete] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [status, setStatus] = useState("");
+  const [walletBalanceFrw, setWalletBalanceFrw] = useState(0);
   const preferences = useUserPreferences();
   const { t } = useI18n();
   const enrollCourse = usePlatformStore((state) => state.enrollCourse);
-  const purchase = usePlatformStore((state) => state.purchase);
-  const walletBalance = usePlatformStore((state) => state.walletBalance);
   const enrolledCourseSlugs = usePlatformStore((state) => state.enrolledCourseSlugs);
   const createdCourses = usePlatformStore((state) => state.createdCourses);
   const localCourse = createdCourses.find((item) => item.slug === slug);
@@ -69,7 +77,27 @@ export function CourseEnrollmentPanel({ slug, course }: { slug: string; course?:
   const total = subtotal - discount;
   const freeCourse = isFreePrice(resolvedCourse?.price ?? "$0");
   const displayMoney = (amount: number) => formatConvertedAmount(amount, "USD", preferences.currency, preferences.usdToFrw);
+  const displayFrw = (amount: number) => formatConvertedAmount(amount, "FRW", preferences.currency, preferences.usdToFrw);
   const displayCourseMoney = (amount: number) => (amount <= 0 ? "Free" : displayMoney(amount));
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadWallet() {
+      try {
+        const response = await fetch("/api/wallet", { cache: "no-store" });
+        const payload = await response.json();
+        if (active && response.ok) setWalletBalanceFrw(Number(payload.balance ?? 0));
+      } catch {
+        if (active) setWalletBalanceFrw(0);
+      }
+    }
+
+    void loadWallet();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function completeEnrollment() {
     if (!resolvedCourse || submitting) return;
@@ -78,33 +106,50 @@ export function CourseEnrollmentPanel({ slug, course }: { slug: string; course?:
       return;
     }
 
+    if (!freeCourse && paymentMethod === "stripe") {
+      setStatus("Stripe card payments are coming soon. Choose MTN MoMo, PayPal, or Wallet.");
+      return;
+    }
+
     setSubmitting(true);
-    setStatus("Saving enrollment...");
-    let newEnrollment = true;
+    setStatus(freeCourse ? "Saving enrollment..." : "Processing payment...");
 
     try {
-      const response = await fetch("/api/enrollments", {
+      const response = await fetch(freeCourse ? "/api/enrollments" : "/api/checkout/course", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           courseId: resolvedCourse.id ?? resolvedCourse.slug,
-          paidAmount: total
+          paidAmount: total,
+          paymentMethod,
+          paymentDetails,
+          discount,
+          discountCurrency: "USD",
+          buyerName: session.user.name,
+          buyerEmail: session.user.email
         })
       });
       const payload = await response.json().catch(() => ({}));
 
       if (!response.ok) throw new Error(payload.error ?? "Enrollment could not be saved.");
 
-      newEnrollment = payload.created !== false;
+      if (payload.approvalUrl) {
+        setStatus("Redirecting to PayPal...");
+        window.location.href = payload.approvalUrl;
+        return;
+      }
+
       setStatus(payload.message ?? "Enrollment saved.");
+      if (payload.status === "pending") {
+        setSubmitting(false);
+        return;
+      }
+
+      enrollCourse(resolvedCourse.slug);
+      setComplete(true);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Enrollment saved on this device. Please try again if it does not appear in your dashboard.");
     } finally {
-      if (newEnrollment) {
-        purchase(total, `Course enrollment: ${resolvedCourse.title}`);
-      }
-      enrollCourse(resolvedCourse.slug);
-      setComplete(true);
       setSubmitting(false);
     }
   }
@@ -161,19 +206,16 @@ export function CourseEnrollmentPanel({ slug, course }: { slug: string; course?:
                   </div>
                 </div>
                 <div>
-                  <label className="text-sm font-medium" htmlFor="course-payment">
-                    Payment method
-                  </label>
-                  <select
-                    id="course-payment"
-                    value={paymentMethod}
-                    onChange={(event) => setPaymentMethod(event.target.value)}
-                    className="mt-2 h-10 w-full rounded-md border border-[hsl(var(--border))] bg-transparent px-3 text-sm"
-                  >
-                    {["Wallet", "Stripe card", "PayPal", "Mobile money", "Bank transfer"].map((method) => (
-                      <option key={method}>{method}</option>
-                    ))}
-                  </select>
+                  <p className="text-sm font-medium">Payment method</p>
+                  <div className="mt-2">
+                    <PaymentMethodSelector
+                      value={paymentMethod}
+                      onChange={setPaymentMethod}
+                      details={paymentDetails}
+                      onDetailsChange={setPaymentDetails}
+                      walletBalance={displayFrw(walletBalanceFrw)}
+                    />
+                  </div>
                 </div>
               </div>
             </>
@@ -207,7 +249,7 @@ export function CourseEnrollmentPanel({ slug, course }: { slug: string; course?:
               <Wallet className="size-4 text-[hsl(var(--primary))]" />
               {t("commerce.walletBalance")}
             </p>
-            <p className="mt-1 text-[hsl(var(--muted-foreground))]">{displayMoney(walletBalance)}</p>
+            <p className="mt-1 text-[hsl(var(--muted-foreground))]">{displayFrw(walletBalanceFrw)}</p>
           </div>
           <Button className="w-full" disabled={complete || alreadyEnrolled || submitting} onClick={completeEnrollment}>
             {submitting ? <Loader2 className="size-4 animate-spin" /> : <CreditCard className="size-4" />}

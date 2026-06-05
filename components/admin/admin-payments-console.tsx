@@ -5,12 +5,15 @@ import {
   ArrowDownToLine,
   ArrowUpFromLine,
   Download,
+  Eye,
+  FileText,
   RefreshCw,
   Search,
   Send,
   ShieldCheck,
   Smartphone,
-  Wallet
+  Wallet,
+  X
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -59,6 +62,31 @@ type AdminPaymentsConsoleProps = {
   initialSnapshot: AdminPaymentsSnapshot;
 };
 
+type PaymentBillDetail = {
+  billNo: string;
+  title: string;
+  buyerName: string;
+  buyerEmail: string;
+  amount: number;
+  currency: "USD" | "FRW";
+  status: string;
+  paymentMethod: string;
+  reference: string;
+  paidAt: string;
+  items: Array<{
+    name: string;
+    quantity: number;
+    amount: number;
+  }>;
+};
+
+type PaymentDetail = {
+  transaction: AdminPaymentTransaction & {
+    metadata?: Record<string, unknown>;
+  };
+  bill: PaymentBillDetail;
+};
+
 const statusOptions = ["all", "pending", "completed", "failed", "cancelled"];
 const typeOptions = ["all", "deposit", "withdrawal", "transfer_in", "transfer_out", "admin_payout", "purchase", "refund"];
 
@@ -91,6 +119,7 @@ export function AdminPaymentsConsole({ initialSnapshot }: AdminPaymentsConsolePr
   const [providerBalance, setProviderBalance] = useState("");
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
+  const [detail, setDetail] = useState<PaymentDetail | null>(null);
 
   const stats = useMemo(
     () => [
@@ -210,6 +239,32 @@ export function AdminPaymentsConsole({ initialSnapshot }: AdminPaymentsConsolePr
     }
   }
 
+  async function viewPayment(transactionId: string) {
+    setBusy(`view-${transactionId}`);
+    setMessage("Loading payment details...");
+
+    try {
+      const response = await fetch(`/api/admin/payments/${transactionId}`, { cache: "no-store" });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        setMessage(payload.error ?? "Payment details failed.");
+        return;
+      }
+
+      setDetail(payload);
+      setMessage("Payment details loaded.");
+    } catch {
+      setMessage("Payment details failed. Check the server log.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  function downloadBill(transactionId: string) {
+    window.open(`/api/admin/payments/${transactionId}/bill`, "_blank", "noopener,noreferrer");
+  }
+
   function exportSnapshot() {
     const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -326,17 +381,16 @@ export function AdminPaymentsConsole({ initialSnapshot }: AdminPaymentsConsolePr
           <CardTitle>Transactions</CardTitle>
         </CardHeader>
         <CardContent className="overflow-x-auto p-0">
-          <table className="w-full min-w-[76rem] text-left text-sm">
+          <table className="w-full min-w-[58rem] text-left text-sm">
             <thead className="border-y border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))]">
               <tr>
                 <th className="p-4 font-medium">Date</th>
-                <th className="p-4 font-medium">Type</th>
-                <th className="p-4 font-medium">Account</th>
-                <th className="p-4 font-medium">Mobile</th>
+                <th className="p-4 font-medium">Payment</th>
+                <th className="p-4 font-medium">Customer</th>
                 <th className="p-4 font-medium">Reference</th>
                 <th className="p-4 font-medium">Status</th>
                 <th className="p-4 text-right font-medium">Amount</th>
-                <th className="p-4 text-right font-medium">Action</th>
+                <th className="p-4 text-right font-medium">View</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[hsl(var(--border))]">
@@ -346,13 +400,12 @@ export function AdminPaymentsConsole({ initialSnapshot }: AdminPaymentsConsolePr
                     <td className="p-4 whitespace-nowrap text-[hsl(var(--muted-foreground))]">{dateLabel(transaction.createdAt)}</td>
                     <td className="p-4">
                       <p className="font-black capitalize">{label(transaction.type)}</p>
-                      <p className="mt-1 max-w-64 truncate text-xs text-[hsl(var(--muted-foreground))]">{transaction.description}</p>
+                      <p className="mt-1 max-w-72 truncate text-xs text-[hsl(var(--muted-foreground))]">{transaction.description}</p>
                     </td>
                     <td className="p-4">
-                      <p>{transaction.counterpartyEmail || transaction.userEmail || "-"}</p>
-                      <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{transaction.referenceType ?? "manual"}</p>
+                      <p className="max-w-52 truncate">{transaction.counterpartyEmail || transaction.userEmail || "-"}</p>
+                      <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{transaction.mobilePhone ?? transaction.referenceType ?? "-"}</p>
                     </td>
-                    <td className="p-4 text-[hsl(var(--muted-foreground))]">{transaction.mobilePhone ?? "-"}</td>
                     <td className="p-4 text-xs text-[hsl(var(--muted-foreground))]">
                       {transaction.providerReference ?? transaction.requestTransactionId ?? transaction.referenceId ?? "-"}
                     </td>
@@ -369,11 +422,11 @@ export function AdminPaymentsConsole({ initialSnapshot }: AdminPaymentsConsolePr
                         type="button"
                         size="sm"
                         variant="outline"
-                        disabled={!transaction.requestTransactionId || busy === transaction.requestTransactionId}
-                        onClick={() => void refreshStatus(transaction.requestTransactionId)}
+                        disabled={busy === `view-${transaction.id}`}
+                        onClick={() => void viewPayment(transaction.id)}
                       >
-                        <RefreshCw className="size-4" />
-                        Status
+                        <Eye className="size-4" />
+                        View
                       </Button>
                     </td>
                   </tr>
@@ -389,6 +442,69 @@ export function AdminPaymentsConsole({ initialSnapshot }: AdminPaymentsConsolePr
           </table>
         </CardContent>
       </Card>
+
+      {detail ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-[hsl(var(--border))] p-5">
+              <div>
+                <Badge>{detail.bill.status}</Badge>
+                <h2 className="mt-3 text-2xl font-black">{detail.bill.title}</h2>
+                <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{detail.bill.billNo}</p>
+              </div>
+              <Button type="button" size="icon" variant="outline" onClick={() => setDetail(null)} aria-label="Close payment details">
+                <X className="size-4" />
+              </Button>
+            </div>
+
+            <div className="grid gap-4 p-5 md:grid-cols-2">
+              {[
+                ["Name", detail.bill.buyerName],
+                ["Email", detail.bill.buyerEmail],
+                ["Amount", detail.bill.currency === "FRW" ? money(detail.bill.amount) : `$${Number(detail.bill.amount ?? 0).toFixed(2)}`],
+                ["Method", detail.bill.paymentMethod],
+                ["Status", detail.bill.status],
+                ["Reference", detail.bill.reference],
+                ["Mobile", detail.transaction.mobilePhone ?? "-"],
+                ["Provider transaction", detail.transaction.providerTransactionId ?? "-"]
+              ].map(([key, value]) => (
+                <div key={key} className="rounded-md border border-[hsl(var(--border))] p-3">
+                  <p className="text-xs font-black uppercase tracking-[0.14em] text-[hsl(var(--muted-foreground))]">{key}</p>
+                  <p className="mt-2 break-words font-semibold">{value}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="px-5 pb-5">
+              <div className="rounded-md border border-[hsl(var(--border))]">
+                <div className="grid grid-cols-[1fr_4rem_7rem] border-b border-[hsl(var(--border))] p-3 text-xs font-black uppercase tracking-[0.14em] text-[hsl(var(--muted-foreground))]">
+                  <span>Product / Course</span>
+                  <span>Qty</span>
+                  <span className="text-right">Amount</span>
+                </div>
+                {detail.bill.items.map((item) => (
+                  <div key={`${item.name}-${item.quantity}`} className="grid grid-cols-[1fr_4rem_7rem] p-3 text-sm">
+                    <span>{item.name}</span>
+                    <span>{item.quantity}</span>
+                    <span className="text-right">{detail.bill.currency === "FRW" ? money(item.amount) : `$${Number(item.amount ?? 0).toFixed(2)}`}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-5 flex flex-wrap justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => void refreshStatus(detail.transaction.requestTransactionId)}>
+                  <RefreshCw className="size-4" />
+                  Refresh status
+                </Button>
+                <Button type="button" onClick={() => downloadBill(detail.transaction.id)}>
+                  <FileText className="size-4" />
+                  Download bill
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

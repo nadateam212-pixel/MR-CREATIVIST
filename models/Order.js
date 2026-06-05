@@ -23,7 +23,12 @@ const OrderSchema = new mongoose.Schema(
     total: { type: Number, min: 0, required: true },
     currency: { type: String, enum: ["USD", "FRW"], default: "USD" },
     paymentMethod: { type: String, required: true },
-    status: { type: String, enum: ["pending", "paid", "fulfilled", "refunded", "cancelled"], default: "pending", index: true }
+    paymentReference: { type: String, trim: true, index: true },
+    providerTransactionId: { type: String, trim: true, index: true },
+    paidAt: Date,
+    billSentAt: Date,
+    status: { type: String, enum: ["pending", "paid", "fulfilled", "refunded", "cancelled"], default: "pending", index: true },
+    metadata: { type: mongoose.Schema.Types.Mixed, default: {} }
   },
   { timestamps: true }
 );

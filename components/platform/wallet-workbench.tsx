@@ -136,7 +136,7 @@ export function WalletWorkbench({ initialSnapshot, initialError = "" }: WalletWo
       const payload = await response.json();
 
       if (!response.ok) {
-        setDatabaseReady(false);
+        setDatabaseReady(!payload.degraded);
         setStatus(payload.error ?? "Transaction failed.");
         return;
       }
