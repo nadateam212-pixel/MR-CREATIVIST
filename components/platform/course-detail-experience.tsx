@@ -1,16 +1,20 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Award,
   BookOpen,
   CheckCircle2,
   Clock,
+  CreditCard,
   Download,
   Heart,
   Layers3,
+  Lock,
   MessageCircle,
+  Pause,
+  Play,
   PlayCircle,
   Share2,
   Star,
@@ -210,27 +214,130 @@ function formatLessonMinutes(minutes: number) {
 function CoursePreviewPlayer({
   title,
   url,
-  poster
+  poster,
+  courseSlug,
+  previewGateActive,
+  previewSecondsLimit
 }: {
   title: string;
   url: string;
   poster: string;
+  courseSlug: string;
+  previewGateActive: boolean;
+  previewSecondsLimit: number;
 }) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const source = useMemo(
     () => videoSourceForUrl(url, { controls: false, origin: typeof window === "undefined" ? undefined : window.location.origin }),
     [url]
   );
+  const blocked = previewGateActive && elapsedSeconds >= previewSecondsLimit;
+
+  useEffect(() => {
+    if (!previewGateActive || blocked) return undefined;
+
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "hidden") return;
+      if (source.provider === "direct" && !playing) return;
+      setElapsedSeconds((current) => Math.min(previewSecondsLimit, current + 1));
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [blocked, playing, previewGateActive, previewSecondsLimit, source.provider]);
+
+  useEffect(() => {
+    if (!blocked) return;
+
+    videoRef.current?.pause();
+    if (iframeRef.current && source.embedUrl) iframeRef.current.src = source.embedUrl;
+  }, [blocked, source.embedUrl]);
+
+  async function toggleDirectPreview() {
+    if (!videoRef.current || blocked) return;
+
+    if (videoRef.current.paused) {
+      await videoRef.current.play();
+      setPlaying(true);
+    } else {
+      videoRef.current.pause();
+      setPlaying(false);
+    }
+  }
+
+  function paywallOverlay() {
+    if (!blocked) return null;
+
+    return (
+      <div className="absolute inset-0 z-20 grid place-items-center bg-black/70 p-4 text-white backdrop-blur-sm">
+        <div className="w-full max-w-sm rounded-lg border border-white/15 bg-black/80 p-5 text-center shadow-xl">
+          <div className="mx-auto mb-3 grid size-12 place-items-center rounded-full bg-white/10">
+            <Lock className="size-6" />
+          </div>
+          <h2 className="text-lg font-bold">Enrollment required</h2>
+          <p className="mt-2 text-sm leading-6 text-white/75">
+            Your paid preview has ended. Unlock the full course to keep watching and save progress.
+          </p>
+          <Button asChild className="mt-4 w-full">
+            <Link href={`/courses/${courseSlug}/enroll`}>
+              <CreditCard className="size-4" />
+              Enroll or pay
+            </Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  function driveShield() {
+    if (source.provider !== "google-drive") return null;
+
+    return (
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex h-14 items-start justify-between bg-gradient-to-b from-black/90 via-black/55 to-transparent p-2">
+        <span className="inline-flex items-center gap-2 rounded bg-black/70 px-2 py-1 text-xs font-semibold text-white shadow">
+          <span className="relative size-5 overflow-hidden rounded">
+            <SafeImage src="/icons/logo.png" alt="" fill sizes="20px" className="object-contain" />
+          </span>
+          <span className="hidden sm:inline">MR Creativist</span>
+        </span>
+        <span className="grid size-10 place-items-center rounded-md bg-white/95 text-[hsl(var(--primary))] shadow-lg ring-1 ring-black/10">
+          <Download className="size-5" />
+        </span>
+      </div>
+    );
+  }
 
   if (source.provider === "direct") {
     return (
-      <video
-        src={source.playbackUrl}
-        poster={poster}
-        controls
-        controlsList="nodownload noremoteplayback"
-        disablePictureInPicture
-        className="aspect-video w-full bg-black object-contain"
-      />
+      <div className="relative aspect-video w-full overflow-hidden bg-black">
+        <video
+          ref={videoRef}
+          src={source.playbackUrl}
+          poster={poster}
+          playsInline
+          controls={false}
+          controlsList="nodownload noplaybackrate noremoteplayback"
+          disablePictureInPicture
+          className="h-full w-full bg-black object-contain"
+          onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
+          onEnded={() => setPlaying(false)}
+        />
+        <button
+          type="button"
+          onClick={() => void toggleDirectPreview()}
+          disabled={blocked}
+          className="group absolute inset-0 grid place-items-center text-white transition hover:bg-black/10 disabled:cursor-not-allowed"
+          aria-label={playing ? "Pause preview" : "Play preview"}
+        >
+          <span className={`grid size-16 place-items-center rounded-2xl bg-black/75 shadow-lg transition ${playing ? "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100" : "opacity-100"}`}>
+            {playing ? <Pause className="size-8" /> : <Play className="ml-1 size-8 fill-current" />}
+          </span>
+        </button>
+        {paywallOverlay()}
+      </div>
     );
   }
 
@@ -238,6 +345,7 @@ function CoursePreviewPlayer({
     return (
       <div className="relative aspect-video w-full overflow-hidden bg-black">
         <iframe
+          ref={iframeRef}
           src={source.embedUrl}
           title="Course preview video"
           allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
@@ -245,6 +353,8 @@ function CoursePreviewPlayer({
           referrerPolicy="strict-origin-when-cross-origin"
           className={embeddedPreviewClass()}
         />
+        {driveShield()}
+        {paywallOverlay()}
       </div>
     );
   }
@@ -260,6 +370,7 @@ function CoursePreviewPlayer({
         className="object-contain"
         priority
       />
+      {paywallOverlay()}
     </div>
   );
 }
@@ -336,6 +447,8 @@ export function CourseDetailExperience({
   const accessType = courseAccessType(course);
   const accessText = accessLabel(accessType);
   const freeCourse = accessType === "free";
+  const previewSecondsLimit = Math.max(30, Number(process.env.NEXT_PUBLIC_COURSE_PREVIEW_SECONDS ?? 120) || 120);
+  const previewGateActive = !enrolled && accessType !== "free";
   const learningHref = enrolled
     ? `/dashboard/learning/${course.slug}`
     : freeCourse
@@ -345,7 +458,7 @@ export function CourseDetailExperience({
     ? "Continue learning"
     : freeCourse
       ? "Start free course"
-      : "Start learning";
+      : "Course tracking";
   const commentHref = enrolled ? `/dashboard/learning/${course.slug}#comments` : `/courses/${course.slug}/preview#comments`;
   const [engagement, setEngagement] = useState<CourseEngagement>({
     likes: Number(course.likes ?? 0),
@@ -438,7 +551,14 @@ export function CourseDetailExperience({
         <div className="space-y-5">
           <Card className="overflow-hidden">
             <div className="bg-black">
-              <CoursePreviewPlayer title={course.title} url={previewVideoUrl} poster={course.image} />
+              <CoursePreviewPlayer
+                title={course.title}
+                url={previewVideoUrl}
+                poster={course.image}
+                courseSlug={course.slug}
+                previewGateActive={previewGateActive}
+                previewSecondsLimit={previewSecondsLimit}
+              />
             </div>
             <div className="flex flex-wrap items-center gap-2 border-b border-[hsl(var(--border))] bg-[hsl(var(--card))] p-3 sm:justify-end">
               <Button
@@ -454,12 +574,14 @@ export function CourseDetailExperience({
               <Button asChild size="sm" variant="outline">
                 <Link href={commentHref}>
                   <MessageCircle className="size-4" />
-                  {compactCount(engagement.commentCount || engagement.comments + engagement.replies)} comments
+                  <span>{compactCount(engagement.commentCount || engagement.comments + engagement.replies)}</span>
+                  <span className="hidden sm:inline">comments</span>
                 </Link>
               </Button>
               <Button type="button" size="sm" variant="outline" onClick={() => void shareCourse()}>
                 <Share2 className="size-4" />
-                Share{engagement.shareCount ? ` ${compactCount(engagement.shareCount)}` : ""}
+                <span className="hidden sm:inline">Share</span>
+                {engagement.shareCount ? <span>{compactCount(engagement.shareCount)}</span> : null}
               </Button>
             </div>
             <CardContent className="space-y-5 p-5 lg:p-6">
@@ -620,12 +742,6 @@ export function CourseDetailExperience({
                 <Link href={learningHref}>
                   <PlayCircle className="size-4" />
                   {learningLabel}
-                </Link>
-              </Button>
-              <Button asChild className="w-full" variant="outline">
-                <Link href={`/courses/${course.slug}/preview`}>
-                  <BookOpen className="size-4" />
-                  Open preview
                 </Link>
               </Button>
             </CardContent>

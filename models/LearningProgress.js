@@ -8,8 +8,9 @@ const LearningEventSchema = new mongoose.Schema(
     action: {
       type: String,
       enum: [
-        "viewed",
-        "played",
+      "viewed",
+      "position",
+      "played",
         "studied",
         "read",
         "watched",
@@ -36,6 +37,8 @@ const LearningProgressSchema = new mongoose.Schema(
     learnerEmail: { type: String, required: true, lowercase: true, trim: true, match: /.+@.+\..+/ },
     completedLessonKeys: [{ type: String, trim: true }],
     currentLessonKey: { type: String, trim: true },
+    lessonPositions: { type: Map, of: Number, default: {} },
+    watchedSecondsByLesson: { type: Map, of: Number, default: {} },
     progressPercent: { type: Number, min: 0, max: 100, default: 0 },
     status: { type: String, enum: ["active", "completed"], default: "active" },
     startedAt: { type: Date, default: Date.now },

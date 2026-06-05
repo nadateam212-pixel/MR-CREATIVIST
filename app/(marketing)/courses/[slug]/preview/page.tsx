@@ -33,6 +33,8 @@ export default async function CoursePreviewPage({ params }: { params: Promise<{ 
     certificateIssuedAt: null,
     events: [],
     studySecondsByLesson: {},
+    lessonPositions: {},
+    watchedSecondsByLesson: {},
     studySecondsByModule: {},
     moduleRequiredSeconds: {},
     totalStudySeconds: 0,

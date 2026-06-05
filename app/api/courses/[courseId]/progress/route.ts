@@ -19,6 +19,7 @@ const progressSchema = z.object({
   action: z
     .enum([
       "viewed",
+      "position",
       "played",
       "studied",
       "read",
@@ -31,11 +32,28 @@ const progressSchema = z.object({
     ])
     .default("completed"),
   seconds: z.coerce.number().min(0).max(86400).optional(),
+  position: z.coerce.number().min(0).max(86400).optional(),
+  watchedSeconds: z.coerce.number().min(0).max(86400).optional(),
+  duration: z.coerce.number().min(0).max(86400).optional(),
   score: z.coerce.number().min(0).max(100).optional(),
   progressPercent: z.coerce.number().min(0).max(100).optional()
 });
 
 const completionActions = new Set(["read", "watched", "completed", "quiz_passed", "assignment_submitted", "downloaded"]);
+
+function progressNumberMap(value: unknown) {
+  if (!value) return {} as Record<string, number>;
+  if (value instanceof Map) return Object.fromEntries(value.entries()) as Record<string, number>;
+  return typeof value === "object" ? (value as Record<string, number>) : {};
+}
+
+function lessonWatchRequirement(lesson: { durationMinutes?: number } | null, duration?: number) {
+  const measuredDuration = Math.floor(Number(duration ?? 0));
+  if (measuredDuration > 0) return Math.max(1, measuredDuration - 2);
+
+  const savedDuration = Math.round(Number(lesson?.durationMinutes ?? 0) * 60);
+  return savedDuration > 0 ? Math.max(1, savedDuration - 2) : 1;
+}
 
 function previousModulesReady(
   structure: ReturnType<typeof buildCourseStructure>,
@@ -144,6 +162,27 @@ export async function POST(request: Request, { params }: { params: Promise<{ cou
       return jsonOk({ error: "Quiz score must be at least 75% before the next chapter can unlock." }, 422);
     }
 
+    const existingWatchedSeconds = progressNumberMap(existingProgress?.watchedSecondsByLesson);
+    const previousWatchedSeconds = lesson ? Number(existingWatchedSeconds[lesson.key] ?? 0) : 0;
+    const nextWatchedSeconds = lesson
+      ? Math.max(previousWatchedSeconds, Math.floor(Number(body.watchedSeconds ?? 0)), Math.floor(Number(body.seconds ?? 0)))
+      : 0;
+
+    if (lesson?.type === "video" && completionActions.has(body.action)) {
+      const requiredSeconds = lessonWatchRequirement(lesson, body.duration);
+
+      if (nextWatchedSeconds < requiredSeconds) {
+        return jsonOk(
+          {
+            error: "Watch the full video before this lesson can be marked complete.",
+            requiredSeconds,
+            watchedSeconds: nextWatchedSeconds
+          },
+          422
+        );
+      }
+    }
+
     if (lesson && completionActions.has(body.action)) {
       completedLessonKeys.add(lesson.key);
     }
@@ -159,22 +198,33 @@ export async function POST(request: Request, { params }: { params: Promise<{ cou
     const nextKey = body.currentLessonKey ?? nextLessonKey(structure, completedKeys) ?? lesson?.key;
     const now = new Date();
     const learnerName = account?.name ?? session?.user?.name ?? "Learner";
+    const setFields: Record<string, unknown> = {
+      courseId: course._id,
+      userId: account?._id,
+      learnerName,
+      learnerEmail: normalizedEmail,
+      completedLessonKeys: completedKeys,
+      currentLessonKey: nextKey,
+      progressPercent,
+      status: progressPercent >= 100 ? "completed" : "active",
+      lastActivityAt: now
+    };
+
+    if (lesson && typeof body.position === "number") {
+      const safePosition = Math.max(0, Math.floor(body.position));
+      setFields[`lessonPositions.${lesson.key}`] = safePosition;
+    }
+
+    if (lesson && (typeof body.watchedSeconds === "number" || typeof body.seconds === "number")) {
+      setFields[`watchedSecondsByLesson.${lesson.key}`] = nextWatchedSeconds;
+      existingWatchedSeconds[lesson.key] = nextWatchedSeconds;
+    }
 
     const progress = await LearningProgress.findOneAndUpdate(
       { courseId: course._id, learnerEmail: normalizedEmail },
       {
-        $set: {
-          courseId: course._id,
-          userId: account?._id,
-          learnerName,
-          learnerEmail: normalizedEmail,
-          completedLessonKeys: completedKeys,
-          currentLessonKey: nextKey,
-          progressPercent,
-          status: progressPercent >= 100 ? "completed" : "active",
-          lastActivityAt: now
-        },
-        ...(lesson
+        $set: setFields,
+        ...(lesson && body.action !== "position"
           ? {
               $push: {
                 events: {

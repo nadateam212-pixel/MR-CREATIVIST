@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type SyntheticEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Award,
@@ -19,7 +19,6 @@ import {
   Pause,
   Play,
   QrCode,
-  RotateCcw,
   Send,
   Share2,
   Sparkles,
@@ -121,6 +120,8 @@ type LearningProgressSnapshot = {
     createdAt?: string;
   }[];
   studySecondsByLesson?: Record<string, number>;
+  lessonPositions?: Record<string, number>;
+  watchedSecondsByLesson?: Record<string, number>;
   studySecondsByModule?: Record<string, number>;
   moduleRequiredSeconds?: Record<string, number>;
   totalStudySeconds?: number;
@@ -320,8 +321,11 @@ export function CourseLearningWorkspace({
   learnerName: string;
 }) {
   const firstLessonKey = course.flatLessons[0]?.key ?? "";
+  const initialActiveKey = initialProgress.currentLessonKey || firstLessonKey;
+  const initialResumeSecond = Math.max(0, Number(initialProgress.lessonPositions?.[initialActiveKey] ?? 0));
+  const initialWatchedSecond = Math.max(0, Number(initialProgress.watchedSecondsByLesson?.[initialActiveKey] ?? 0));
   const [completedLessonKeys, setCompletedLessonKeys] = useState(initialProgress.completedLessonKeys ?? []);
-  const [activeKey, setActiveKey] = useState(initialProgress.currentLessonKey || firstLessonKey);
+  const [activeKey, setActiveKey] = useState(initialActiveKey);
   const [serverProgressPercent, setServerProgressPercent] = useState(initialProgress.progressPercent ?? 0);
   const [savingKey, setSavingKey] = useState("");
   const [message, setMessage] = useState("");
@@ -332,6 +336,10 @@ export function CourseLearningWorkspace({
   const [certificate, setCertificate] = useState<CertificateResult | null>(null);
   const [studySecondsByLesson, setStudySecondsByLesson] = useState<Record<string, number>>(
     initialProgress.studySecondsByLesson ?? {}
+  );
+  const [lessonPositions, setLessonPositions] = useState<Record<string, number>>(initialProgress.lessonPositions ?? {});
+  const [watchedSecondsByLesson, setWatchedSecondsByLesson] = useState<Record<string, number>>(
+    initialProgress.watchedSecondsByLesson ?? {}
   );
   const [activeStudySeconds, setActiveStudySeconds] = useState(0);
   const [communityMessages, setCommunityMessages] = useState<CommunityMessage[]>([]);
@@ -357,12 +365,16 @@ export function CourseLearningWorkspace({
   const commentsSectionRef = useRef<HTMLDivElement | null>(null);
   const communityInputRef = useRef<HTMLTextAreaElement | null>(null);
   const studyDeltaRef = useRef(0);
+  const maxWatchedSecondRef = useRef(initialWatchedSecond);
+  const lastMediaSecondRef = useRef(initialResumeSecond);
+  const lastSavedPositionRef = useRef(initialResumeSecond);
+  const lastSavedWatchedRef = useRef(initialWatchedSecond);
   const [mediaPlaying, setMediaPlaying] = useState(false);
-  const [mediaSeconds, setMediaSeconds] = useState(0);
-  const [playbackRate, setPlaybackRate] = useState(1);
-  const [vimeoNonce, setVimeoNonce] = useState(0);
+  const [mediaSeconds, setMediaSeconds] = useState(initialResumeSecond);
+  const [mediaDuration, setMediaDuration] = useState(0);
+  const vimeoNonce = 0;
   const [previewElapsedSeconds, setPreviewElapsedSeconds] = useState(0);
-  const previewSecondsLimit = Math.max(30, Number(process.env.NEXT_PUBLIC_COURSE_PREVIEW_SECONDS ?? 180) || 180);
+  const previewSecondsLimit = Math.max(30, Number(process.env.NEXT_PUBLIC_COURSE_PREVIEW_SECONDS ?? 120) || 120);
   const accessType =
     course.accessType ??
     (course.pricingType === "subscription" || course.pricingType === "manual"
@@ -418,6 +430,30 @@ export function CourseLearningWorkspace({
     },
     [activeLesson?.key, activeLesson?.type, activeLesson?.videoUrl, vimeoNonce]
   );
+  const videoRequiredSeconds = useCallback(
+    (lesson: FlatLesson | null | undefined = activeLesson) => {
+      if (!lesson || lesson.type !== "video") return 0;
+
+      const measuredSeconds = lesson.key === activeLesson?.key ? Math.floor(mediaDuration) : 0;
+      if (measuredSeconds > 0) return Math.max(1, measuredSeconds - 2);
+
+      const lessonSeconds = Math.round(Number(lesson.durationMinutes ?? 0) * 60);
+      return lessonSeconds > 0 ? Math.max(1, lessonSeconds - 2) : 1;
+    },
+    [activeLesson, mediaDuration]
+  );
+  const activeWatchedSeconds = activeLesson
+    ? Math.max(
+        Number(watchedSecondsByLesson[activeLesson.key] ?? 0),
+        activeLesson.type === "video" ? activeStudySeconds : 0
+      )
+    : 0;
+  const activeVideoComplete =
+    !activeLesson ||
+    activeLesson.type !== "video" ||
+    completedSet.has(activeLesson.key) ||
+    activeWatchedSeconds >= videoRequiredSeconds(activeLesson);
+  const canAdvanceFromActive = Boolean(activeLesson && activeVideoComplete);
   const stopMedia = useCallback(() => {
     videoRef.current?.pause();
     if (activeVideoSource.provider === "youtube") {
@@ -512,11 +548,16 @@ export function CourseLearningWorkspace({
   }
 
   function activateLesson(key: string) {
+    const savedPosition = Math.max(0, Number(lessonPositions[key] ?? 0));
     setActiveKey(key);
     setMediaPlaying(false);
-    setMediaSeconds(0);
-    setPlaybackRate(1);
+    setMediaSeconds(savedPosition);
+    setMediaDuration(0);
     setActiveStudySeconds(0);
+    maxWatchedSecondRef.current = Math.max(0, Number(watchedSecondsByLesson[key] ?? 0));
+    lastMediaSecondRef.current = savedPosition;
+    lastSavedPositionRef.current = savedPosition;
+    lastSavedWatchedRef.current = maxWatchedSecondRef.current;
     studyDeltaRef.current = 0;
     setQuizResult(null);
   }
@@ -526,19 +567,30 @@ export function CourseLearningWorkspace({
 
     const timer = window.setInterval(() => {
       if (document.visibilityState === "hidden") return;
-      if (activeLesson.type === "video" && !mediaPlaying) return;
+      if (activeLesson.type === "video" && activeVideoSource.canUseToolbar && !mediaPlaying) return;
 
       setActiveStudySeconds((current) => current + 1);
       studyDeltaRef.current += 1;
+      if (activeLesson.type === "video" && !activeVideoSource.canUseToolbar) {
+        setMediaSeconds((current) => current + 1);
+        setLessonPositions((current) => ({
+          ...current,
+          [activeLesson.key]: Math.max(0, Number(current[activeLesson.key] ?? 0) + 1)
+        }));
+        setWatchedSecondsByLesson((current) => ({
+          ...current,
+          [activeLesson.key]: Math.max(Number(current[activeLesson.key] ?? 0), Number(current[activeLesson.key] ?? 0) + 1)
+        }));
+      }
     }, 1000);
 
     return () => window.clearInterval(timer);
-  }, [activeLesson, mediaPlaying]);
+  }, [activeLesson, activeVideoSource.canUseToolbar, mediaPlaying]);
 
   async function persistLesson(
     lesson: FlatLesson,
     action: LearningProgressSnapshot["events"][number]["action"],
-    options: { seconds?: number; score?: number; complete?: boolean } = {}
+    options: { seconds?: number; score?: number; complete?: boolean; position?: number; watchedSeconds?: number; duration?: number; silent?: boolean } = {}
   ) {
     if (previewGateActive) {
       if (previewBlocked || options.complete !== false) {
@@ -572,6 +624,9 @@ export function CourseLearningWorkspace({
           currentLessonKey: optimisticNextKey,
           action,
           seconds: options.seconds,
+          position: options.position,
+          watchedSeconds: options.watchedSeconds,
+          duration: options.duration,
           score: options.score
         })
       });
@@ -584,13 +639,15 @@ export function CourseLearningWorkspace({
       setCompletedLessonKeys(data.progress.completedLessonKeys ?? []);
       setServerProgressPercent(data.progress.progressPercent ?? 0);
       setStudySecondsByLesson(data.progress.studySecondsByLesson ?? studySecondsByLesson);
+      setLessonPositions(data.progress.lessonPositions ?? lessonPositions);
+      setWatchedSecondsByLesson(data.progress.watchedSecondsByLesson ?? watchedSecondsByLesson);
       if (options.complete === false) {
         setActiveKey(data.progress.currentLessonKey || optimisticNextKey);
       } else {
         activateLesson(data.progress.currentLessonKey || optimisticNextKey);
       }
-      setMessage(options.complete === false ? "Activity saved." : "Lesson completed and saved.");
-      if (options.complete !== false) {
+      if (!options.silent) setMessage(options.complete === false ? "Activity saved." : "Lesson completed and saved.");
+      if (options.complete !== false && !options.silent) {
         toast.success("Lesson completed and saved.");
       }
 
@@ -604,6 +661,15 @@ export function CourseLearningWorkspace({
         ...current,
         [lesson.key]: (current[lesson.key] ?? 0) + Number(options.seconds ?? 0)
       }));
+      if (typeof options.position === "number") {
+        setLessonPositions((current) => ({ ...current, [lesson.key]: Math.max(0, Math.floor(options.position ?? 0)) }));
+      }
+      if (typeof options.watchedSeconds === "number") {
+        setWatchedSecondsByLesson((current) => ({
+          ...current,
+          [lesson.key]: Math.max(Number(current[lesson.key] ?? 0), Math.floor(options.watchedSeconds ?? 0))
+        }));
+      }
       setServerProgressPercent(nextPercent);
       if (shouldComplete) {
         activateLesson(optimisticNextKey);
@@ -614,10 +680,10 @@ export function CourseLearningWorkspace({
           : error instanceof Error
             ? error.message
             : "Activity could not be saved.";
-      setMessage(nextMessage);
-      if (shouldComplete) {
+      if (!options.silent) setMessage(nextMessage);
+      if (shouldComplete && !options.silent) {
         toast.success("Lesson completed locally.");
-      } else if (error instanceof Error) {
+      } else if (error instanceof Error && !options.silent) {
         toast.error(error.message);
       }
       return {
@@ -640,6 +706,9 @@ export function CourseLearningWorkspace({
 
     if (!lessonUnlocked(lesson.key)) return;
 
+    if (activeLesson?.type === "video") {
+      await savePlaybackPosition({ force: true });
+    }
     activateLesson(lesson.key);
     if (!completedSet.has(lesson.key)) {
       await persistLesson(lesson, "viewed", { complete: false });
@@ -663,6 +732,68 @@ export function CourseLearningWorkspace({
     toast.success("Study time saved.");
   }
 
+  function currentPlaybackSnapshot() {
+    const position = Math.max(0, Math.floor(videoRef.current?.currentTime ?? mediaSeconds));
+    const duration = Math.max(0, Math.floor(videoRef.current?.duration || mediaDuration || 0));
+    const watchedSeconds = activeLesson
+      ? Math.max(
+          Number(watchedSecondsByLesson[activeLesson.key] ?? 0),
+          Math.floor(maxWatchedSecondRef.current),
+          activeLesson.type === "video" ? activeStudySeconds : 0
+        )
+      : 0;
+
+    return { position, duration, watchedSeconds };
+  }
+
+  async function savePlaybackPosition(options: { force?: boolean } = {}) {
+    if (!activeLesson || activeLesson.type !== "video" || previewGateActive) return;
+
+    const snapshot = currentPlaybackSnapshot();
+    const positionDelta = Math.abs(snapshot.position - lastSavedPositionRef.current);
+    const watchedDelta = Math.abs(snapshot.watchedSeconds - lastSavedWatchedRef.current);
+    if (!options.force && positionDelta < 8 && watchedDelta < 8) return;
+    if (!snapshot.position && !snapshot.watchedSeconds) return;
+
+    lastSavedPositionRef.current = snapshot.position;
+    lastSavedWatchedRef.current = snapshot.watchedSeconds;
+    await persistLesson(activeLesson, "position", {
+      complete: false,
+      position: snapshot.position,
+      watchedSeconds: snapshot.watchedSeconds,
+      duration: snapshot.duration,
+      silent: true
+    });
+  }
+
+  useEffect(() => {
+    if (!activeLesson || activeLesson.type !== "video" || previewGateActive) return undefined;
+
+    const timer = window.setInterval(() => {
+      void savePlaybackPosition();
+    }, 12000);
+
+    function flushPlaybackPosition() {
+      void savePlaybackPosition({ force: true });
+    }
+
+    function flushWhenHidden() {
+      if (document.visibilityState === "hidden") flushPlaybackPosition();
+    }
+
+    window.addEventListener("pagehide", flushPlaybackPosition);
+    document.addEventListener("visibilitychange", flushWhenHidden);
+
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("pagehide", flushPlaybackPosition);
+      document.removeEventListener("visibilitychange", flushWhenHidden);
+      flushPlaybackPosition();
+    };
+    // Save loop follows the active lesson and current playback refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeLesson?.key, previewGateActive]);
+
   async function completeActive(action: LearningProgressSnapshot["events"][number]["action"], score?: number) {
     if (!activeLesson) return;
     if (previewGateActive) {
@@ -679,8 +810,23 @@ export function CourseLearningWorkspace({
       return;
     }
 
-    const seconds = Math.max(studyDeltaRef.current, activeStudySeconds, Math.floor(mediaSeconds));
-    const progress = await persistLesson(activeLesson, action, { seconds, score });
+    const playback = currentPlaybackSnapshot();
+    const requiredSeconds = videoRequiredSeconds(activeLesson);
+    if (activeLesson.type === "video" && playback.watchedSeconds < requiredSeconds) {
+      const nextMessage = `Watch the full video to unlock completion. ${formatClock(playback.watchedSeconds)} / ${formatClock(requiredSeconds)} watched.`;
+      setMessage(nextMessage);
+      toast.error("Watch the full video before marking it complete.");
+      return;
+    }
+
+    const seconds = Math.max(studyDeltaRef.current, activeStudySeconds, Math.floor(mediaSeconds), playback.watchedSeconds);
+    const progress = await persistLesson(activeLesson, action, {
+      seconds,
+      score,
+      position: playback.position,
+      watchedSeconds: playback.watchedSeconds,
+      duration: playback.duration
+    });
 
     studyDeltaRef.current = 0;
     setActiveStudySeconds(0);
@@ -726,8 +872,10 @@ export function CourseLearningWorkspace({
         const eventName = String(payload.event ?? "");
         const data = typeof payload.data === "object" && payload.data !== null ? (payload.data as Record<string, unknown>) : {};
         const seconds = Number(data.seconds);
+        const duration = Number(data.duration);
 
         if (Number.isFinite(seconds)) setMediaSeconds(seconds);
+        if (Number.isFinite(duration) && duration > 0) setMediaDuration(Math.floor(duration));
         if (eventName === "play") setMediaPlaying(true);
         if (eventName === "pause") setMediaPlaying(false);
         if ((eventName === "finish" || eventName === "ended") && activeLesson && !completedSet.has(activeLesson.key)) {
@@ -785,63 +933,76 @@ export function CourseLearningWorkspace({
     setMediaPlaying((current) => !current);
   }
 
-  function replayMedia() {
-    if (!activeVideoSource.canUseToolbar) return;
+  function handleDirectLoadedMetadata(event: SyntheticEvent<HTMLVideoElement>) {
+    if (!activeLesson) return;
 
-    if (videoRef.current) {
-      videoRef.current.currentTime = 0;
-      void videoRef.current.play();
-      setMediaPlaying(true);
-      return;
-    }
+    const node = event.currentTarget;
+    const duration = Math.max(0, Math.floor(node.duration || 0));
+    const savedPosition = Math.max(0, Number(lessonPositions[activeLesson.key] ?? 0));
+    const savedWatched = Math.max(0, Number(watchedSecondsByLesson[activeLesson.key] ?? 0));
+    const resumeAt = completedSet.has(activeLesson.key)
+      ? 0
+      : Math.min(savedPosition, Math.max(0, duration - 1), Math.max(savedWatched + 1, 0));
 
-    setMediaSeconds(0);
-    if (activeVideoSource.provider === "youtube") {
-      sendYouTubeCommand("seekTo", [0, true]);
-      sendYouTubeCommand("playVideo");
-    } else if (activeVideoSource.provider === "vimeo") {
-      sendVimeoCommand("setCurrentTime", 0);
-      sendVimeoCommand("play");
-      setVimeoNonce((current) => current + 1);
-    }
-    setMediaPlaying(true);
+    setMediaDuration(duration);
+    maxWatchedSecondRef.current = savedWatched;
+    lastMediaSecondRef.current = resumeAt;
+    setMediaSeconds(resumeAt);
+    if (resumeAt > 0) node.currentTime = resumeAt;
   }
 
-  function skipMedia(seconds: number) {
-    if (!activeVideoSource.canUseToolbar) return;
+  function handleDirectSeeking(event: SyntheticEvent<HTMLVideoElement>) {
+    const node = event.currentTarget;
+    const allowedSecond = Math.max(0, maxWatchedSecondRef.current + 1.25);
 
-    if (videoRef.current) {
-      const next = Math.max(0, Math.min(videoRef.current.duration || Number.MAX_SAFE_INTEGER, videoRef.current.currentTime + seconds));
-      videoRef.current.currentTime = next;
-      setMediaSeconds(next);
-      return;
+    if (node.currentTime > allowedSecond) {
+      node.currentTime = Math.max(0, maxWatchedSecondRef.current);
+      setMediaSeconds(node.currentTime);
     }
-
-    setMediaSeconds((current) => {
-      const next = Math.max(0, current + seconds);
-      if (activeVideoSource.provider === "youtube") {
-        sendYouTubeCommand("seekTo", [next, true]);
-      } else if (activeVideoSource.provider === "vimeo") {
-        sendVimeoCommand("setCurrentTime", next);
-      }
-      return next;
-    });
   }
 
-  function changePlaybackRate(value: number) {
-    setPlaybackRate(value);
-    if (!activeVideoSource.canUseToolbar) return;
+  function handleDirectTimeUpdate(event: SyntheticEvent<HTMLVideoElement>) {
+    if (!activeLesson) return;
 
-    if (videoRef.current) {
-      videoRef.current.playbackRate = value;
+    const node = event.currentTarget;
+    const currentSecond = Math.max(0, node.currentTime);
+    const duration = Math.max(0, Math.floor(node.duration || mediaDuration || 0));
+    const maxAllowedForward = Math.max(maxWatchedSecondRef.current + 2.25, lastMediaSecondRef.current + 4);
+
+    if (!completedSet.has(activeLesson.key) && currentSecond > maxAllowedForward) {
+      node.currentTime = Math.max(0, maxWatchedSecondRef.current);
+      setMediaSeconds(node.currentTime);
       return;
     }
 
-    if (activeVideoSource.provider === "youtube") {
-      sendYouTubeCommand("setPlaybackRate", [value]);
-    } else if (activeVideoSource.provider === "vimeo") {
-      sendVimeoCommand("setPlaybackRate", value);
-    }
+    lastMediaSecondRef.current = currentSecond;
+    maxWatchedSecondRef.current = Math.max(maxWatchedSecondRef.current, Math.floor(currentSecond));
+    setMediaSeconds(currentSecond);
+    if (duration > 0) setMediaDuration(duration);
+    setWatchedSecondsByLesson((current) => ({
+      ...current,
+      [activeLesson.key]: Math.max(Number(current[activeLesson.key] ?? 0), Math.floor(maxWatchedSecondRef.current))
+    }));
+    setLessonPositions((current) => ({
+      ...current,
+      [activeLesson.key]: Math.max(0, Math.floor(currentSecond))
+    }));
+    void savePlaybackPosition();
+  }
+
+  function handleDirectEnded(event: SyntheticEvent<HTMLVideoElement>) {
+    if (!activeLesson) return;
+
+    const node = event.currentTarget;
+    const duration = Math.max(1, Math.floor(node.duration || mediaDuration || mediaSeconds || 1));
+
+    setMediaPlaying(false);
+    setMediaSeconds(duration);
+    setMediaDuration(duration);
+    maxWatchedSecondRef.current = duration;
+    setWatchedSecondsByLesson((current) => ({ ...current, [activeLesson.key]: Math.max(Number(current[activeLesson.key] ?? 0), duration) }));
+    setLessonPositions((current) => ({ ...current, [activeLesson.key]: duration }));
+    void completeActive("watched");
   }
 
   async function loadQuiz() {
@@ -1248,8 +1409,8 @@ export function CourseLearningWorkspace({
         {message ? <p className="max-w-xs text-sm text-[hsl(var(--muted-foreground))]">{message}</p> : null}
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[17rem_minmax(0,1fr)_17rem] 2xl:grid-cols-[18rem_minmax(0,1fr)_18rem]">
-        <Card>
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_18rem] 2xl:grid-cols-[18rem_minmax(0,1fr)_18rem]">
+        <Card className="hidden 2xl:block">
           <CardHeader>
             <CardTitle>Chapters</CardTitle>
           </CardHeader>
@@ -1347,14 +1508,23 @@ export function CourseLearningWorkspace({
                     <video
                       ref={videoRef}
                       src={activeVideoSource.playbackUrl}
-                      controls
-                      controlsList="nodownload noremoteplayback"
+                      playsInline
+                      controls={false}
+                      controlsList="nodownload noplaybackrate noremoteplayback"
                       disablePictureInPicture
                       className="aspect-video w-full rounded-md bg-black object-contain"
-                      onPlay={() => void persistLesson(activeLesson, "played", { complete: false })}
-                      onPause={() => setMediaPlaying(false)}
-                      onTimeUpdate={(event) => setMediaSeconds(event.currentTarget.currentTime)}
-                      onEnded={() => void completeActive("watched")}
+                      onLoadedMetadata={handleDirectLoadedMetadata}
+                      onPlay={() => {
+                        setMediaPlaying(true);
+                        void persistLesson(activeLesson, "played", { complete: false, silent: true });
+                      }}
+                      onPause={() => {
+                        setMediaPlaying(false);
+                        void savePlaybackPosition({ force: true });
+                      }}
+                      onSeeking={handleDirectSeeking}
+                      onTimeUpdate={handleDirectTimeUpdate}
+                      onEnded={handleDirectEnded}
                     />
                   ) : activeVideoSource.isIframe ? (
                     <div className="relative aspect-video w-full overflow-hidden rounded-md border border-[hsl(var(--border))] bg-black">
@@ -1372,6 +1542,19 @@ export function CourseLearningWorkspace({
                         referrerPolicy="strict-origin-when-cross-origin"
                         className={embeddedVideoClass()}
                       />
+                      {activeVideoSource.provider === "google-drive" ? (
+                        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex h-14 items-start justify-between bg-gradient-to-b from-black/90 via-black/55 to-transparent p-2">
+                          <span className="inline-flex items-center gap-2 rounded bg-black/70 px-2 py-1 text-xs font-semibold text-white shadow">
+                            <span className="relative size-5 overflow-hidden rounded">
+                              <SafeImage src="/icons/logo.png" alt="" fill sizes="20px" className="object-contain" />
+                            </span>
+                            <span className="hidden sm:inline">MR Creativist</span>
+                          </span>
+                          <span className="grid size-10 place-items-center rounded-md bg-white/95 text-[hsl(var(--primary))] shadow-lg ring-1 ring-black/10">
+                            <Download className="size-5" />
+                          </span>
+                        </div>
+                      ) : null}
                     </div>
                   ) : (
                     <div className="flex aspect-video flex-col items-center justify-center rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--muted))] p-6 text-center">
@@ -1396,53 +1579,32 @@ export function CourseLearningWorkspace({
                       </Button>
                       <Button type="button" size="sm" variant="outline" onClick={focusCommunityComposer}>
                         <MessageCircle className="size-4" />
-                        {compactCount(communityTotal(communityMessages) || engagement.commentCount || engagement.comments + engagement.replies)} comments
+                        <span>{compactCount(communityTotal(communityMessages) || engagement.commentCount || engagement.comments + engagement.replies)}</span>
+                        <span className="hidden sm:inline">comments</span>
                       </Button>
                       <Button type="button" size="sm" variant="outline" onClick={() => void shareCourse()}>
                         <Share2 className="size-4" />
-                        Share{engagement.shareCount ? ` ${compactCount(engagement.shareCount)}` : ""}
+                        <span className="hidden sm:inline">Share</span>
+                        {engagement.shareCount ? <span>{compactCount(engagement.shareCount)}</span> : null}
                       </Button>
                     </div>
-                    <p className="text-xs text-[hsl(var(--muted-foreground))]">Like, share, or ask below the lesson.</p>
+                    <p className="hidden text-xs text-[hsl(var(--muted-foreground))] sm:block">Like, share, or ask below the lesson.</p>
                   </div>
                   <div className="grid gap-2 rounded-md border border-[hsl(var(--border))] p-3 sm:grid-cols-[auto_1fr_auto] sm:items-center">
                     <div className="flex flex-wrap gap-2">
                       <Button size="sm" variant="outline" onClick={() => previousLesson && void openLesson(previousLesson)} disabled={!previousLesson}>
                         <SkipBack className="size-4" />
-                        Prev
+                        <span className="hidden sm:inline">Prev</span>
                       </Button>
                       <Button size="sm" onClick={() => void togglePlayback()} disabled={!activeVideoSource.canUseToolbar}>
                         {mediaPlaying ? <Pause className="size-4" /> : <Play className="size-4" />}
-                        {mediaPlaying ? "Pause" : "Play"}
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => replayMedia()} disabled={!activeVideoSource.canUseToolbar}>
-                        <RotateCcw className="size-4" />
-                        Replay
+                        <span className="hidden sm:inline">{mediaPlaying ? "Pause" : "Play"}</span>
                       </Button>
                     </div>
                     <div className="flex flex-wrap justify-center gap-2">
-                      <Button size="sm" variant="outline" onClick={() => skipMedia(-10)} disabled={!activeVideoSource.canUseToolbar}>
-                        -10s
-                      </Button>
                       <span className="flex h-9 items-center rounded-md border border-[hsl(var(--border))] px-3 text-xs text-[hsl(var(--muted-foreground))]">
-                        {formatClock(mediaSeconds)}
+                        {formatClock(mediaSeconds)}{mediaDuration ? ` / ${formatClock(mediaDuration)}` : ""}
                       </span>
-                      <Button size="sm" variant="outline" onClick={() => skipMedia(30)} disabled={!activeVideoSource.canUseToolbar}>
-                        +30s
-                      </Button>
-                      <select
-                        value={playbackRate}
-                        onChange={(event) => changePlaybackRate(Number(event.target.value))}
-                        disabled={!activeVideoSource.canUseToolbar}
-                        className="h-9 rounded-md border border-[hsl(var(--border))] bg-transparent px-2 text-sm"
-                        aria-label="Playback speed"
-                      >
-                        {[0.75, 1, 1.25, 1.5, 2].map((speed) => (
-                          <option key={speed} value={speed}>
-                            {speed}x
-                          </option>
-                        ))}
-                      </select>
                     </div>
                     <div className="flex justify-end">
                       <Button
@@ -1451,16 +1613,19 @@ export function CourseLearningWorkspace({
                         onClick={() => {
                           if (nextLesson) void openLesson(nextLesson);
                         }}
-                        disabled={!nextLesson || !lessonUnlocked(nextLesson.key)}
+                        disabled={!nextLesson || !lessonUnlocked(nextLesson.key) || !canAdvanceFromActive}
                       >
                         <SkipForward className="size-4" />
-                        Next
+                        <span className="hidden sm:inline">Next</span>
                       </Button>
                     </div>
                   </div>
-                  <Button onClick={() => void completeActive("watched")} disabled={savingKey === activeLesson.key}>
+                  <Button onClick={() => void completeActive("watched")} disabled={savingKey === activeLesson.key || !activeVideoComplete}>
                     <CheckCircle2 className="size-4" />
-                    Mark video watched
+                    <span className="hidden sm:inline">
+                      {activeVideoComplete ? "Mark video watched" : `Watch ${formatClock(Math.max(0, videoRequiredSeconds(activeLesson) - activeWatchedSeconds))} more`}
+                    </span>
+                    <span className="sm:hidden">Watched</span>
                   </Button>
                 </div>
               ) : null}
@@ -1808,20 +1973,24 @@ export function CourseLearningWorkspace({
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" onClick={() => void saveStudyTime()} disabled={savingKey === activeLesson.key || activeStudySeconds <= 0}>
                   <Timer className="size-4" />
-                  Save study time
+                  <span className="hidden sm:inline">Save study time</span>
                 </Button>
-                <Button variant="outline" onClick={() => void completeActive("completed")} disabled={savingKey === activeLesson.key || activeLesson.type === "quiz"}>
+                <Button
+                  variant="outline"
+                  onClick={() => void completeActive("completed")}
+                  disabled={savingKey === activeLesson.key || activeLesson.type === "quiz" || !canAdvanceFromActive}
+                >
                   <CheckCircle2 className="size-4" />
-                  Complete lesson
+                  <span className="hidden sm:inline">Complete lesson</span>
                 </Button>
                 <Button
                   onClick={() => {
                     if (nextLesson) void openLesson(nextLesson);
                   }}
-                  disabled={!nextLesson || !lessonUnlocked(nextLesson.key)}
+                  disabled={!nextLesson || !lessonUnlocked(nextLesson.key) || !canAdvanceFromActive}
                 >
                   <Play className="size-4" />
-                  Continue next
+                  <span className="hidden sm:inline">Continue next</span>
                 </Button>
               </div>
             </div>
