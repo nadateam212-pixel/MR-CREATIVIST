@@ -1,4 +1,5 @@
 import { apiError, apiOk } from "@/lib/api";
+import { databaseMediaUrl } from "@/lib/database-media";
 import connectMongoDB from "@/lib/mongodb";
 import AITool from "@/models/AITool";
 import BlogPost from "@/models/BlogPost";
@@ -23,11 +24,11 @@ export async function GET(request: Request) {
 
     const [courses, products, consultants, jobs, shops, freelancers, posts, aiTools] = await Promise.all([
       Course.find(term ? { ...publicFilter, $or: [{ title: term }, { category: term }, { instructorName: term }, { tags: term }, { outcomes: term }] } : publicFilter)
-        .select("title slug category instructorName shortDescription image rating")
+        .select("title slug category instructorName shortDescription rating")
         .limit(8)
         .lean(),
       Product.find(term ? { ...publicFilter, $or: [{ name: term }, { category: term }, { sellerName: term }, { type: term }, { tags: term }] } : publicFilter)
-        .select("name slug category sellerName images price rating type")
+        .select("name slug category sellerName price rating type")
         .limit(8)
         .lean(),
       ConsultingService.find(term ? { ...publicFilter, $or: [{ title: term }, { expertName: term }, { expertTitle: term }, { expertise: term }] } : publicFilter)
@@ -64,7 +65,7 @@ export async function GET(request: Request) {
         subtitle: `${item.category} course by ${item.instructorName}`,
         description: item.shortDescription,
         href: `/courses/${item.slug}`,
-        image: item.image
+        image: databaseMediaUrl("courses", item)
       })),
       ...products.map((item) => ({
         id: String(item._id),
@@ -73,7 +74,7 @@ export async function GET(request: Request) {
         subtitle: `${item.category} ${item.type ?? "product"} by ${item.sellerName}`,
         description: item.price ? `Marketplace item priced at ${item.price}` : "Marketplace item",
         href: `/marketplace/product/${item.slug}`,
-        image: item.images?.[0]
+        image: databaseMediaUrl("products", item)
       })),
       ...consultants.map((item) => ({
         id: String(item._id),

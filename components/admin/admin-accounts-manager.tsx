@@ -1,9 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, BadgeCheck, CheckCircle2, ExternalLink, FileCheck2, MessageSquare, Share2, ShieldCheck, ShieldOff, Users, XCircle } from "lucide-react";
+import { BadgeCheck, CheckCircle2, EllipsisVertical, ExternalLink, Eye, FileCheck2, KeyRound, MessageSquare, Search, Share2, ShieldCheck, ShieldOff, UserCog, UserPlus, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,7 +21,9 @@ type AdminUser = {
   validatedRoles: PlatformRole[];
   accountStatus: "active" | "review" | "suspended";
   isVerified?: boolean;
+  profileImage?: string;
   createdAt?: string;
+  lastLoginAt?: string;
 };
 
 type ApplicationDocument = {
@@ -53,42 +54,55 @@ type AccountApplication = {
 
 function formatDate(value?: string) {
   if (!value) return "Not recorded";
-  return new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  return new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(new Date(value));
+}
+
+function initials(value?: string) {
+  return (value ?? "MC")
+    .split(/\s+/)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 }
 
 function UserRoleRow({ user, onSave }: { user: AdminUser; onSave: (user: AdminUser) => void }) {
   const [activeRole, setActiveRole] = useState<PlatformRole>(user.role);
   const [accountStatus, setAccountStatus] = useState(user.accountStatus);
   const [isVerified, setIsVerified] = useState(Boolean(user.isVerified));
-  const [validatedRoles, setValidatedRoles] = useState<PlatformRole[]>(user.validatedRoles?.length ? user.validatedRoles : ["client"]);
+  const [validatedRoles, setValidatedRoles] = useState<PlatformRole[]>(
+    user.validatedRoles?.length ? user.validatedRoles : ["client", "student", "instructor", "seller", "freelancer", "consultant"]
+  );
   const [saving, setSaving] = useState(false);
+  const [roleEditorOpen, setRoleEditorOpen] = useState(false);
 
   function toggleRole(role: PlatformRole) {
-    setValidatedRoles((current) =>
-      current.includes(role) ? current.filter((item) => item !== role) : [...current, role]
-    );
+    setValidatedRoles((current) => (current.includes(role) ? current.filter((item) => item !== role) : [...current, role]));
   }
 
-  async function save(nextStatus = accountStatus, verifiedOverride = isVerified) {
+  async function save(nextStatus = accountStatus, verifiedOverride = isVerified, nextRoles = validatedRoles, nextRole = activeRole) {
     setSaving(true);
     try {
       const response = await fetch(`/api/admin/users/${user.id}/roles`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: activeRole, validatedRoles, accountStatus: nextStatus, isVerified: verifiedOverride })
+        body: JSON.stringify({ role: nextRole, validatedRoles: nextRoles, accountStatus: nextStatus, isVerified: verifiedOverride })
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "User update failed.");
 
-      setAccountStatus(payload.user.accountStatus ?? nextStatus);
-      onSave({
+      const updatedUser = {
         ...user,
         role: payload.user.role,
         validatedRoles: payload.user.validatedRoles ?? [],
         accountStatus: payload.user.accountStatus ?? nextStatus,
         isVerified: Boolean(payload.user.isVerified)
-      });
-      setIsVerified(Boolean(payload.user.isVerified));
+      };
+      setActiveRole(updatedUser.role);
+      setValidatedRoles(updatedUser.validatedRoles);
+      setAccountStatus(updatedUser.accountStatus);
+      setIsVerified(updatedUser.isVerified);
+      onSave(updatedUser);
       toast.success("User controls saved.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "User update failed.");
@@ -98,105 +112,201 @@ function UserRoleRow({ user, onSave }: { user: AdminUser; onSave: (user: AdminUs
   }
 
   function shareUser() {
-    void navigator.clipboard?.writeText(`${user.name} - ${user.email} - ${user.role}`);
-    toast.success("User share summary copied.");
+    void navigator.clipboard?.writeText(`${window.location.origin}/profile/${user.id}`);
+    toast.success("Profile link copied.");
+  }
+
+  async function resetPassword() {
+    setSaving(true);
+    try {
+      const response = await fetch(`/api/admin/users/${user.id}/password-reset`, { method: "POST" });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "Password reset failed.");
+      toast.success(payload.message ?? "Password reset link sent.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Password reset failed.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function fullAccessRoles() {
+    const roles = ["client", "student", "instructor", "seller", "freelancer", "consultant"] as PlatformRole[];
+    setValidatedRoles(roles);
+    void save(accountStatus, isVerified, roles);
   }
 
   return (
-    <tr>
-      <td className="p-4">
-        <p className="font-semibold">{user.name}</p>
-        <p className="text-xs text-[hsl(var(--muted-foreground))]">{user.email}</p>
-      </td>
-      <td className="p-4">
-        <select
-          value={activeRole}
-          onChange={(event) => setActiveRole(event.target.value as PlatformRole)}
-          className="h-9 rounded-md border border-[hsl(var(--border))] bg-transparent px-2 text-sm"
-        >
-          {roleOptions.map((role) => (
-            <option key={role} value={role}>
-              {role}
-            </option>
-          ))}
-        </select>
-        <label className="mt-2 inline-flex items-center gap-2 text-xs font-semibold">
-          <input type="checkbox" checked={isVerified} onChange={(event) => setIsVerified(event.target.checked)} />
-          Verified badge
-        </label>
-      </td>
-      <td className="p-4">
-        <select
-          value={accountStatus}
-          onChange={(event) => setAccountStatus(event.target.value as typeof accountStatus)}
-          className="h-9 rounded-md border border-[hsl(var(--border))] bg-transparent px-2 text-sm"
-        >
-          {accountStatuses.map((status) => (
-            <option key={status} value={status}>
-              {status}
-            </option>
-          ))}
-        </select>
-      </td>
-      <td className="p-4">
-        <div className="flex max-w-md flex-wrap gap-2">
-          {roleOptions.map((role) => (
-            <label key={role} className="inline-flex items-center gap-1 rounded-md border border-[hsl(var(--border))] px-2 py-1 text-xs">
-              <input type="checkbox" checked={validatedRoles.includes(role)} onChange={() => toggleRole(role)} />
-              {role}
-            </label>
-          ))}
-        </div>
-      </td>
-      <td className="p-4 text-right">
-        <div className="flex flex-wrap justify-end gap-2">
-          <Button size="sm" onClick={() => void save()} disabled={saving || validatedRoles.length === 0}>
-            Save
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => void save(accountStatus, true)} disabled={saving}>
-            <BadgeCheck className="size-4" />
-            Verify
-          </Button>
-          <Button asChild size="sm" variant="outline">
-            <Link href={`/messages/${user.id}`}>
-              <MessageSquare className="size-4" />
-              Message
-            </Link>
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => void save(accountStatus === "suspended" ? "active" : "suspended")} disabled={saving || validatedRoles.length === 0}>
-            {accountStatus === "suspended" ? <CheckCircle2 className="size-4" /> : <ShieldOff className="size-4" />}
-            {accountStatus === "suspended" ? "Activate" : "Block"}
-          </Button>
-          <Button size="sm" variant="outline" onClick={shareUser}>
-            <Share2 className="size-4" />
-            Share
-          </Button>
-        </div>
-      </td>
-    </tr>
+    <>
+      <tr className="border-b border-[hsl(var(--border))] last:border-b-0">
+        <td className="p-4">
+          <input type="checkbox" aria-label={`Select ${user.name}`} className="size-4 rounded border-[hsl(var(--border))]" />
+        </td>
+        <td className="p-4">
+          <div className="flex min-w-56 items-center gap-3">
+            <span
+              className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-md bg-[hsl(var(--muted))] text-xs font-black"
+              style={user.profileImage ? { backgroundImage: `url(${user.profileImage})`, backgroundPosition: "center", backgroundSize: "cover" } : undefined}
+            >
+              {user.profileImage ? null : initials(user.name)}
+            </span>
+            <span className="min-w-0">
+              <span className="flex items-center gap-1 font-semibold">
+                <span className="truncate">{user.name}</span>
+                {isVerified ? <BadgeCheck className="size-4 shrink-0 text-emerald-500" /> : null}
+              </span>
+              <span className="block truncate text-xs text-[hsl(var(--muted-foreground))]">{validatedRoles.length} roles</span>
+            </span>
+          </div>
+        </td>
+        <td className="p-4 text-sm text-[hsl(var(--muted-foreground))]">{user.email}</td>
+        <td className="p-4">
+          <Badge>{activeRole}</Badge>
+        </td>
+        <td className="p-4">
+          <Badge className={accountStatus === "active" ? "border-emerald-500/45 text-emerald-600" : accountStatus === "suspended" ? "border-[hsl(var(--destructive))]/45 text-[hsl(var(--destructive))]" : "border-amber-500/45 text-amber-600"}>
+            {accountStatus}
+          </Badge>
+        </td>
+        <td className="p-4">
+          <Badge className={isVerified ? "border-emerald-500/45 text-emerald-600" : "border-amber-500/45 text-amber-600"}>
+            {isVerified ? "verified" : "pending"}
+          </Badge>
+        </td>
+        <td className="p-4 text-sm text-[hsl(var(--muted-foreground))]">{formatDate(user.createdAt)}</td>
+        <td className="p-4 text-sm text-[hsl(var(--muted-foreground))]">{formatDate(user.lastLoginAt)}</td>
+        <td className="p-4 text-right">
+          <details className="relative inline-block">
+            <summary className="grid size-9 cursor-pointer list-none place-items-center rounded-md border border-[hsl(var(--border))] hover:bg-[hsl(var(--muted))] [&::-webkit-details-marker]:hidden" aria-label={`Actions for ${user.name}`}>
+              <EllipsisVertical className="size-4" />
+            </summary>
+            <div className="absolute right-0 z-30 mt-2 w-56 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-2 text-left shadow-xl">
+              <Button asChild size="sm" variant="ghost" className="w-full justify-start">
+                <Link href={`/profile/${user.id}`}>
+                  <Eye className="size-4" />
+                  View User
+                </Link>
+              </Button>
+              <Button asChild size="sm" variant="ghost" className="w-full justify-start">
+                <Link href={`/admin/users/${user.id}`}>
+                  <UserCog className="size-4" />
+                  Edit User
+                </Link>
+              </Button>
+              <Button size="sm" variant="ghost" className="w-full justify-start" onClick={() => void save(accountStatus, true)} disabled={saving}>
+                <BadgeCheck className="size-4" />
+                Verify User
+              </Button>
+              <Button size="sm" variant="ghost" className="w-full justify-start" onClick={() => setRoleEditorOpen((current) => !current)}>
+                <UserCog className="size-4" />
+                Change Role
+              </Button>
+              <Button size="sm" variant="ghost" className="w-full justify-start" onClick={fullAccessRoles} disabled={saving}>
+                <ShieldCheck className="size-4" />
+                View All User Roles
+              </Button>
+              <Button asChild size="sm" variant="ghost" className="w-full justify-start">
+                <Link href={`/messages/${user.id}`}>
+                  <MessageSquare className="size-4" />
+                  Message
+                </Link>
+              </Button>
+              <Button size="sm" variant="ghost" className="w-full justify-start" onClick={shareUser}>
+                <Share2 className="size-4" />
+                Share
+              </Button>
+              <Button size="sm" variant="ghost" className="w-full justify-start" onClick={() => void save(accountStatus === "suspended" ? "active" : "suspended")} disabled={saving || validatedRoles.length === 0}>
+                {accountStatus === "suspended" ? <CheckCircle2 className="size-4" /> : <ShieldOff className="size-4" />}
+                {accountStatus === "suspended" ? "Activate User" : "Suspend User"}
+              </Button>
+              <Button size="sm" variant="ghost" className="w-full justify-start" onClick={() => void resetPassword()} disabled={saving}>
+                <KeyRound className="size-4" />
+                Reset Password
+              </Button>
+              <Button size="sm" variant="ghost" className="w-full justify-start text-[hsl(var(--destructive))]" onClick={() => void save("suspended")} disabled={saving}>
+                <XCircle className="size-4" />
+                Delete User
+              </Button>
+            </div>
+          </details>
+        </td>
+      </tr>
+      {roleEditorOpen ? (
+        <tr className="border-b border-[hsl(var(--border))] bg-[hsl(var(--muted))]/25">
+          <td colSpan={9} className="p-4">
+            <div className="grid gap-3 lg:grid-cols-[12rem_12rem_1fr_auto] lg:items-start">
+              <select value={activeRole} onChange={(event) => setActiveRole(event.target.value as PlatformRole)} className="h-10 rounded-md border border-[hsl(var(--border))] bg-transparent px-3 text-sm capitalize">
+                {roleOptions.map((role) => (
+                  <option key={role} value={role}>
+                    {role}
+                  </option>
+                ))}
+              </select>
+              <select value={accountStatus} onChange={(event) => setAccountStatus(event.target.value as AdminUser["accountStatus"])} className="h-10 rounded-md border border-[hsl(var(--border))] bg-transparent px-3 text-sm capitalize">
+                {accountStatuses.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </select>
+              <div className="flex flex-wrap gap-1.5">
+                {roleOptions.map((role) => (
+                  <label key={role} className="inline-flex items-center gap-1 rounded-md border border-[hsl(var(--border))] px-2 py-1 text-xs">
+                    <input type="checkbox" checked={validatedRoles.includes(role)} onChange={() => toggleRole(role)} />
+                    {role}
+                  </label>
+                ))}
+              </div>
+              <Button size="sm" onClick={() => void save()} disabled={saving || validatedRoles.length === 0}>
+                <CheckCircle2 className="size-4" />
+                Save
+              </Button>
+            </div>
+          </td>
+        </tr>
+      ) : null}
+    </>
   );
 }
 
 export function AdminAccountsManager({
   initialUsers,
-  initialApplications
+  initialApplications,
+  mode = "users"
 }: {
   initialUsers: AdminUser[];
   initialApplications: AccountApplication[];
+  mode?: "users" | "applications";
 }) {
   const [users, setUsers] = useState(initialUsers);
   const [applications, setApplications] = useState(initialApplications);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [statusFilter, setStatusFilter] = useState("pending");
+  const [query, setQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [accountFilter, setAccountFilter] = useState("all");
+  const [verificationFilter, setVerificationFilter] = useState("all");
+
+  const filteredUsers = useMemo(() => {
+    const search = query.trim().toLowerCase();
+    return users.filter((user) => {
+      const target = `${user.name} ${user.email} ${user.role} ${user.validatedRoles.join(" ")}`.toLowerCase();
+      const matchesSearch = !search || target.includes(search);
+      const matchesRole = roleFilter === "all" || user.role === roleFilter || user.validatedRoles.includes(roleFilter as PlatformRole);
+      const matchesAccount = accountFilter === "all" || user.accountStatus === accountFilter;
+      const matchesVerification = verificationFilter === "all" || (verificationFilter === "verified" ? user.isVerified : !user.isVerified);
+      return matchesSearch && matchesRole && matchesAccount && matchesVerification;
+    });
+  }, [accountFilter, query, roleFilter, users, verificationFilter]);
 
   const filteredApplications = useMemo(
     () => applications.filter((application) => statusFilter === "all" || application.status === statusFilter),
     [applications, statusFilter]
   );
 
-  const pendingCount = applications.filter((application) => application.status === "pending").length;
-  const approvedCount = applications.filter((application) => application.status === "approved").length;
-  const reviewCount = applications.filter((application) => application.status === "needs_more_info").length;
+  function updateUser(updatedUser: AdminUser) {
+    setUsers((current) => current.map((user) => (user.id === updatedUser.id ? updatedUser : user)));
+  }
 
   async function reviewApplication(applicationId: string, status: AccountApplication["status"]) {
     const response = await fetch("/api/admin/account-applications", {
@@ -218,210 +328,191 @@ export function AdminAccountsManager({
     }
   }
 
-  function updateUser(updatedUser: AdminUser) {
-    setUsers((current) => current.map((user) => (user.id === updatedUser.id ? updatedUser : user)));
-  }
-
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-12">
-      <section className="relative min-h-[24rem] overflow-hidden rounded-lg border border-[hsl(var(--border))]">
-        <Image
-          src="https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&w=1800&q=85"
-          alt="Admin user validation workspace"
-          fill
-          sizes="(min-width: 1024px) 74vw, 100vw"
-          priority
-          className="object-cover"
-        />
-        <div className="absolute inset-0 bg-slate-950/76" />
-        <div className="relative flex min-h-[24rem] flex-col justify-end p-6 text-white sm:p-8 lg:p-10">
-          <div className="max-w-4xl">
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-black uppercase tracking-[0.22em] backdrop-blur">
-              <ShieldCheck className="size-4 text-cyan-300" />
-              ADMIN VALIDATION
-            </div>
-            <h1 className="text-4xl font-black uppercase leading-[0.98] tracking-tight sm:text-6xl">User accounts</h1>
-            <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-200">
-              Validate seller, instructor, freelancer, and consultant accounts after checking documents. Client and
-              student modes stay self-service.
-            </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Button asChild size="lg">
-                <Link href="/admin/dashboard">
-                  ADMIN DASHBOARD
-                  <ArrowRight className="size-5" />
-                </Link>
-              </Button>
-              <Button asChild size="lg" variant="outline" className="border-white bg-white/10 text-white hover:bg-white/20">
-                <Link href="#validated-users">
-                  <Users className="size-5" />
-                  VALIDATED USERS
-                </Link>
-              </Button>
-            </div>
+    <div className="mx-auto w-full max-w-7xl space-y-6">
+      <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight">{mode === "applications" ? "Account applications" : "Users Management"}</h1>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {(mode === "applications"
+              ? [
+                  ["Pending", applications.filter((application) => application.status === "pending").length],
+                  ["Needs info", applications.filter((application) => application.status === "needs_more_info").length],
+                  ["Approved", applications.filter((application) => application.status === "approved").length],
+                  ["Rejected", applications.filter((application) => application.status === "rejected").length]
+                ]
+              : [
+                  ["Total", users.length],
+                  ["Active", users.filter((user) => user.accountStatus === "active").length],
+                  ["Verified", users.filter((user) => user.isVerified).length],
+                  ["Suspended", users.filter((user) => user.accountStatus === "suspended").length]
+                ]).map(([label, value]) => (
+              <Badge key={String(label)} className="px-3 py-1">
+                {label}: {Number(value).toLocaleString()}
+              </Badge>
+            ))}
           </div>
         </div>
+        {mode === "applications" ? (
+          <Button asChild variant="outline">
+            <Link href="/admin/users">
+              <UserCog className="size-4" />
+              Users
+            </Link>
+          </Button>
+        ) : (
+          <Button asChild>
+            <Link href="/register">
+              <UserPlus className="size-4" />
+              Create user
+            </Link>
+          </Button>
+        )}
       </section>
 
-      <section className="rounded-lg border-y border-[hsl(var(--border))] bg-[hsl(var(--muted))]/45 p-4">
-        <div className="grid gap-4 md:grid-cols-3">
-        {[
-          { label: "Pending applications", value: pendingCount, icon: FileCheck2 },
-          { label: "Approved roles", value: approvedCount, icon: CheckCircle2 },
-          { label: "Needs more info", value: reviewCount, icon: ShieldCheck }
-        ].map((metric) => (
-          <div key={metric.label} className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] p-6">
-            <metric.icon className="mb-5 size-6 text-[hsl(var(--primary))]" />
-            <p className="text-4xl font-black uppercase tracking-tight">{metric.value}</p>
-            <p className="mt-2 text-xs font-bold uppercase tracking-[0.16em] text-[hsl(var(--muted-foreground))]">
-              {metric.label}
-            </p>
-          </div>
-        ))}
-        </div>
-      </section>
+      {mode !== "applications" ? (
+        <>
+          <section className="grid gap-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 lg:grid-cols-[minmax(16rem,1fr)_10rem_10rem_10rem_auto]">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" />
+              <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search users by name or email..." className="pl-9" />
+            </div>
+            <select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)} className="h-10 rounded-md border border-[hsl(var(--border))] bg-transparent px-3 text-sm">
+              <option value="all">All roles</option>
+              {roleOptions.map((role) => (
+                <option key={role} value={role}>
+                  {role}
+                </option>
+              ))}
+            </select>
+            <select value={accountFilter} onChange={(event) => setAccountFilter(event.target.value)} className="h-10 rounded-md border border-[hsl(var(--border))] bg-transparent px-3 text-sm">
+              <option value="all">All status</option>
+              {accountStatuses.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+            <select value={verificationFilter} onChange={(event) => setVerificationFilter(event.target.value)} className="h-10 rounded-md border border-[hsl(var(--border))] bg-transparent px-3 text-sm">
+              <option value="all">All badges</option>
+              <option value="verified">Verified</option>
+              <option value="pending">Pending</option>
+            </select>
+            <Button type="button" variant="outline" onClick={() => toast.success(`${filteredUsers.length} users shown.`)}>
+              Filter
+            </Button>
+          </section>
 
-      <section className="space-y-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div className="max-w-3xl">
-            <p className="text-sm font-black uppercase tracking-[0.18em] text-[hsl(var(--primary))]">APPLICATION QUEUE</p>
-            <h2 className="mt-3 text-3xl font-black uppercase tracking-tight sm:text-5xl">Review professional roles</h2>
+          <Card className="overflow-hidden">
+            <CardContent className="overflow-x-auto p-0">
+              <table className="w-full min-w-[76rem] text-left text-sm">
+                <thead className="border-b border-[hsl(var(--border))] bg-[hsl(var(--muted))]/35 text-[hsl(var(--muted-foreground))]">
+                  <tr>
+                    <th className="w-12 p-4">
+                      <input type="checkbox" aria-label="Select all users" className="size-4 rounded border-[hsl(var(--border))]" />
+                    </th>
+                    <th className="p-4 font-medium">Name</th>
+                    <th className="p-4 font-medium">Email</th>
+                    <th className="p-4 font-medium">Role</th>
+                    <th className="p-4 font-medium">Status</th>
+                    <th className="p-4 font-medium">Verification</th>
+                    <th className="p-4 font-medium">Joined</th>
+                    <th className="p-4 font-medium">Last activity</th>
+                    <th className="p-4 text-right font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredUsers.map((user) => (
+                    <UserRoleRow key={user.id} user={user} onSave={updateUser} />
+                  ))}
+                </tbody>
+              </table>
+              {filteredUsers.length === 0 ? (
+                <div className="p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">No users match these filters.</div>
+              ) : null}
+            </CardContent>
+          </Card>
+        </>
+      ) : null}
+
+      {mode !== "users" ? (
+        <Card className="overflow-hidden">
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <FileCheck2 className="size-5 text-[hsl(var(--primary))]" />
+            <CardTitle>Account applications</CardTitle>
+            <Badge>{filteredApplications.length}</Badge>
           </div>
-          <select
-            value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value)}
-            className="h-11 rounded-md border border-[hsl(var(--border))] bg-transparent px-3 text-sm"
-          >
+          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-10 rounded-md border border-[hsl(var(--border))] bg-transparent px-3 text-sm">
             {["pending", "needs_more_info", "approved", "rejected", "all"].map((status) => (
               <option key={status} value={status}>
                 {status}
               </option>
             ))}
           </select>
-        </div>
-
-        <Card className="overflow-hidden">
-        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <CardTitle className="uppercase">Account applications</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4">
-          {filteredApplications.length ? (
-            filteredApplications.map((application) => (
-              <div key={application.id} className="rounded-lg border border-[hsl(var(--border))] p-4">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge>{application.requestedRole}</Badge>
-                      <Badge>{application.status}</Badge>
-                      <span className="text-xs text-[hsl(var(--muted-foreground))]">{formatDate(application.updatedAt)}</span>
-                    </div>
-                    <h2 className="mt-3 text-xl font-semibold">{application.applicantName}</h2>
-                    <p className="text-sm text-[hsl(var(--muted-foreground))]">
-                      {application.applicantEmail} - {application.professionalTitle}
-                    </p>
-                    <p className="mt-3 max-w-3xl text-sm leading-6">{application.summary}</p>
-                    {application.roleDetails && Object.keys(application.roleDetails).length ? (
-                      <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                        {Object.entries(application.roleDetails).map(([key, value]) => (
-                          <div key={`${application.id}-${key}`} className="rounded-md border border-[hsl(var(--border))] p-3">
-                            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[hsl(var(--muted-foreground))]">
-                              {key.replace(/([A-Z])/g, " $1")}
-                            </p>
-                            <p className="mt-1 text-sm leading-6">{String(value || "Not provided")}</p>
-                          </div>
-                        ))}
-                      </div>
-                    ) : null}
-                    <div className="mt-3 flex flex-wrap gap-2 text-xs text-[hsl(var(--muted-foreground))]">
-                      {application.organization ? <span>{application.organization}</span> : null}
-                      {application.phone ? <span>{application.phone}</span> : null}
-                      {application.website ? (
-                        <Link href={application.website} target="_blank" className="inline-flex items-center gap-1 text-[hsl(var(--primary))]">
-                          Website <ExternalLink className="size-3" />
-                        </Link>
-                      ) : null}
-                    </div>
+          {filteredApplications.map((application) => (
+            <div key={application.id} className="rounded-lg border border-[hsl(var(--border))] p-4">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge>{application.requestedRole}</Badge>
+                    <Badge className={application.status === "approved" ? "border-emerald-500/45 text-emerald-600" : application.status === "rejected" ? "border-[hsl(var(--destructive))]/45 text-[hsl(var(--destructive))]" : "border-amber-500/45 text-amber-600"}>
+                      {application.status}
+                    </Badge>
+                    <span className="text-xs text-[hsl(var(--muted-foreground))]">{formatDate(application.updatedAt)}</span>
                   </div>
-                  <div className="min-w-64 space-y-2">
-                    <Input
-                      value={notes[application.id] ?? application.adminNotes ?? ""}
-                      onChange={(event) => setNotes((current) => ({ ...current, [application.id]: event.target.value }))}
-                      placeholder="Admin notes"
-                    />
-                    <div className="flex flex-wrap gap-2">
-                      <Button size="sm" onClick={() => void reviewApplication(application.id, "approved")}>
-                        <CheckCircle2 className="size-4" />
-                        Approve
+                  <h2 className="mt-3 text-lg font-semibold">{application.applicantName}</h2>
+                  <p className="text-sm text-[hsl(var(--muted-foreground))]">{application.applicantEmail} - {application.professionalTitle}</p>
+                  <p className="mt-3 max-w-3xl text-sm leading-6">{application.summary}</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {application.documents.map((document) => (
+                      <Button key={`${application.id}-${document.label}`} asChild size="sm" variant="outline">
+                        <Link href={document.url} target="_blank">
+                          <ExternalLink className="size-4" />
+                          {document.label}
+                        </Link>
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => void reviewApplication(application.id, "needs_more_info")}>
-                        More info
+                    ))}
+                    {application.website ? (
+                      <Button asChild size="sm" variant="outline">
+                        <Link href={application.website} target="_blank">
+                          <ExternalLink className="size-4" />
+                          Website
+                        </Link>
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => void reviewApplication(application.id, "rejected")}>
-                        <XCircle className="size-4" />
-                        Reject
-                      </Button>
-                    </div>
+                    ) : null}
                   </div>
                 </div>
-                <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {application.documents.map((document) => (
-                    <Link
-                      key={`${application.id}-${document.label}`}
-                      href={document.url}
-                      target="_blank"
-                      className="rounded-md border border-[hsl(var(--border))] p-3 text-sm hover:bg-[hsl(var(--muted))]/45"
-                    >
-                      <span className="font-medium">{document.label}</span>
-                      <span className="mt-1 block text-xs text-[hsl(var(--muted-foreground))]">
-                        {document.fileName || document.kind}
-                      </span>
-                      <span className="mt-1 flex items-center gap-1 text-xs text-[hsl(var(--primary))]">
-                        Open document <ExternalLink className="size-3" />
-                      </span>
-                    </Link>
-                  ))}
+                <div className="min-w-64 space-y-2">
+                  <Input value={notes[application.id] ?? application.adminNotes ?? ""} onChange={(event) => setNotes((current) => ({ ...current, [application.id]: event.target.value }))} placeholder="Admin notes" />
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" onClick={() => void reviewApplication(application.id, "approved")}>
+                      <CheckCircle2 className="size-4" />
+                      Approve
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => void reviewApplication(application.id, "needs_more_info")}>
+                      <ShieldCheck className="size-4" />
+                      More info
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => void reviewApplication(application.id, "rejected")}>
+                      <XCircle className="size-4" />
+                      Reject
+                    </Button>
+                  </div>
                 </div>
               </div>
-            ))
-          ) : (
+            </div>
+          ))}
+          {filteredApplications.length === 0 ? (
             <div className="rounded-lg border border-dashed border-[hsl(var(--border))] p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">
               No applications in this status.
             </div>
-          )}
+          ) : null}
         </CardContent>
         </Card>
-      </section>
-
-      <section id="validated-users" className="space-y-6">
-        <div className="max-w-3xl">
-          <p className="text-sm font-black uppercase tracking-[0.18em] text-[hsl(var(--primary))]">ROLE CONTROL TABLE</p>
-          <h2 className="mt-3 text-3xl font-black uppercase tracking-tight sm:text-5xl">Users and validated accounts</h2>
-        </div>
-
-      <Card className="overflow-hidden">
-        <CardHeader>
-          <CardTitle className="uppercase">Users and validated accounts</CardTitle>
-        </CardHeader>
-        <CardContent className="overflow-x-auto p-0">
-          <table className="w-full min-w-[64rem] text-left text-sm">
-            <thead className="border-b border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))]">
-              <tr>
-                <th className="p-4 font-medium">User</th>
-                <th className="p-4 font-medium">Active account</th>
-                <th className="p-4 font-medium">Status</th>
-                <th className="p-4 font-medium">Validated roles</th>
-                <th className="p-4 text-right font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[hsl(var(--border))]">
-              {users.map((user) => (
-                <UserRoleRow key={user.id} user={user} onSave={updateUser} />
-              ))}
-            </tbody>
-          </table>
-        </CardContent>
-      </Card>
-      </section>
+      ) : null}
     </div>
   );
 }

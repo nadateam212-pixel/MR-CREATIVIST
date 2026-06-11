@@ -1,4 +1,5 @@
 import Gig from "@/models/Gig";
+import User from "@/models/User";
 import { gigSchema } from "@/lib/mongo-validations";
 import { jsonError, jsonOk, parsePagination, readJson, requireAuthenticated, requireMongo, uniqueSlugFor } from "@/lib/mongo-api";
 import { normalizeGig, slugify } from "@/lib/platform-db";
@@ -26,10 +27,12 @@ export async function GET(request: Request) {
       const term = new RegExp(q, "i");
       filter.$or = [{ title: term }, { category: term }, { packageName: term }, { ownerName: term }, { tags: term }];
     }
+    const includeRawImage = Boolean(all || ownerId);
 
     const [items, total] = await Promise.all([
       Gig.find(filter)
-        .populate("ownerId", "name email phone profileImage isVerified")
+        .select(`studioId ownerId ownerName slug title category packageName description price currency deliveryDays revisions ownerAddress ownerCity ownerCountry tags deliverables rating orders status isFeatured isVerified createdAt updatedAt${includeRawImage ? " image" : ""}`)
+        .populate({ path: "ownerId", select: "name email phone profileImage isVerified", model: User })
         .sort({ isFeatured: -1, rating: -1, orders: -1, createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -37,7 +40,7 @@ export async function GET(request: Request) {
       Gig.countDocuments(filter)
     ]);
 
-    return jsonOk({ items: items.map(normalizeGig), total });
+    return jsonOk({ items: items.map((item) => normalizeGig(item, { includeImage: includeRawImage })), total });
   } catch (error) {
     return jsonError(error);
   }

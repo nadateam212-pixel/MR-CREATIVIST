@@ -21,9 +21,13 @@ async function getSellerProducts() {
 
     if (!filter.length) return [];
 
-    const products = await Product.find({ $or: filter, status: { $ne: "archived" } }).sort({ updatedAt: -1, createdAt: -1 }).limit(100).lean();
+    const products = await Product.find({ $or: filter, status: { $ne: "archived" } })
+      .select("name slug type sellerId sellerName price compareAtPrice currency category stock rating downloads delivery tools status isFeatured isVerified createdAt updatedAt")
+      .sort({ updatedAt: -1, createdAt: -1 })
+      .limit(100)
+      .lean();
 
-    return products.map(normalizeProduct);
+    return products.map((product) => normalizeProduct(product, { includeImages: false }));
   } catch {
     return [];
   }

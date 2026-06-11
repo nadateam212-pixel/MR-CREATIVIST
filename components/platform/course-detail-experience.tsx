@@ -160,7 +160,8 @@ function compactCount(value: number) {
   );
 }
 
-function embeddedPreviewClass() {
+function embeddedPreviewClass(provider?: string) {
+  if (provider === "google-drive") return "absolute -top-[7%] left-0 h-[114%] w-full border-0";
   return "absolute inset-0 h-full w-full border-0";
 }
 
@@ -335,7 +336,7 @@ function CoursePreviewPlayer({
           allowFullScreen
           referrerPolicy="strict-origin-when-cross-origin"
           sandbox="allow-same-origin allow-scripts allow-presentation"
-          className={embeddedPreviewClass()}
+          className={embeddedPreviewClass(source.provider)}
         />
         <ProtectedVideoOverlays />
         {paywallOverlay()}

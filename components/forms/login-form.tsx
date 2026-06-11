@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { GoogleAuthButton } from "@/components/forms/google-auth-button";
+import { PasswordInput } from "@/components/forms/password-input";
 
 export function LoginForm({ callbackUrl = "" }: { callbackUrl?: string }) {
   const [pending, setPending] = useState(false);
@@ -47,45 +48,52 @@ export function LoginForm({ callbackUrl = "" }: { callbackUrl?: string }) {
     }
   }
 
-  async function resolvePostLoginPath(defaultPath: string) {
-    try {
-      const response = await fetch("/api/account/roles", {
-        cache: "no-store",
-        headers: { Accept: "application/json" }
-      });
-
-      if (!response.ok) return defaultPath;
-
-      const payload = await response.json();
-      if (payload?.isAdmin) return payload.adminPath ?? "/admin/dashboard";
-    } catch {
-      return defaultPath;
-    }
-
-    return defaultPath;
-  }
-
   async function onSubmit(input: LoginInput) {
     setPending(true);
 
     try {
-      const result = await signIn("credentials", {
-        email: input.email.toLowerCase().trim(),
-        password: input.password,
-        redirect: false,
-        redirectTo
+      const email = input.email.toLowerCase().trim();
+      const response = await fetch("/api/auth/login/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          password: input.password,
+          callbackUrl: redirectTo
+        })
       });
+      const payload = await response.json().catch(() => ({}));
 
-      if (!result?.ok || result.error) {
-        toast.error("Email or password is incorrect.");
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Email or password is incorrect.");
+      }
+
+      if (payload.requiresOtp && payload.verifyUrl) {
+        toast.success("OTP sent. Enter the code to finish signing in.");
+        window.location.assign(payload.verifyUrl);
         return;
       }
 
-      const nextPath = await resolvePostLoginPath(toCurrentOriginPath(result.url));
-      toast.success("Signed in. Opening your dashboard...");
-      window.location.assign(nextPath);
-    } catch {
-      toast.error("Sign in could not finish. Check your connection and try again.");
+      if (payload.adminLogin) {
+        const result = await signIn("credentials", {
+          email,
+          password: input.password,
+          redirect: false,
+          redirectTo: payload.redirectTo ?? "/admin/dashboard"
+        });
+
+        if (!result?.ok || result.error) {
+          throw new Error("Email or password is incorrect.");
+        }
+
+        toast.success("Signed in. Opening admin dashboard...");
+        window.location.assign(payload.redirectTo ?? toCurrentOriginPath(result.url));
+        return;
+      }
+
+      throw new Error("Sign-in flow could not continue.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Sign in could not finish. Check your connection and try again.");
     } finally {
       setPending(false);
     }
@@ -113,12 +121,12 @@ export function LoginForm({ callbackUrl = "" }: { callbackUrl?: string }) {
               Forgot password?
             </Link>
           </div>
-          <Input id="password" type="password" autoComplete="current-password" {...register("password")} />
+          <PasswordInput id="password" autoComplete="current-password" {...register("password")} />
           {errors.password ? <p className="text-sm text-[hsl(var(--destructive))]">{errors.password.message}</p> : null}
         </div>
         <Button type="submit" className="w-full" disabled={pending}>
           {pending ? <Loader2 className="size-4 animate-spin" /> : null}
-          Sign in with password
+          Continue with OTP
         </Button>
       </form>
     </div>

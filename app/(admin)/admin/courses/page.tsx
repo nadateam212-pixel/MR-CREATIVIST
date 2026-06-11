@@ -66,6 +66,7 @@ export default async function AdminCoursesPage() {
     id: String(course.id ?? course.slug),
     title: course.title,
     subtitle: `${course.category ?? "Course"} - ${course.instructor ?? "Instructor"} - ${course.learners ?? 0} learners`,
+    image: course.image,
     kind: course.level ?? "course",
     status: course.status ?? "draft",
     isVerified: Boolean(course.status === "approved" || course.status === "published"),

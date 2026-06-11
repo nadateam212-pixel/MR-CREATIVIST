@@ -21,7 +21,6 @@ import {
   MessageSquare,
   Newspaper,
   Search,
-  Settings,
   ShoppingBag,
   ShoppingCart,
   Sparkles,
@@ -50,7 +49,7 @@ const tools = [
   { href: "/ai-tools", labelKey: "nav.aiTools", fallback: "AI Tools", icon: Bot },
   { href: "/messages", labelKey: "nav.messages", fallback: "Messages", icon: MessageSquare },
   { href: "/support", labelKey: "nav.support", fallback: "Support", icon: Headphones },
-  { href: "/settings", labelKey: "nav.settings", fallback: "Settings", icon: Settings }
+  { href: "/profile", labelKey: "nav.profile", fallback: "Profile", icon: User }
 ];
 
 const activityItems = [
@@ -66,7 +65,7 @@ const mobileNavItems = [
   { href: "/courses", labelKey: "nav.courses", fallback: "Courses", icon: GraduationCap },
   { href: "/marketplace", labelKey: "nav.marketplace", fallback: "Marketplace", icon: ShoppingBag },
   { href: "/ai-tools", labelKey: "nav.aiTools", fallback: "AI Tools", icon: Bot },
-  { href: "/settings", labelKey: "nav.settings", fallback: "Settings", icon: Settings }
+  { href: "/profile", labelKey: "nav.profile", fallback: "Profile", icon: User }
 ];
 
 const mobileNavLabels: Record<string, string> = {
@@ -74,7 +73,7 @@ const mobileNavLabels: Record<string, string> = {
   "/courses": "Courses",
   "/marketplace": "Market",
   "/ai-tools": "AI",
-  "/settings": "Settings"
+  "/profile": "Profile"
 };
 
 function initials(value?: string | null) {
@@ -274,8 +273,8 @@ export function PublicAppShell({
               className="w-full border-[hsl(var(--primary))]/35 bg-[hsl(var(--primary))]/10 text-[hsl(var(--foreground))] hover:bg-[hsl(var(--primary))]/20"
             >
               <Link href="/profile">
-                <Sparkles className="size-4" />
-                {t("nav.createProfile")}
+                {user ? <User className="size-4" /> : <Sparkles className="size-4" />}
+                {user ? "Profile" : t("nav.createProfile")}
               </Link>
             </Button>
           </div>
@@ -367,8 +366,7 @@ export function PublicAppShell({
                         { href: "/studio", label: "MrC. Studio", icon: Bot },
                         { href: "/profile", label: "Profile", icon: User },
                         { href: "/messages", label: "Messages", icon: MessageSquare },
-                        { href: "/notifications", label: "Notifications", icon: Bell },
-                        { href: "/settings", label: "Settings", icon: Settings }
+                        { href: "/notifications", label: "Notifications", icon: Bell }
                       ].map((item) => (
                         <Link
                           key={item.href}

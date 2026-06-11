@@ -52,11 +52,7 @@ export function CheckoutWorkbench({ mode = "cart", products = [] }: { mode?: "ca
   const addToCart = usePlatformStore((state) => state.addToCart);
   const updateCartQuantity = usePlatformStore((state) => state.updateCartQuantity);
   const clearCart = usePlatformStore((state) => state.clearCart);
-  const createdProducts = usePlatformStore((state) => state.createdProducts);
-  const marketplaceProducts = useMemo(
-    () => [...products, ...createdProducts.filter((product) => product.status === "published")],
-    [products, createdProducts]
-  );
+  const marketplaceProducts = useMemo(() => products, [products]);
 
   const cartProducts = marketplaceProducts
     .filter((product) => cartItems[product.slug])

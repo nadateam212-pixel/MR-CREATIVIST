@@ -15,7 +15,7 @@ const UserSchema = new mongoose.Schema(
     },
     validatedRoles: {
       type: [{ type: String, enum: roleValues }],
-      default: ["client"]
+      default: ["client", "student", "instructor", "seller", "freelancer", "consultant"]
     },
     accountStatus: {
       type: String,
@@ -40,6 +40,12 @@ const UserSchema = new mongoose.Schema(
       instagram: String,
       x: String
     },
+    following: [{ type: mongoose.Schema.Types.ObjectId, ref: "User", index: true }],
+    followers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User", index: true }],
+    referredByUserId: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true },
+    referredByEmail: { type: String, lowercase: true, trim: true },
+    referredByCode: { type: String, uppercase: true, trim: true },
+    referredAt: Date,
     isVerified: { type: Boolean, default: false },
     lastLoginAt: Date
   },

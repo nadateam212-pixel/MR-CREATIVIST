@@ -4,8 +4,8 @@ import { useActionState, useEffect } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { resetPasswordAction, type PasswordResetFormState } from "@/app/(auth)/actions";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/forms/password-input";
 import { SubmitButton } from "@/components/forms/submit-button";
 
 const initialState: PasswordResetFormState = {
@@ -28,11 +28,11 @@ export function ResetPasswordForm({ token }: { token: string }) {
         <input type="hidden" name="token" value={token} />
         <div className="space-y-2">
           <Label htmlFor="password">New password</Label>
-          <Input id="password" name="password" type="password" autoComplete="new-password" required />
+          <PasswordInput id="password" name="password" autoComplete="new-password" required />
         </div>
         <div className="space-y-2">
           <Label htmlFor="confirmPassword">Confirm password</Label>
-          <Input id="confirmPassword" name="confirmPassword" type="password" autoComplete="new-password" required />
+          <PasswordInput id="confirmPassword" name="confirmPassword" autoComplete="new-password" required />
         </div>
         <SubmitButton>Update password</SubmitButton>
       </form>

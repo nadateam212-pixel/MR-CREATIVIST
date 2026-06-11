@@ -1,22 +1,25 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CalendarClock, CheckCircle2, Download, Eye, LifeBuoy, PackageCheck, ReceiptText, ShoppingBag } from "lucide-react";
+import { CalendarClock, CheckCircle2, Download, Eye, FileText, LifeBuoy, PackageCheck, ReceiptText, ShoppingBag } from "lucide-react";
 import { auth } from "@/auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import connectMongoDB, { hasMongoConfig } from "@/lib/mongodb";
 import Order from "@/models/Order";
+import Product from "@/models/Product";
 
 export const metadata: Metadata = {
   title: "Orders"
 };
 
 type OrderItem = {
+  productId?: string;
   name: string;
   slug: string;
   quantity: number;
   unitPrice: number;
+  image?: string;
 };
 
 type BuyerOrder = {
@@ -59,17 +62,37 @@ async function getBuyerOrders(email?: string | null): Promise<BuyerOrder[]> {
   try {
     await connectMongoDB();
     const orders = await Order.find({ buyerEmail: email.toLowerCase() }).sort({ createdAt: -1 }).limit(50).lean();
+    const productIds = [
+      ...new Set(
+        orders.flatMap((order) =>
+          (order.items ?? [])
+            .map((item: { productId?: unknown }) => String(item.productId ?? ""))
+            .filter(Boolean)
+        )
+      )
+    ];
+    const products = productIds.length
+      ? await Product.find({ _id: { $in: productIds } }).select("images slug").lean()
+      : [];
+    const productMap = new Map(products.map((product) => [String(product._id), product]));
 
     return orders.map((order) => ({
       id: String(order._id),
       createdAt: order.createdAt?.toISOString?.() ?? String(order.createdAt ?? ""),
       updatedAt: order.updatedAt?.toISOString?.() ?? String(order.updatedAt ?? ""),
-      items: (order.items ?? []).map((item: OrderItem) => ({
-        name: item.name,
-        slug: item.slug,
-        quantity: Number(item.quantity ?? 1),
-        unitPrice: Number(item.unitPrice ?? 0)
-      })),
+      items: (order.items ?? []).map((item: OrderItem) => {
+        const product = item.productId ? productMap.get(String(item.productId)) : null;
+        const image = Array.isArray(product?.images) ? product.images[0] : undefined;
+
+        return {
+          productId: item.productId ? String(item.productId) : undefined,
+          name: item.name,
+          slug: item.slug,
+          quantity: Number(item.quantity ?? 1),
+          unitPrice: Number(item.unitPrice ?? 0),
+          image
+        };
+      }),
       subtotal: Number(order.subtotal ?? 0),
       discount: Number(order.discount ?? 0),
       tax: Number(order.tax ?? 0),
@@ -150,6 +173,12 @@ export default async function OrdersPage() {
                       Support
                     </Link>
                   </Button>
+                  <Button asChild variant="outline" size="sm">
+                    <Link href={`/marketplace/orders/${order.id}?view=invoice`}>
+                      <FileText className="size-4" />
+                      Invoice
+                    </Link>
+                  </Button>
                 </div>
               </CardHeader>
               <CardContent className="space-y-5">
@@ -169,11 +198,19 @@ export default async function OrdersPage() {
                 <div className="divide-y divide-[hsl(var(--border))] rounded-lg border border-[hsl(var(--border))]">
                   {order.items.map((item) => (
                     <div key={`${order.id}-${item.slug}`} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <p className="font-semibold">{item.name}</p>
-                        <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
-                          Qty {item.quantity} · {money(item.unitPrice, order.currency)}
-                        </p>
+                      <div className="flex items-center gap-3">
+                        <span
+                          className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]"
+                          style={item.image ? { backgroundImage: `url(${item.image})`, backgroundPosition: "center", backgroundSize: "cover" } : undefined}
+                        >
+                          {item.image ? null : <PackageCheck className="size-6" />}
+                        </span>
+                        <div>
+                          <p className="font-semibold">{item.name}</p>
+                          <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
+                            Qty {item.quantity} · {money(item.unitPrice, order.currency)}
+                          </p>
+                        </div>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <Button asChild variant="outline" size="sm">

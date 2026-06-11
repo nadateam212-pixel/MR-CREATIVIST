@@ -29,9 +29,10 @@ export function LogoutButton({
     setPending(true);
 
     try {
-      await signOut({ callbackUrl: "/", redirect: true });
+      await signOut({ redirect: false });
+      window.location.assign(window.location.origin);
     } catch {
-      window.location.assign("/");
+      window.location.assign(window.location.origin);
     }
   }
 
@@ -49,4 +50,3 @@ export function LogoutButton({
     </Button>
   );
 }
-

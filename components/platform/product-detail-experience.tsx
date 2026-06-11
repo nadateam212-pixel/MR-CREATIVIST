@@ -38,12 +38,11 @@ type ProductDetail = {
   sellerEmail?: string;
 };
 
-export function ProductDetailExperience({ slug, initialProduct }: { slug: string; initialProduct: ProductDetail | null }) {
+export function ProductDetailExperience({ initialProduct }: { initialProduct: ProductDetail | null }) {
   const router = useRouter();
-  const createdProducts = usePlatformStore((state) => state.createdProducts);
   const addToCart = usePlatformStore((state) => state.addToCart);
   const [cartMessage, setCartMessage] = useState("");
-  const product = initialProduct ?? createdProducts.find((item) => item.slug === slug && item.status === "published") ?? null;
+  const product = initialProduct;
   const productDescription = product && "description" in product ? product.description : undefined;
 
   if (!product) {

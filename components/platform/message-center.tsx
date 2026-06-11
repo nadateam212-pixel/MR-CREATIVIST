@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { Inbox, Loader2, MessageSquare, Search, Send, ShieldCheck } from "lucide-react";
+import { BadgeCheck, Inbox, Loader2, MessageSquare, Search, Send, ShieldCheck, UserMinus, UserPlus, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,8 @@ type Contact = {
   role?: string;
   profileImage?: string;
   isVerified?: boolean;
+  isFollowing?: boolean;
+  followerCount?: number;
   source?: string;
   unreadCount?: number;
   lastMessage?: ChatMessage | null;
@@ -67,6 +70,7 @@ export function MessageCenter({ recipientId }: { recipientId?: string }) {
   const [contextId] = useState(searchParams.get("contextId") ?? "");
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(true);
+  const [followBusyId, setFollowBusyId] = useState("");
   const currentUserId = session?.user?.id ?? "";
 
   const selectedContact = useMemo(
@@ -86,6 +90,14 @@ export function MessageCenter({ recipientId }: { recipientId?: string }) {
       context === filter;
     return matchesQuery && matchesFilter;
   });
+  const recommendedContacts = contacts
+    .filter((contact) => contact.id !== selectedId)
+    .sort((left, right) => {
+      if (left.source === "recommended" && right.source !== "recommended") return -1;
+      if (right.source === "recommended" && left.source !== "recommended") return 1;
+      return Number(right.followerCount ?? 0) - Number(left.followerCount ?? 0);
+    })
+    .slice(0, 6);
 
   const loadMessages = useCallback(
     async (nextSelectedId = selectedId) => {
@@ -171,8 +183,40 @@ export function MessageCenter({ recipientId }: { recipientId?: string }) {
     }
   }
 
+  async function toggleFollow(contact: Contact) {
+    const nextAction = contact.isFollowing ? "unfollow" : "follow";
+    setFollowBusyId(contact.id);
+    try {
+      const response = await fetch("/api/social/follow", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetUserId: contact.id, action: nextAction })
+      });
+      const payload = await response.json();
+
+      if (!response.ok) throw new Error(payload.error ?? "Follow action failed.");
+
+      setContacts((current) =>
+        current.map((item) =>
+          item.id === contact.id
+            ? {
+                ...item,
+                isFollowing: Boolean(payload.following),
+                followerCount: Number(payload.followerCount ?? item.followerCount ?? 0)
+              }
+            : item
+        )
+      );
+      toast.success(payload.following ? "Account followed." : "Account unfollowed.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Follow action failed.");
+    } finally {
+      setFollowBusyId("");
+    }
+  }
+
   return (
-    <div className="grid min-h-[calc(100vh-10rem)] gap-5 lg:grid-cols-[21rem_1fr]">
+    <div className="grid min-h-[calc(100vh-10rem)] gap-5 xl:grid-cols-[21rem_minmax(0,1fr)_20rem]">
       <Card className="overflow-hidden">
         <CardHeader>
           <div className="flex items-center gap-3">
@@ -284,7 +328,21 @@ export function MessageCenter({ recipientId }: { recipientId?: string }) {
                 <ShieldCheck className="mr-1 size-3" />
                 Secure thread
               </Badge>
+              {selectedContact?.isVerified ? (
+                <Badge className="border-emerald-500/45 text-emerald-600">
+                  <BadgeCheck className="mr-1 size-3" />
+                  Verified
+                </Badge>
+              ) : null}
               {contextType !== "direct" ? <Badge>{contextType}</Badge> : null}
+              {selectedContact ? (
+                <Button asChild variant="outline" size="sm">
+                  <Link href={`/profile/${selectedContact.id}`}>
+                    <UserRound className="size-4" />
+                    Profile
+                  </Link>
+                </Button>
+              ) : null}
             </div>
           </div>
         </CardHeader>
@@ -363,6 +421,69 @@ export function MessageCenter({ recipientId }: { recipientId?: string }) {
             </div>
             {status ? <p className="mt-3 text-sm text-[hsl(var(--muted-foreground))]">{status}</p> : null}
           </form>
+        </CardContent>
+      </Card>
+
+      <Card className="overflow-hidden xl:sticky xl:top-24 xl:self-start">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <UserPlus className="size-5 text-[hsl(var(--primary))]" />
+            <CardTitle>Recommended accounts</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="grid gap-3">
+          {recommendedContacts.map((contact) => (
+            <div key={contact.id} className="rounded-lg border border-[hsl(var(--border))] p-3">
+              <div className="flex gap-3">
+                <span className="relative flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-md bg-[hsl(var(--muted))] text-sm font-black">
+                  {contact.profileImage ? (
+                    <Image src={contact.profileImage} alt={contact.name ?? "User"} fill sizes="44px" className="object-cover" />
+                  ) : (
+                    initials(contact.name)
+                  )}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1">
+                    <p className="truncate text-sm font-semibold">{contact.name ?? contact.email}</p>
+                    {contact.isVerified ? <BadgeCheck className="size-3.5 shrink-0 text-emerald-500" /> : null}
+                  </div>
+                  <p className="mt-1 truncate text-xs capitalize text-[hsl(var(--muted-foreground))]">{contact.role ?? "creator"}</p>
+                  <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
+                    {Number(contact.followerCount ?? 0).toLocaleString()} followers
+                  </p>
+                </div>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={contact.isFollowing ? "outline" : "default"}
+                  disabled={followBusyId === contact.id}
+                  onClick={() => void toggleFollow(contact)}
+                >
+                  {followBusyId === contact.id ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : contact.isFollowing ? (
+                    <UserMinus className="size-4" />
+                  ) : (
+                    <UserPlus className="size-4" />
+                  )}
+                  {contact.isFollowing ? "Unfollow" : "Follow"}
+                </Button>
+                <Button asChild size="sm" variant="outline">
+                  <Link href={`/profile/${contact.id}`}>
+                    <UserRound className="size-4" />
+                    Profile
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          ))}
+          {recommendedContacts.length === 0 ? (
+            <div className="rounded-md border border-dashed border-[hsl(var(--border))] p-5 text-sm text-[hsl(var(--muted-foreground))]">
+              Search creators, sellers, freelancers, instructors, or consultants to start building your network.
+            </div>
+          ) : null}
         </CardContent>
       </Card>
     </div>

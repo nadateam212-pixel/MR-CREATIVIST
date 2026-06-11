@@ -1,17 +1,11 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { ArrowLeft, CalendarDays } from "lucide-react";
 import { PageShell } from "@/components/layout/page-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SafeImage } from "@/components/ui/safe-image";
 import { getBlogPostBySlug } from "@/lib/platform-db";
-
-const fallbackContent =
-  "This MR Creativist article is prepared for public editorial publishing. Admins can replace it from the blog manager with full news, information, platform updates and creator playbooks.";
-
-function titleFromSlug(slug: string) {
-  return slug.replaceAll("-", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
 
 function formatDate(value?: string | Date) {
   if (!value) return "Recently";
@@ -21,15 +15,17 @@ function formatDate(value?: string | Date) {
 export default async function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const post = await getBlogPostBySlug(slug);
-  const title = post?.title ?? titleFromSlug(slug);
-  const content = String(post?.content ?? fallbackContent);
+  if (!post) notFound();
+
+  const title = post.title;
+  const content = String(post?.content ?? "");
   const paragraphs = content.split("\n").filter(Boolean);
 
   return (
     <PageShell
       eyebrow={post?.categoryName ?? "Article"}
       title={title}
-      description={post?.excerpt ?? "MR Creativist public blog, news and information article."}
+      description={post?.excerpt ?? ""}
     >
       <div className="mb-6 flex flex-wrap items-center gap-3">
         <Button asChild variant="outline" size="sm">
@@ -38,14 +34,18 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
             Back to blogs
           </Link>
         </Button>
-        <Badge>{post?.categoryName ?? "Platform Updates"}</Badge>
-        <span className="flex items-center gap-2 text-sm text-[hsl(var(--muted-foreground))]">
-          <CalendarDays className="size-4" />
-          {formatDate(post?.publishedAt)}
-        </span>
-        <span className="text-sm font-semibold text-[hsl(var(--muted-foreground))]">
-          By {post?.authorName ?? "MR Creativist Editorial"}
-        </span>
+        {post?.categoryName ? <Badge>{post.categoryName}</Badge> : null}
+        {post?.publishedAt ? (
+          <span className="flex items-center gap-2 text-sm text-[hsl(var(--muted-foreground))]">
+            <CalendarDays className="size-4" />
+            {formatDate(post.publishedAt)}
+          </span>
+        ) : null}
+        {post?.authorName ? (
+          <span className="text-sm font-semibold text-[hsl(var(--muted-foreground))]">
+            By {post.authorName}
+          </span>
+        ) : null}
       </div>
 
       {post?.image ? (
@@ -60,6 +60,9 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
             {paragraph}
           </p>
         ))}
+        {paragraphs.length === 0 ? (
+          <p className="leading-8 text-[hsl(var(--muted-foreground))]">No article content yet.</p>
+        ) : null}
       </article>
     </PageShell>
   );

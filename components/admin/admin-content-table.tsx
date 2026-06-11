@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { SafeImage } from "@/components/ui/safe-image";
 
 export type AdminContentField = {
   key: string;
@@ -19,6 +20,7 @@ export type AdminContentRow = {
   id: string;
   title: string;
   subtitle?: string;
+  image?: string;
   kind?: string;
   status: string;
   href?: string;
@@ -330,8 +332,21 @@ export function AdminContentTable({
                 visibleRows.map((row) => (
                   <tr key={row.id}>
                     <td className="p-4">
-                      <p className="font-semibold">{row.title}</p>
-                      {row.subtitle ? <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{row.subtitle}</p> : null}
+                      <div className="flex min-w-64 items-center gap-3">
+                        {row.image ? (
+                          <span className="relative block size-14 overflow-hidden rounded-md border border-[hsl(var(--border))]">
+                            <SafeImage src={row.image} alt={row.title} fill sizes="56px" className="object-cover" />
+                          </span>
+                        ) : (
+                          <span className="grid size-14 place-items-center rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--muted))]/50 text-xs font-black">
+                            {row.title.slice(0, 2).toUpperCase()}
+                          </span>
+                        )}
+                        <span className="min-w-0">
+                          <span className="block truncate font-semibold">{row.title}</span>
+                          {row.subtitle ? <span className="mt-1 block truncate text-xs text-[hsl(var(--muted-foreground))]">{row.subtitle}</span> : null}
+                        </span>
+                      </div>
                     </td>
                     <td className="p-4">
                       <Badge>{row.kind ?? "record"}</Badge>

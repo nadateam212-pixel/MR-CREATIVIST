@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import { auth } from "@/auth";
-import { ApiError, apiError } from "@/lib/api";
+import { ApiError, apiError, apiOk } from "@/lib/api";
 import connectMongoDB from "@/lib/mongodb";
 import UploadAsset from "@/models/UploadAsset";
 
@@ -47,6 +47,33 @@ export async function GET(_request: Request, { params }: { params: Promise<{ ass
         "Cache-Control": "private, max-age=60"
       }
     });
+  } catch (error) {
+    return apiError(error);
+  }
+}
+
+export async function DELETE(_request: Request, { params }: { params: Promise<{ assetId: string }> }) {
+  try {
+    const session = await auth();
+    if (!session?.user) throw new ApiError("Unauthorized.", 401);
+
+    const { assetId } = await params;
+    if (!mongoose.Types.ObjectId.isValid(assetId)) {
+      throw new ApiError("Document not found.", 404);
+    }
+
+    await connectMongoDB();
+    const asset = await UploadAsset.findById(assetId);
+    if (!asset) throw new ApiError("Document not found.", 404);
+
+    const ownsAsset = String(asset.userId) === session.user.id;
+    const canReview = session.user.role === "admin";
+    if (!ownsAsset && !canReview) {
+      throw new ApiError("You do not have access to this document.", 403);
+    }
+
+    await UploadAsset.findByIdAndDelete(assetId);
+    return apiOk({ ok: true, deleted: true, id: assetId });
   } catch (error) {
     return apiError(error);
   }

@@ -1,4 +1,5 @@
 import Gig from "@/models/Gig";
+import User from "@/models/User";
 import { gigSchema } from "@/lib/mongo-validations";
 import { jsonError, jsonOk, mongoIdOrSlug, readJson, requireAuthenticated, requireMongo, submittedFields, uniqueSlugFor } from "@/lib/mongo-api";
 import { normalizeGig, slugify } from "@/lib/platform-db";
@@ -10,7 +11,7 @@ export async function GET(_: Request, context: { params: Promise<{ gigId: string
     await requireMongo();
     const { gigId } = await context.params;
     const gig = await Gig.findOne(mongoIdOrSlug(gigId))
-      .populate("ownerId", "name email phone profileImage isVerified")
+      .populate({ path: "ownerId", select: "name email phone profileImage isVerified", model: User })
       .lean();
 
     if (!gig) return jsonOk({ error: "Gig not found." }, 404);
@@ -47,7 +48,7 @@ export async function PUT(request: Request, context: { params: Promise<{ gigId: 
     }
 
     const gig = await Gig.findByIdAndUpdate(existing._id, patch, { returnDocument: "after", runValidators: true })
-      .populate("ownerId", "name email phone profileImage isVerified");
+      .populate({ path: "ownerId", select: "name email phone profileImage isVerified", model: User });
     await syncFreelancerProfileFromGig(gig, session.user);
     revalidatePublicContent("gig", existing.slug);
     revalidatePublicContent("gig", gig?.slug);
@@ -79,7 +80,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ gigI
     }
 
     const gig = await Gig.findByIdAndUpdate(existing._id, { status: "archived" }, { returnDocument: "after" })
-      .populate("ownerId", "name email phone profileImage isVerified");
+      .populate({ path: "ownerId", select: "name email phone profileImage isVerified", model: User });
     revalidatePublicContent("gig", existing.slug);
 
     return jsonOk({ ok: true, item: normalizeGig(gig) });

@@ -1,4 +1,5 @@
 import Course from "@/models/Course";
+import User from "@/models/User";
 import { jsonError, jsonOk, parsePagination, readJson, requireMongo, requireRole, uniqueSlugFor } from "@/lib/mongo-api";
 import { normalizeCourse, slugify } from "@/lib/platform-db";
 import { courseSchema } from "@/lib/mongo-validations";
@@ -19,7 +20,8 @@ export async function GET(request: Request) {
 
     const [items, total] = await Promise.all([
       Course.find(filter)
-        .populate("instructorId", "name email profileImage isVerified")
+        .select("title slug level category price compareAtPrice currency rating enrolledCount likes shareCount commentCount replyCount pricingType duration lessonsCount instructorId instructorName certificate outcomes chapters modules.title tools status isFeatured createdAt updatedAt")
+        .populate({ path: "instructorId", select: "name email profileImage isVerified", model: User })
         .sort({ isFeatured: -1, createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -27,7 +29,7 @@ export async function GET(request: Request) {
       Course.countDocuments(filter)
     ]);
 
-    return jsonOk({ items: items.map(normalizeCourse), total });
+    return jsonOk({ items: items.map((item) => normalizeCourse(item, { includeImage: false })), total });
   } catch (error) {
     return jsonError(error);
   }

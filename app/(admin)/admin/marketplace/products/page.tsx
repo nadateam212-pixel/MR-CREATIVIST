@@ -25,6 +25,7 @@ export default async function AdminProductsPage() {
     id: String(product.id ?? product.slug),
     title: product.name,
     subtitle: `${product.category ?? "Marketplace"} - ${product.seller ?? "Seller"} - ${product.price}`,
+    image: product.image ?? product.images?.[0],
     kind: product.type ?? "product",
     status: product.status ?? "draft",
     isVerified: Boolean(product.isVerified),

@@ -42,6 +42,7 @@ type GigDoc = {
   slug: string;
   title: string;
   category: string;
+  image?: string;
   packageName?: string;
   status?: "draft" | "submitted" | "changes_requested" | "approved" | "published" | "archived";
   isVerified?: boolean;
@@ -105,6 +106,7 @@ export default async function AdminFreelancersPage() {
     id: `gig:${gig.slug ?? gig._id}`,
     title: gig.title,
     subtitle: `${gig.ownerName ?? "Freelancer"} - ${gig.packageName ?? gig.category}`,
+    image: gig.image,
     kind: "Gig",
     status: gig.status ?? "draft",
     isVerified: Boolean(gig.isVerified),

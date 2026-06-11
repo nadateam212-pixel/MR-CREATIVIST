@@ -15,39 +15,6 @@ type BlogListItem = {
   categoryName?: string;
 };
 
-const examplePosts = [
-  {
-    title: "How AI-powered learning helps creators sell knowledge",
-    slug: "ai-learning-creators-sell-knowledge",
-    excerpt: "A practical guide to packaging expertise into courses, products and services with AI support.",
-    image: "https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop&w=1200&q=85",
-    content: "",
-    published: true,
-    categoryName: "AI Learning",
-    publishedAt: new Date().toISOString()
-  },
-  {
-    title: "Building multimedia products for a modern African marketplace",
-    slug: "multimedia-products-african-marketplace",
-    excerpt: "How creators can turn media skills into digital products, services and repeatable business systems.",
-    image: "https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1200&q=85",
-    content: "",
-    published: true,
-    categoryName: "Marketplace",
-    publishedAt: new Date().toISOString()
-  },
-  {
-    title: "What sellers should include in a professional business profile",
-    slug: "professional-shop-profile-checklist",
-    excerpt: "A clear checklist for business name, contact details, address, offers, trust signals and messaging.",
-    image: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=1200&q=85",
-    content: "",
-    published: true,
-    categoryName: "Business",
-    publishedAt: new Date().toISOString()
-  }
-];
-
 function formatDate(value?: string | Date) {
   if (!value) return "Recently";
   return new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(new Date(value));
@@ -55,7 +22,7 @@ function formatDate(value?: string | Date) {
 
 export default async function BlogPage() {
   const posts = await getBlogPosts({ limit: 24 });
-  const postItems: BlogListItem[] = posts.length ? posts : examplePosts;
+  const postItems: BlogListItem[] = posts;
 
   return (
     <PageShell
@@ -67,15 +34,21 @@ export default async function BlogPage() {
         {postItems.map((post) => (
           <Link key={post.slug} href={`/blog/${post.slug}`} className="group">
             <Card className="h-full overflow-hidden transition-colors hover:bg-[hsl(var(--muted))]/35">
-              <div className="relative aspect-video bg-[hsl(var(--muted))]">
-                <SafeImage
-                  src={post.image || "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=85"}
-                  alt={post.title}
-                  fill
-                  sizes="(min-width: 1280px) 33vw, 50vw"
-                  className="object-cover"
-                />
-              </div>
+              {post.image ? (
+                <div className="relative aspect-video bg-[hsl(var(--muted))]">
+                  <SafeImage
+                    src={post.image}
+                    alt={post.title}
+                    fill
+                    sizes="(min-width: 1280px) 33vw, 50vw"
+                    className="object-cover"
+                  />
+                </div>
+              ) : (
+                <div className="grid aspect-video place-items-center bg-[hsl(var(--muted))]">
+                  <Newspaper className="size-10 text-[hsl(var(--primary))]" />
+                </div>
+              )}
               <CardHeader>
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <Badge>{post.categoryName ?? "Platform Updates"}</Badge>
@@ -88,11 +61,18 @@ export default async function BlogPage() {
                 <CardTitle className="leading-tight group-hover:text-[hsl(var(--primary))]">{post.title}</CardTitle>
               </CardHeader>
               <CardContent className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-                {post.excerpt ?? "Read practical playbooks for learning, selling, AI, media and digital growth."}
+                {post.excerpt ?? ""}
               </CardContent>
             </Card>
           </Link>
         ))}
+        {postItems.length === 0 ? (
+          <Card className="md:col-span-2 xl:col-span-3">
+            <CardContent className="p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">
+              No blog posts yet.
+            </CardContent>
+          </Card>
+        ) : null}
       </div>
     </PageShell>
   );

@@ -18,15 +18,20 @@ function cleanCallback(value: string | string[] | undefined) {
 export default async function RegisterPage({
   searchParams
 }: {
-  searchParams: Promise<{ callbackUrl?: string | string[] }>;
+  searchParams: Promise<{ callbackUrl?: string | string[]; referral?: string | string[]; ref?: string | string[]; code?: string | string[] }>;
 }) {
   const params = await searchParams;
   const callbackUrl = cleanCallback(params.callbackUrl);
+  const referral =
+    (Array.isArray(params.referral) ? params.referral[0] : params.referral) ||
+    (Array.isArray(params.ref) ? params.ref[0] : params.ref) ||
+    (Array.isArray(params.code) ? params.code[0] : params.code) ||
+    "";
 
   return (
     <main className="min-h-screen bg-[hsl(var(--background))] text-[hsl(var(--foreground))]">
-      <div className="mx-auto grid min-h-screen w-full max-w-7xl px-4 py-8 sm:px-6 lg:grid-cols-[0.92fr_1.08fr] lg:items-center lg:gap-10">
-        <section className="flex flex-col items-center justify-center text-center lg:min-h-[calc(100vh-4rem)]">
+      <div className="mx-auto grid min-h-screen w-full max-w-7xl px-4 py-4 sm:px-6 sm:py-8 lg:grid-cols-[0.92fr_1.08fr] lg:items-center lg:gap-10">
+        <section className="hidden flex-col items-center justify-center text-center lg:flex lg:min-h-[calc(100vh-4rem)]">
           <Link href="/" className="mb-8 inline-flex items-center gap-2 text-sm font-bold text-[hsl(var(--primary))] hover:text-[hsl(var(--foreground))]">
             <ArrowLeft className="size-4" />
             Back to MR Creativist
@@ -58,14 +63,14 @@ export default async function RegisterPage({
           </div>
         </section>
 
-        <section className="mx-auto mt-10 w-full max-w-xl lg:mt-0">
+        <section className="mx-auto flex min-h-screen w-full max-w-xl items-center lg:mt-0 lg:min-h-0">
           <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5 shadow-2xl shadow-black/10 backdrop-blur sm:p-8">
-            <div className="mb-6 text-center">
+            <div className="mb-6 hidden text-center sm:block">
               <Rocket className="mx-auto mb-3 size-8 text-[hsl(var(--primary))]" />
               <h2 className="text-2xl font-black tracking-tight">Create account</h2>
               <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">Start as a learner, client, seller, freelancer, consultant or instructor.</p>
             </div>
-            <RegisterForm callbackUrl={callbackUrl} />
+            <RegisterForm callbackUrl={callbackUrl} referral={referral} />
             <p className="mt-6 text-center text-sm text-[hsl(var(--muted-foreground))]">
               Already have an account?{" "}
               <Link href={callbackUrl ? `/login?callbackUrl=${encodeURIComponent(callbackUrl)}` : "/login"} className="font-bold text-[hsl(var(--primary))] hover:text-[hsl(var(--foreground))]">

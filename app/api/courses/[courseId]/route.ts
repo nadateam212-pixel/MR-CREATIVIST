@@ -1,4 +1,5 @@
 import Course from "@/models/Course";
+import User from "@/models/User";
 import { jsonError, jsonOk, mongoIdOrSlug, readJson, requireMongo, requireRole, uniqueSlugFor } from "@/lib/mongo-api";
 import { normalizeCourse, slugify } from "@/lib/platform-db";
 import { courseSchema } from "@/lib/mongo-validations";
@@ -36,7 +37,7 @@ export async function GET(_: Request, context: { params: Promise<{ courseId: str
     await requireMongo();
     const { courseId } = await context.params;
     const course = await Course.findOne({ ...mongoIdOrSlug(courseId), status: { $ne: "archived" } })
-      .populate("instructorId", "name email profileImage isVerified")
+      .populate({ path: "instructorId", select: "name email profileImage isVerified", model: User })
       .lean();
 
     if (!course) {
@@ -87,7 +88,7 @@ export async function PUT(request: Request, context: { params: Promise<{ courseI
     const publicationPatch = compileCoursePublicationPatch(mergedCourse, String(patch.status ?? existing.status ?? "draft"));
 
     const course = await Course.findByIdAndUpdate(existing._id, { ...patch, ...publicationPatch }, { returnDocument: "after", runValidators: true })
-      .populate("instructorId", "name email profileImage isVerified");
+      .populate({ path: "instructorId", select: "name email profileImage isVerified", model: User });
     revalidatePublicContent("course", existing.slug);
     revalidatePublicContent("course", course?.slug);
 

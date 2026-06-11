@@ -5,13 +5,14 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { BriefcaseBusiness, Edit3, Eye, ImagePlus, Save, Send, Share2, Trash2, Upload } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { PriceDisplay } from "@/components/ui/price-display";
 
 const defaultGigImage = "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&w=1200&q=85";
+type StudioCurrency = "USD" | "FRW";
 
 type StudioGig = {
   id?: string;
@@ -47,9 +48,21 @@ function splitLines(value: string) {
     .filter(Boolean);
 }
 
-function price(value: string) {
-  const normalized = value.trim().replace(/^\$/, "");
-  return `$${normalized || "0"}`;
+function price(value: string, currency: StudioCurrency = "USD") {
+  const normalized = value.trim().replace(/^(USD|FRW|\$)\s*/i, "").replace(/\s*(USD|FRW)$/i, "");
+  return currency === "FRW" ? `FRW ${normalized || "0"}` : `$${normalized || "0"}`;
+}
+
+function currencyFromPrice(value?: string, fallback: StudioCurrency = "USD"): StudioCurrency {
+  const normalized = String(value ?? "").trim().toUpperCase();
+  return normalized.startsWith("FRW") || normalized.includes(" FRW") ? "FRW" : fallback;
+}
+
+function studioMoney(value: string) {
+  const trimmed = String(value ?? "").trim();
+  if (!trimmed) return "$0";
+  if (/^(FRW|USD|\$)/i.test(trimmed)) return trimmed;
+  return `$${trimmed}`;
 }
 
 function numericPrice(value: string) {
@@ -84,6 +97,7 @@ export function FreelancerGigManager({
 }) {
   const [gigs, setGigs] = useState(initialGigs);
   const [editingSlug, setEditingSlug] = useState("");
+  const [showForm, setShowForm] = useState(false);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState("");
   const [form, setForm] = useState({
@@ -93,6 +107,7 @@ export function FreelancerGigManager({
     description:
       "I will create a conversion-focused landing page, offer structure, launch copy, and handoff checklist for your online course.",
     price: "250",
+    currency: "USD" as StudioCurrency,
     deliveryDays: "5",
     revisions: "2",
     image: defaultGigImage,
@@ -117,7 +132,8 @@ export function FreelancerGigManager({
       category: form.category,
       packageName: form.packageName,
       description: form.description,
-      price: price(form.price),
+      price: price(form.price, form.currency),
+      currency: form.currency,
       deliveryDays: Number(form.deliveryDays) || 1,
       revisions: Number(form.revisions) || 0,
       ownerId: freelancerId,
@@ -151,6 +167,7 @@ export function FreelancerGigManager({
       description:
         "I will create a conversion-focused landing page, offer structure, launch copy, and handoff checklist for your online course.",
       price: "250",
+      currency: "USD" as StudioCurrency,
       deliveryDays: "5",
       revisions: "2",
       image: defaultGigImage,
@@ -160,6 +177,7 @@ export function FreelancerGigManager({
       tags: "Landing page\nCourse launch\nCopywriting\nAI workflow",
       deliverables: "Landing page copy\nOffer structure\nCTA blocks\nLaunch checklist"
     });
+    setShowForm(true);
   }
 
   function selectGig(gig: StudioGig) {
@@ -170,6 +188,7 @@ export function FreelancerGigManager({
       packageName: gig.packageName,
       description: gig.description,
       price: String(gig.price).replace(/[^\d.]/g, ""),
+      currency: currencyFromPrice(gig.price, gig.currency === "FRW" ? "FRW" : "USD"),
       deliveryDays: String(gig.deliveryDays),
       revisions: String(gig.revisions),
       image: gig.image,
@@ -179,17 +198,36 @@ export function FreelancerGigManager({
       tags: gig.tags.join("\n"),
       deliverables: gig.deliverables.join("\n")
     });
+    setShowForm(true);
     setMessage(`Editing ${gig.title}.`);
   }
 
   async function save(status: "draft" | "submitted") {
+    const requiredFields = [
+      ["Gig title", form.title],
+      ["Category", form.category],
+      ["Package name", form.packageName],
+      ["Description", form.description],
+      ["Price", form.price],
+      ["Delivery days", form.deliveryDays],
+      ["Cover image", form.image],
+      ["Deliverables", form.deliverables]
+    ];
+    const missing = requiredFields.filter(([, value]) => !String(value ?? "").trim()).map(([label]) => label);
+    if (missing.length) {
+      const nextMessage = `Missing required fields: ${missing.join(", ")}.`;
+      setMessage(nextMessage);
+      toast.error(nextMessage);
+      return;
+    }
+
     const payload = {
       title: form.title.trim() || "Freelancer service",
       category: form.category.trim() || "Creative service",
       packageName: form.packageName.trim() || "Standard package",
       description: form.description.trim(),
       price: numericPrice(form.price),
-      currency: "USD",
+      currency: form.currency,
       deliveryDays: Number(form.deliveryDays) || 1,
       revisions: Number(form.revisions) || 0,
       ownerName: freelancerName,
@@ -220,9 +258,14 @@ export function FreelancerGigManager({
         return exists ? current.map((gig) => (gig.slug === saved.slug ? saved : gig)) : [saved, ...current];
       });
       setEditingSlug(saved.slug);
-      setMessage(status === "submitted" ? "Gig submitted. Admin can approve, verify, and publish it." : "Gig draft saved.");
+      setShowForm(false);
+      const nextMessage = status === "submitted" ? "Gig submitted. Admin can approve, verify, and publish it." : "Gig draft saved.";
+      setMessage(nextMessage);
+      toast.success(nextMessage);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Gig save failed.");
+      const nextMessage = error instanceof Error ? error.message : "Gig save failed.";
+      setMessage(nextMessage);
+      toast.error(nextMessage);
     } finally {
       setBusy("");
     }
@@ -241,8 +284,11 @@ export function FreelancerGigManager({
       const item = payload.item ?? { ...gig, status: "archived" };
       setGigs((current) => current.map((row) => (row.slug === gig.slug ? item : row)));
       setMessage("Gig archived.");
+      toast.success("Gig archived.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Gig archive failed.");
+      const nextMessage = error instanceof Error ? error.message : "Gig archive failed.";
+      setMessage(nextMessage);
+      toast.error(nextMessage);
     } finally {
       setBusy("");
     }
@@ -262,8 +308,11 @@ export function FreelancerGigManager({
 
       setGigs((current) => current.map((row) => (row.slug === gig.slug ? payload : row)));
       setMessage("Gig submitted for admin review.");
+      toast.success("Gig submitted for admin review.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Gig submit failed.");
+      const nextMessage = error instanceof Error ? error.message : "Gig submit failed.";
+      setMessage(nextMessage);
+      toast.error(nextMessage);
     } finally {
       setBusy("");
     }
@@ -287,6 +336,13 @@ export function FreelancerGigManager({
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6">
+      <div className="flex justify-end">
+        <Button type="button" onClick={resetForm}>
+          <Upload className="size-4" />
+          Create gig
+        </Button>
+      </div>
+
       <section className="grid gap-4 md:grid-cols-3">
         {[
           { label: "Total gigs", value: gigs.length },
@@ -303,6 +359,7 @@ export function FreelancerGigManager({
         ))}
       </section>
 
+      {showForm ? (
       <section className="grid gap-4 xl:grid-cols-[1fr_0.75fr]">
         <Card>
           <CardHeader>
@@ -314,23 +371,34 @@ export function FreelancerGigManager({
           <CardContent className="grid gap-4 md:grid-cols-2">
             <label className="grid gap-2 text-sm font-medium">
               Gig title
-              <Input value={form.title} onChange={(event) => update("title", event.target.value)} />
+              <Input value={form.title} onChange={(event) => update("title", event.target.value)} required minLength={3} />
             </label>
             <label className="grid gap-2 text-sm font-medium">
               Category
-              <Input value={form.category} onChange={(event) => update("category", event.target.value)} />
+              <Input value={form.category} onChange={(event) => update("category", event.target.value)} required minLength={2} />
             </label>
             <label className="grid gap-2 text-sm font-medium">
               Package name
-              <Input value={form.packageName} onChange={(event) => update("packageName", event.target.value)} />
+              <Input value={form.packageName} onChange={(event) => update("packageName", event.target.value)} required minLength={2} />
             </label>
             <label className="grid gap-2 text-sm font-medium">
               Price
-              <Input value={form.price} onChange={(event) => update("price", event.target.value)} inputMode="decimal" />
+              <Input value={form.price} onChange={(event) => update("price", event.target.value)} inputMode="decimal" required />
+            </label>
+            <label className="grid gap-2 text-sm font-medium">
+              Currency
+              <select
+                value={form.currency}
+                onChange={(event) => setForm((current) => ({ ...current, currency: event.target.value as StudioCurrency }))}
+                className="h-10 rounded-md border border-[hsl(var(--border))] bg-transparent px-3"
+              >
+                <option value="USD">USD</option>
+                <option value="FRW">FRW</option>
+              </select>
             </label>
             <label className="grid gap-2 text-sm font-medium">
               Delivery days
-              <Input value={form.deliveryDays} onChange={(event) => update("deliveryDays", event.target.value)} inputMode="numeric" />
+              <Input value={form.deliveryDays} onChange={(event) => update("deliveryDays", event.target.value)} inputMode="numeric" required />
             </label>
             <label className="grid gap-2 text-sm font-medium">
               Revisions
@@ -353,6 +421,8 @@ export function FreelancerGigManager({
               <textarea
                 value={form.description}
                 onChange={(event) => update("description", event.target.value)}
+                required
+                minLength={20}
                 className="min-h-28 rounded-md border border-[hsl(var(--border))] bg-transparent p-3 outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
               />
             </label>
@@ -369,13 +439,14 @@ export function FreelancerGigManager({
               <textarea
                 value={form.deliverables}
                 onChange={(event) => update("deliverables", event.target.value)}
+                required
                 className="min-h-28 rounded-md border border-[hsl(var(--border))] bg-transparent p-3 outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
               />
             </label>
             <label className="grid gap-2 text-sm font-medium md:col-span-2">
               Cover image URL
               <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-                <Input value={form.image} onChange={(event) => update("image", event.target.value)} />
+                <Input value={form.image} onChange={(event) => update("image", event.target.value)} required />
                 <Button asChild type="button" variant="outline">
                   <label className="cursor-pointer">
                     <ImagePlus className="size-4" />
@@ -406,29 +477,33 @@ export function FreelancerGigManager({
                 </p>
                 <p className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">{previewGig.description}</p>
                 <div className="flex items-center justify-between gap-3">
-                  <PriceDisplay price={previewGig.price} className="text-xl text-[hsl(var(--primary))]" />
+                  <span className="text-xl font-semibold text-[hsl(var(--primary))]">{studioMoney(previewGig.price)}</span>
                   <span className="text-sm font-medium">{previewGig.deliveryDays} days</span>
                 </div>
               </div>
             </div>
             <div className="grid gap-2">
-              <Button onClick={() => void save("submitted")} disabled={busy === "submitted"}>
-                <Send className="size-4" />
-                Submit for review
+              <Button onClick={() => void save("submitted")} disabled={Boolean(busy)}>
+                {busy === "submitted" ? <Upload className="size-4 animate-pulse" /> : <Send className="size-4" />}
+                {busy === "submitted" ? "Submitting..." : message.includes("submitted") ? "Submitted" : "Submit for review"}
               </Button>
-              <Button variant="outline" onClick={() => void save("draft")} disabled={busy === "draft"}>
-                <Save className="size-4" />
-                Save draft
+              <Button variant="outline" onClick={() => void save("draft")} disabled={Boolean(busy)}>
+                {busy === "draft" ? <Upload className="size-4 animate-pulse" /> : <Save className="size-4" />}
+                {busy === "draft" ? "Saving..." : message.includes("draft") ? "Saved draft" : "Save draft"}
               </Button>
               <Button variant="outline" onClick={resetForm}>
                 <Upload className="size-4" />
                 New gig
+              </Button>
+              <Button variant="outline" onClick={() => setShowForm(false)}>
+                Close form
               </Button>
             </div>
             {message ? <p className="rounded-md border border-[hsl(var(--border))] p-3 text-sm">{message}</p> : null}
           </CardContent>
         </Card>
       </section>
+      ) : null}
 
       <Card>
         <CardHeader>
@@ -459,7 +534,7 @@ export function FreelancerGigManager({
                         </div>
                       </div>
                     </td>
-                    <td className="p-4"><PriceDisplay price={gig.price} className="text-sm" /></td>
+                    <td className="p-4"><span className="text-sm font-semibold">{studioMoney(gig.price)}</span></td>
                     <td className="p-4"><Badge>{gigScore(gig)}%</Badge></td>
                     <td className="p-4"><Badge>{gig.status}</Badge></td>
                     <td className="p-4 text-[hsl(var(--muted-foreground))]">{formatDate(gig.updatedAt)}</td>

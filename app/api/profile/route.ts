@@ -21,15 +21,17 @@ export async function PATCH(request: Request) {
 
     await connectMongoDB();
     const body = profileSchema.parse(await request.json());
+    const patch: Record<string, unknown> = {
+      name: body.name,
+      phone: body.phone,
+      location: body.location,
+      bio: body.bio
+    };
+    if (body.profileImage) patch.profileImage = body.profileImage;
+
     const user = await User.findByIdAndUpdate(
       session.user.id,
-      {
-        name: body.name,
-        phone: body.phone,
-        location: body.location,
-        bio: body.bio,
-        profileImage: body.profileImage
-      },
+      patch,
       {
         new: true,
         runValidators: true

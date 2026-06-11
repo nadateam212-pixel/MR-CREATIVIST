@@ -36,6 +36,26 @@ select {
   font: inherit;
 }
 
+input:required:user-invalid,
+textarea:required:user-invalid,
+select:required:user-invalid,
+input[aria-invalid="true"],
+textarea[aria-invalid="true"],
+select[aria-invalid="true"] {
+  border-color: hsl(var(--destructive));
+  box-shadow: 0 0 0 1px hsl(var(--destructive) / 0.7);
+}
+
+input:required:user-invalid:focus,
+textarea:required:user-invalid:focus,
+select:required:user-invalid:focus,
+input[aria-invalid="true"]:focus,
+textarea[aria-invalid="true"]:focus,
+select[aria-invalid="true"]:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px hsl(var(--destructive) / 0.28);
+}
+
 select {
   color-scheme: light;
 }

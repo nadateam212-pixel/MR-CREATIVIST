@@ -12,7 +12,12 @@ export const registerSchema = z.object({
     .string()
     .min(8, "Password must be at least 8 characters.")
     .regex(/[A-Z]/, "Use at least one uppercase letter.")
-    .regex(/[0-9]/, "Use at least one number.")
+    .regex(/[0-9]/, "Use at least one number."),
+  referral: z
+    .string()
+    .trim()
+    .max(40, "Referral code is too long.")
+    .optional()
 });
 
 export const forgotPasswordSchema = z.object({

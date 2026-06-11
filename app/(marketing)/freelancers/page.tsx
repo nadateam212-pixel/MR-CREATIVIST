@@ -115,5 +115,11 @@ export default async function FreelancersPage() {
     return items;
   }, []);
 
-  return <FreelancerStudio initialFreelancers={[...freelancerItems, ...derivedGigFreelancers]} initialGigs={gigs} />;
+  return (
+    <FreelancerStudio
+      initialFreelancers={[...freelancerItems, ...derivedGigFreelancers]}
+      initialGigs={gigs}
+      isAuthenticated={Boolean(currentUser)}
+    />
+  );
 }

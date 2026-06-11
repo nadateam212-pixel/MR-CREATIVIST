@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { signIn } from "next-auth/react";
 import { Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,8 +10,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { GoogleAuthButton } from "@/components/forms/google-auth-button";
+import { PasswordInput } from "@/components/forms/password-input";
 
-export function RegisterForm({ callbackUrl = "" }: { callbackUrl?: string }) {
+export function RegisterForm({ callbackUrl = "", referral = "" }: { callbackUrl?: string; referral?: string }) {
   const [pending, setPending] = useState(false);
   const {
     register,
@@ -23,7 +23,8 @@ export function RegisterForm({ callbackUrl = "" }: { callbackUrl?: string }) {
     defaultValues: {
       name: "",
       email: "",
-      password: ""
+      password: "",
+      referral
     }
   });
 
@@ -31,21 +32,6 @@ export function RegisterForm({ callbackUrl = "" }: { callbackUrl?: string }) {
     callbackUrl.startsWith("/") && !callbackUrl.startsWith("//") && !callbackUrl.includes("://")
       ? callbackUrl
       : "/dashboard";
-
-  function toCurrentOriginPath(value?: string | null) {
-    if (!value) return redirectTo;
-
-    try {
-      const url = new URL(value, window.location.origin);
-      if (url.origin !== window.location.origin && !["localhost", "127.0.0.1", "::1"].includes(url.hostname)) {
-        return redirectTo;
-      }
-
-      return `${url.pathname}${url.search}${url.hash}` || redirectTo;
-    } catch {
-      return redirectTo;
-    }
-  }
 
   async function onSubmit(input: RegisterInput) {
     setPending(true);
@@ -57,7 +43,9 @@ export function RegisterForm({ callbackUrl = "" }: { callbackUrl?: string }) {
         body: JSON.stringify({
           name: input.name,
           email: input.email.toLowerCase().trim(),
-          password: input.password
+          password: input.password,
+          referral: input.referral?.trim(),
+          callbackUrl: redirectTo
         })
       });
       const payload = await response.json().catch(() => ({}));
@@ -66,21 +54,14 @@ export function RegisterForm({ callbackUrl = "" }: { callbackUrl?: string }) {
         throw new Error(payload.error ?? "Account could not be created.");
       }
 
-      const result = await signIn("credentials", {
-        email: input.email.toLowerCase().trim(),
-        password: input.password,
-        redirect: false,
-        redirectTo
-      });
-
-      if (!result?.ok || result.error) {
-        toast.success("Account created. Sign in with your password to continue.");
-        window.location.assign(`/login?callbackUrl=${encodeURIComponent(redirectTo)}`);
+      if (payload.requiresOtp && payload.verifyUrl) {
+        toast.success("OTP sent. Enter the code to finish registration.");
+        window.location.assign(payload.verifyUrl);
         return;
       }
 
-      toast.success("Account ready. Opening your dashboard...");
-      window.location.assign(toCurrentOriginPath(result.url));
+      toast.success("Account exists. Sign in to continue.");
+      window.location.assign(`/login?callbackUrl=${encodeURIComponent(redirectTo)}`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Registration could not finish.");
     } finally {
@@ -110,8 +91,13 @@ export function RegisterForm({ callbackUrl = "" }: { callbackUrl?: string }) {
         </div>
         <div className="space-y-2">
           <Label htmlFor="password">Password</Label>
-          <Input id="password" type="password" autoComplete="new-password" {...register("password")} />
+          <PasswordInput id="password" autoComplete="new-password" {...register("password")} />
           {errors.password ? <p className="text-sm text-[hsl(var(--destructive))]">{errors.password.message}</p> : null}
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="referral">Referral code</Label>
+          <Input id="referral" type="text" autoComplete="off" placeholder="MRC-CREATOR" {...register("referral")} />
+          {errors.referral ? <p className="text-sm text-[hsl(var(--destructive))]">{errors.referral.message}</p> : null}
         </div>
         <Button type="submit" className="w-full" disabled={pending}>
           {pending ? <Loader2 className="size-4 animate-spin" /> : null}

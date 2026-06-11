@@ -12,6 +12,7 @@ export type PlatformCourseDraft = {
   category: string;
   price: string;
   compareAt: string;
+  currency?: "USD" | "FRW";
   rating: number;
   learners: number;
   duration: string;
@@ -35,6 +36,7 @@ export type PlatformProductDraft = {
   type: string;
   price: string;
   compareAt: string;
+  currency?: "USD" | "FRW";
   seller: string;
   stock: number;
   rating: number;
@@ -42,6 +44,7 @@ export type PlatformProductDraft = {
   category: string;
   delivery: string;
   image: string;
+  images?: string[];
   tools: string[];
   status: PublishingStatus;
   isVerified?: boolean;
@@ -290,97 +293,6 @@ function createChapter(courseSlug: string, title: string, order: number): Course
   };
 }
 
-function createSeedLessons(courseSlug: string, chapters: CourseChapterDraft[]): CourseLessonDraft[] {
-  const timestamp = nowIso();
-
-  return chapters.flatMap((chapter, chapterIndex) => {
-    const baseDuration = Math.max(15, Math.round(chapter.estimatedMinutes / 3));
-    const seeds: Array<Pick<CourseLessonDraft, "title" | "type" | "durationMinutes" | "summary" | "content" | "videoUrl" | "imageUrl" | "assetIds" | "resources" | "isPreview">> = [
-      {
-        title: `Watch: ${chapter.title}`,
-        type: "video",
-        durationMinutes: baseDuration,
-        summary: `Instructor video lesson for ${chapter.title}.`,
-        content: `Watch the instructor explanation for ${chapter.title}, then complete the next activity.`,
-        videoUrl: "",
-        imageUrl: "",
-        assetIds: [],
-        resources: [],
-        isPreview: chapterIndex === 0
-      },
-      {
-        title: `Read: ${chapter.title} playbook`,
-        type: "article",
-        durationMinutes: baseDuration,
-        summary: `Text lesson and notes for ${chapter.title}.`,
-        content: `${chapter.description} Add written guidance, examples, images, and supporting documents here.`,
-        videoUrl: "",
-        imageUrl: "",
-        assetIds: [],
-        resources: [],
-        isPreview: false
-      },
-      {
-        title: `Practice lab: ${chapter.title}`,
-        type: "assignment",
-        durationMinutes: baseDuration,
-        summary: `Practical task for ${chapter.title}.`,
-        content: "Create a small proof of work, upload your evidence, and mark the activity complete.",
-        videoUrl: "",
-        imageUrl: "",
-        assetIds: [],
-        resources: [],
-        isPreview: false
-      }
-    ];
-
-    return seeds.map((lesson, lessonIndex) => ({
-      ...lesson,
-      id: createId("lesson"),
-      courseSlug,
-      chapterId: chapter.id,
-      order: lessonIndex + 1,
-      createdAt: timestamp,
-      updatedAt: timestamp
-    }));
-  });
-}
-
-function createDefaultStudents(courseSlug: string, chapters: CourseChapterDraft[]): StudentCourseRecord[] {
-  const firstChapter = chapters[0]?.id;
-  const secondChapter = chapters[1]?.id;
-
-  return [
-    {
-      id: createId("student"),
-      studentName: "Aline N.",
-      courseSlug,
-      completedChapterIds: firstChapter ? [firstChapter] : [],
-      averageScore: 84,
-      isBlocked: false,
-      updatedAt: nowIso()
-    },
-    {
-      id: createId("student"),
-      studentName: "Joseph M.",
-      courseSlug,
-      completedChapterIds: [firstChapter, secondChapter].filter(Boolean) as string[],
-      averageScore: 92,
-      isBlocked: false,
-      updatedAt: nowIso()
-    },
-    {
-      id: createId("student"),
-      studentName: "Divine U.",
-      courseSlug,
-      completedChapterIds: [],
-      averageScore: 58,
-      isBlocked: true,
-      updatedAt: nowIso()
-    }
-  ];
-}
-
 function createQuestions(courseTitle: string, seeds: string[], kind: "quiz" | "test"): CourseQuestionDraft[] {
   const source = seeds.length > 0 ? seeds : ["Core concept", "Practical workflow", "Final outcome"];
 
@@ -420,20 +332,9 @@ export const usePlatformStore = create<PlatformState>()(
   sidebarOpen: false,
   cartCount: 0,
   cartItems: {},
-  enrolledCourseSlugs: ["creator-commerce-foundations"],
-  courseProgress: {
-    "creator-commerce-foundations": 72,
-    "marketplace-growth-systems": 38
-  },
-  certificates: [
-    {
-      courseSlug: "creator-commerce-foundations",
-      courseTitle: "Creator Commerce Foundations",
-      verificationCode: "MRC-CCF-2026-0142",
-      issuedAt: "2026-04-18T09:30:00.000Z",
-      template: "Professional"
-    }
-  ],
+  enrolledCourseSlugs: [],
+  courseProgress: {},
+  certificates: [],
   walletBalance: 0,
   pendingBalance: 0,
   walletTransactions: [],
@@ -446,10 +347,7 @@ export const usePlatformStore = create<PlatformState>()(
   courseQuizzes: [],
   studentCourseRecords: {},
   completedChapters: {},
-  courseScores: {
-    "creator-commerce-foundations": 84,
-    "marketplace-growth-systems": 72
-  },
+  courseScores: {},
   setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
   setCartCount: (cartCount) => set({ cartCount }),
   createCourse: (course) => {
@@ -458,8 +356,7 @@ export const usePlatformStore = create<PlatformState>()(
       course.title,
       get().createdCourses.map((item) => item.slug)
     );
-    const seededChapters = course.chapters.map((chapter, index) => createChapter(slug, chapter, index + 1));
-    const seededLessons = createSeedLessons(slug, seededChapters);
+    const chapters = course.chapters.map((chapter, index) => createChapter(slug, chapter, index + 1));
 
     set((state) => ({
       createdCourses: [
@@ -476,15 +373,15 @@ export const usePlatformStore = create<PlatformState>()(
       ],
       courseChapters: {
         ...state.courseChapters,
-        [slug]: seededChapters
+        [slug]: chapters
       },
       courseLessons: {
         ...state.courseLessons,
-        [slug]: seededLessons
+        [slug]: []
       },
       studentCourseRecords: {
         ...state.studentCourseRecords,
-        [slug]: createDefaultStudents(slug, seededChapters)
+        [slug]: []
       }
     }));
 
@@ -531,14 +428,13 @@ export const usePlatformStore = create<PlatformState>()(
         },
         courseLessons: {
           ...state.courseLessons,
-          [courseSlug]: [...(state.courseLessons[courseSlug] ?? []), ...createSeedLessons(courseSlug, [nextChapter])]
+          [courseSlug]: state.courseLessons[courseSlug] ?? []
         },
         createdCourses: state.createdCourses.map((course) =>
           course.slug === courseSlug
             ? {
                 ...course,
                 chapters: [...course.chapters, chapter.title],
-                lessons: course.lessons + 1,
                 updatedAt: nowIso()
               }
             : course
@@ -1070,15 +966,28 @@ export const usePlatformStore = create<PlatformState>()(
     }),
     {
       name: "mr-creativist-platform-store",
-      version: 2,
+      version: 3,
       migrate: (persistedState) => {
         const state = persistedState as Partial<PlatformState>;
 
         return {
           ...state,
+          enrolledCourseSlugs: [],
+          courseProgress: {},
+          certificates: [],
           walletBalance: 0,
           pendingBalance: 0,
-          walletTransactions: []
+          walletTransactions: [],
+          createdCourses: [],
+          createdProducts: [],
+          createdGigs: [],
+          courseChapters: {},
+          courseLessons: {},
+          courseAssets: [],
+          courseQuizzes: [],
+          studentCourseRecords: {},
+          completedChapters: {},
+          courseScores: {}
         } as PlatformState;
       },
       partialize: (state) => ({

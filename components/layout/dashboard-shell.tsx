@@ -10,13 +10,13 @@ import {
   Award,
   BarChart3,
   BookOpen,
-  Boxes,
   BriefcaseBusiness,
   CalendarDays,
   Bell,
   ChevronDown,
   CreditCard,
   GraduationCap,
+  HandCoins,
   Headphones,
   Home,
   LayoutDashboard,
@@ -46,15 +46,15 @@ const normalNavItems: NavItem[] = [
   { href: "/dashboard/downloads", label: "Downloads", icon: Package },
   { href: "/dashboard/orders", label: "Orders", icon: ReceiptText },
   { href: "/dashboard/wallet", label: "Wallet", icon: Wallet },
+  { href: "/dashboard/earnings", label: "Earnings", icon: HandCoins },
+  { href: "/dashboard/referrals", label: "Referrals", icon: HandCoins },
   { href: "/profile", label: "Profile", icon: Users }
 ];
 
 const studioNavItems: NavItem[] = [
   { href: "/studio", label: "MrC. Studio", icon: Sparkles },
-  { href: "/instructor/courses/create", label: "Create course", icon: GraduationCap },
   { href: "/instructor/courses", label: "Courses", icon: BookOpen },
   { href: "/seller/products", label: "Products", icon: Package },
-  { href: "/seller/products/create", label: "Add product", icon: Boxes },
   { href: "/seller/shop", label: "Business", icon: ShoppingBag },
   { href: "/freelancer/gigs", label: "Gigs", icon: BriefcaseBusiness },
   { href: "/consultant/profile", label: "Consulting", icon: CalendarDays },
@@ -327,12 +327,12 @@ export function DashboardShell({ children, user }: { children: React.ReactNode; 
       </aside>
 
       <div className="lg:pl-72">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-[hsl(var(--border))] bg-[hsl(var(--background))]/90 px-4 backdrop-blur sm:px-6">
-          <div>
+        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-2 border-b border-[hsl(var(--border))] bg-[hsl(var(--background))]/90 px-3 backdrop-blur sm:px-6">
+          <div className="hidden min-w-0 sm:block">
             <p className="text-sm text-[hsl(var(--muted-foreground))]">{workspaceGroup.title}</p>
-            <p className="font-medium">{user.name ?? "Creative operator"}</p>
+            <p className="truncate font-medium">{user.name ?? "Creative operator"}</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="ml-auto flex min-w-0 items-center gap-1 sm:gap-2">
             <Button asChild variant="outline" size="sm">
               <Link href="/">
                 <Home className="size-4" />
@@ -361,7 +361,6 @@ export function DashboardShell({ children, user }: { children: React.ReactNode; 
             </Button>
             <ModeToggle />
             <AccountProfileMenu user={user} />
-            <LogoutButton size="sm" className="lg:hidden" />
           </div>
         </header>
         <div className="border-b border-[hsl(var(--border))] p-3 lg:hidden">

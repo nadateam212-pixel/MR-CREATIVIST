@@ -25,6 +25,7 @@ export default async function AdminShopsPage() {
     id: String(shop.id ?? shop.slug),
     title: shop.name,
     subtitle: `${shop.category ?? "Business"} - ${[shop.city, shop.country].filter(Boolean).join(", ") || "Location not set"}`,
+    image: shop.coverImage ?? shop.logo,
     kind: "business",
     status: shop.status ?? "draft",
     isVerified: Boolean(shop.isVerified),

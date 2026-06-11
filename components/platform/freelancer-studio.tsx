@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
 import { useMemo, useState } from "react";
 import {
   BriefcaseBusiness,
@@ -70,13 +69,14 @@ function locationLabel(gig: PublicGig) {
 
 export function FreelancerStudio({
   initialFreelancers = [],
-  initialGigs = []
+  initialGigs = [],
+  isAuthenticated = false
 }: {
   initialFreelancers?: Freelancer[];
   initialGigs?: PublicGig[];
+  isAuthenticated?: boolean;
 }) {
   const router = useRouter();
-  const { data: session } = useSession();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All");
   const [requestingGigSlug, setRequestingGigSlug] = useState("");
@@ -100,7 +100,7 @@ export function FreelancerStudio({
   });
 
   async function requestGig(gig: PublicGig) {
-    if (!session?.user) {
+    if (!isAuthenticated) {
       router.push(`/login?callbackUrl=/freelancers%23${gig.slug}`);
       return;
     }

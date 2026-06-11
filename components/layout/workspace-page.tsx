@@ -1,10 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Image from "next/image";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, Archive, ArrowRight, CheckCircle2, Copy, Database, Download, Edit3, Eye, FileCheck2, Settings, Share2, Sparkles } from "lucide-react";
+import { Activity, Archive, CheckCircle2, Copy, Download, Edit3, Eye, FileCheck2, Settings, Share2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,18 +20,6 @@ type WorkspaceRecord = {
   currency?: string;
   updatedAt: string;
 };
-
-const heroImages = [
-  "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1800&q=85",
-  "https://images.unsplash.com/photo-1556761175-4b46a572b786?auto=format&fit=crop&w=1800&q=85",
-  "https://images.unsplash.com/photo-1551434678-e076c223a692?auto=format&fit=crop&w=1800&q=85",
-  "https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=1800&q=85"
-];
-
-function stableImageFor(title: string) {
-  const score = Array.from(title).reduce((total, character) => total + character.charCodeAt(0), 0);
-  return heroImages[score % heroImages.length];
-}
 
 function slugify(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "") || "workspace";
@@ -70,7 +56,6 @@ export function WorkspacePage(props: {
 
 function StandardWorkspacePage({
   title,
-  description,
   tags = [],
   pathname
 }: {
@@ -88,10 +73,6 @@ function StandardWorkspacePage({
   const [editingRecord, setEditingRecord] = useState<WorkspaceRecord | null>(null);
   const [editForm, setEditForm] = useState({ name: "", description: "", kind: "" });
   const resource = pathname.split("/").filter(Boolean).slice(1).join("-") || slugify(title);
-  const heroImage = stableImageFor(title);
-
-  const primaryHref = isAdmin ? "/admin/dashboard" : "/dashboard";
-  const secondaryHref = isAdmin ? "/admin/users" : "/dashboard/support";
   const actions = [
     { label: "Create", icon: Sparkles, method: "POST" },
     { label: "Manage", icon: Settings, method: "PATCH" },
@@ -198,7 +179,7 @@ function StandardWorkspacePage({
         title,
         tags: normalizedTags,
         name: `${title} record ${records.length + 1}`,
-        description: `${title} operational item created from dashboard tools.`
+        description: `${title} record created from dashboard tools.`
       })
     })
       .then(async (response) => {
@@ -316,7 +297,7 @@ function StandardWorkspacePage({
         title,
         tags: normalizedTags,
         name: `Copy of ${record.name}`,
-        description: record.description ?? `${record.name} duplicated from operational table.`,
+        description: record.description ?? `${record.name} duplicated from records.`,
         kind: record.kind ?? "record",
         amount: record.amount ?? 0,
         currency: record.currency ?? "USD",
@@ -342,106 +323,44 @@ function StandardWorkspacePage({
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-12">
-      <section className="relative min-h-[24rem] overflow-hidden rounded-lg border border-[hsl(var(--border))]">
-        <Image src={heroImage} alt={`${title} workspace`} fill sizes="(min-width: 1024px) 74vw, 100vw" className="object-cover" priority />
-        <div className="absolute inset-0 bg-slate-950/76" />
-        <div className="relative flex min-h-[24rem] flex-col justify-end p-6 text-white sm:p-8 lg:p-10">
-          <div className="max-w-4xl">
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-black uppercase tracking-[0.22em] backdrop-blur">
-              <Activity className="size-4 text-cyan-300" />
-              {isAdmin ? "ADMIN WORKSPACE" : "WORKSPACE MODULE"}
-            </div>
-            <h1 className="text-4xl font-black uppercase leading-[0.98] tracking-tight sm:text-6xl">{title}</h1>
-            <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-200">{description}</p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Button asChild size="lg">
-                <Link href={primaryHref}>
-                  {isAdmin ? "ADMIN DASHBOARD" : "DASHBOARD"}
-                  <ArrowRight className="size-5" />
-                </Link>
-              </Button>
-              <Button asChild size="lg" variant="outline" className="border-white bg-white/10 text-white hover:bg-white/20">
-                <Link href={secondaryHref}>{isAdmin ? "MANAGE USERS" : "SUPPORT"}</Link>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="rounded-lg border-y border-[hsl(var(--border))] bg-[hsl(var(--muted))]/45 p-4">
-        <div className="grid gap-4 md:grid-cols-4">
-          {actions.map((action) => (
-            <button
-              key={action.label}
-              type="button"
-              onClick={() => void runAction(action.label, action.method)}
-              className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] p-6 text-left transition-colors hover:bg-[hsl(var(--muted))]/45"
-            >
-              <action.icon className="mb-5 size-6 text-[hsl(var(--primary))]" />
-              <p className="font-black uppercase">{busy === action.label ? "Running" : action.label}</p>
-              <p className="mt-3 text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-                {action.label} records, approvals, exports, and audit activity for this workspace.
-              </p>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <section className="grid gap-5 lg:grid-cols-[1fr_0.72fr]">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <Database className="size-6 text-[hsl(var(--primary))]" />
-              <CardTitle className="uppercase">Module models</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="grid gap-3 sm:grid-cols-2">
+    <div className="mx-auto w-full max-w-7xl space-y-6">
+      <section className="flex flex-col gap-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap gap-2">
             {normalizedTags.map((tag) => (
-              <div key={tag} className="rounded-lg border border-[hsl(var(--border))] p-5">
-                <Badge>{tag}</Badge>
-                <p className="mt-4 text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-                  List, create, update, review, approve, export, and audit {tag.toLowerCase()} data.
-                </p>
-              </div>
+              <Badge key={tag}>{tag}</Badge>
             ))}
-          </CardContent>
-        </Card>
+          </div>
+          <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">{title}</h1>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Badge className="h-10 px-3">
+            <Activity className="mr-2 size-4" />
+            {syncing ? "Syncing" : activity}
+          </Badge>
+          <Button type="button" onClick={addRecord}>
+            <Sparkles className="size-4" />
+            New record
+          </Button>
+        </div>
+      </section>
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <Activity className="size-6 text-[hsl(var(--primary))]" />
-              <CardTitle className="uppercase">Status board</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="grid gap-3">
-            {[
-              syncing ? "Syncing workspace" : activity,
-              "Role controls mapped",
-              "Wallet compatible",
-              "Database audit enabled"
-            ].map((item) => (
-              <div key={item} className="flex items-center justify-between gap-4 rounded-md border border-[hsl(var(--border))] p-4 text-sm">
-                <span>{item}</span>
-                <Badge className="shrink-0">Ready</Badge>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {actions.map((action) => (
+          <Button
+            key={action.label}
+            type="button"
+            variant="outline"
+            className="h-12 justify-start"
+            onClick={() => void runAction(action.label, action.method)}
+          >
+            <action.icon className="size-4" />
+            {busy === action.label ? "Running" : action.label}
+          </Button>
+        ))}
       </section>
 
       <section className="space-y-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-3xl">
-            <p className="text-sm font-black uppercase tracking-[0.18em] text-[hsl(var(--primary))]">WORKING RECORDS</p>
-            <h2 className="mt-3 text-3xl font-black uppercase tracking-tight sm:text-5xl">Operational table</h2>
-          </div>
-          <Button type="button" onClick={addRecord}>
-            <Sparkles className="size-4" />
-            Add record
-          </Button>
-        </div>
 
         {editingRecord ? (
           <Card>

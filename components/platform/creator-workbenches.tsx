@@ -40,7 +40,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { PriceDisplay } from "@/components/ui/price-display";
 import {
   type CourseLessonType,
   type PlatformProductDraft,
@@ -56,6 +55,8 @@ const courseImage =
 const productImage =
   "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=85";
 
+type StudioCurrency = "USD" | "FRW";
+
 function splitLines(value: string) {
   return value
     .split("\n")
@@ -63,10 +64,31 @@ function splitLines(value: string) {
     .filter(Boolean);
 }
 
-function price(value: string) {
-  const normalized = value.trim().replace(/^\$/, "");
-  if (/^free$/i.test(normalized)) return "$0";
-  return `$${normalized || "0"}`;
+function currencyFromPrice(value?: string, fallback: StudioCurrency = "USD"): StudioCurrency {
+  const normalized = String(value ?? "").trim().toUpperCase();
+  if (normalized.startsWith("FRW") || normalized.endsWith("FRW") || normalized.includes(" FRW")) return "FRW";
+  if (normalized.startsWith("$") || normalized.startsWith("USD") || normalized.endsWith("USD")) return "USD";
+
+  return fallback;
+}
+
+function price(value: string, currency: StudioCurrency = "USD") {
+  const normalized = value.trim().replace(/^(USD|FRW|\$)\s*/i, "").replace(/\s*(USD|FRW)$/i, "");
+  if (/^free$/i.test(normalized)) return currency === "FRW" ? "FRW 0" : "$0";
+  const amount = normalized || "0";
+  return currency === "FRW" ? `FRW ${amount}` : `$${amount}`;
+}
+
+function studioMoney(value: string) {
+  const trimmed = String(value ?? "").trim();
+  if (!trimmed) return "$0";
+  if (/^free$/i.test(trimmed)) return "Free";
+  if (/^(FRW|USD|\$)/i.test(trimmed)) return trimmed;
+  return `$${trimmed}`;
+}
+
+function StudioMoney({ value, className = "" }: { value: string; className?: string }) {
+  return <span className={`font-semibold ${className}`}>{studioMoney(value)}</span>;
 }
 
 function safeImage(value: string, fallback: string) {
@@ -100,8 +122,12 @@ function StatusBadge({ status }: { status: PublishingStatus | "base" }) {
 type ProductCatalogRow = {
   name: string;
   slug: string;
+  type?: string;
   category: string;
   price: string;
+  currency?: StudioCurrency | string;
+  image?: string;
+  images?: string[];
   status?: PublishingStatus | "base";
 };
 
@@ -110,6 +136,8 @@ type CourseCatalogRow = {
   slug: string;
   category: string;
   price: string;
+  currency?: StudioCurrency | string;
+  image?: string;
   lessons?: number;
   modules?: { lessons?: unknown[] }[];
   status?: PublishingStatus | "base";
@@ -138,6 +166,7 @@ export function ProductBuilder({
     category: "Templates",
     price: "49",
     compareAt: "89",
+    currency: "USD" as StudioCurrency,
     stock: "250",
     delivery: "Instant download",
     image: productImage,
@@ -154,6 +183,23 @@ export function ProductBuilder({
   }
 
   async function submit(status: "draft" | "submitted") {
+    const requiredFields = [
+      ["Product name", form.name],
+      ["Category", form.category],
+      ["Type", form.type],
+      ["Delivery", form.delivery],
+      ["Price", form.price],
+      ["Stock", form.stock],
+      ["Included tools", form.tools]
+    ];
+    const missing = requiredFields.filter(([, value]) => !String(value ?? "").trim()).map(([label]) => label);
+    if (missing.length) {
+      const nextMessage = `Missing required fields: ${missing.join(", ")}.`;
+      setMessage(nextMessage);
+      toast.error(nextMessage);
+      return;
+    }
+
     setBusy(status);
     setMessage(status === "submitted" ? "Submitting product for admin review..." : "Saving product draft...");
 
@@ -165,9 +211,9 @@ export function ProductBuilder({
           name: form.name,
           type: form.type,
           category: form.category,
-          price: Number(form.price) || 0,
-          compareAtPrice: Number(form.compareAt) || undefined,
-          currency: "USD",
+          price: Number(String(form.price).replace(/[^\d.]/g, "")) || 0,
+          compareAtPrice: Number(String(form.compareAt).replace(/[^\d.]/g, "")) || undefined,
+          currency: form.currency,
           sellerName,
           stock: Number(form.stock) || 0,
           delivery: form.delivery,
@@ -183,9 +229,13 @@ export function ProductBuilder({
       if (!response.ok) throw new Error(product.error ?? "Product save failed.");
 
       setLastSlug(product.slug);
-      setMessage(status === "submitted" ? "Product submitted. Admin can approve, verify, and publish it." : "Product draft saved.");
+      const nextMessage = status === "submitted" ? "Product submitted. Admin can approve, verify, and publish it." : "Product draft saved.";
+      setMessage(nextMessage);
+      toast.success(nextMessage);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Product save failed.");
+      const nextMessage = error instanceof Error ? error.message : "Product save failed.";
+      setMessage(nextMessage);
+      toast.error(nextMessage);
     } finally {
       setBusy("");
     }
@@ -207,6 +257,8 @@ export function ProductBuilder({
               <Input
                 value={form.name}
                 onChange={(event) => update("name", event.target.value)}
+                required
+                minLength={3}
               />
             </label>
             <label className="grid gap-2 text-sm font-medium">
@@ -214,6 +266,8 @@ export function ProductBuilder({
               <Input
                 value={form.category}
                 onChange={(event) => update("category", event.target.value)}
+                required
+                minLength={2}
               />
             </label>
             <label className="grid gap-2 text-sm font-medium">
@@ -221,6 +275,7 @@ export function ProductBuilder({
               <select
                 value={form.type}
                 onChange={(event) => update("type", event.target.value)}
+                required
                 className="h-10 rounded-md border border-[hsl(var(--border))] bg-transparent px-3"
               >
                 {[
@@ -239,6 +294,8 @@ export function ProductBuilder({
               <Input
                 value={form.delivery}
                 onChange={(event) => update("delivery", event.target.value)}
+                required
+                minLength={2}
               />
             </label>
             <label className="grid gap-2 text-sm font-medium">
@@ -247,6 +304,7 @@ export function ProductBuilder({
                 value={form.price}
                 onChange={(event) => update("price", event.target.value)}
                 inputMode="decimal"
+                required
               />
             </label>
             <label className="grid gap-2 text-sm font-medium">
@@ -258,11 +316,23 @@ export function ProductBuilder({
               />
             </label>
             <label className="grid gap-2 text-sm font-medium">
+              Currency
+              <select
+                value={form.currency}
+                onChange={(event) => setForm((current) => ({ ...current, currency: event.target.value as StudioCurrency }))}
+                className="h-10 rounded-md border border-[hsl(var(--border))] bg-transparent px-3"
+              >
+                <option value="USD">USD</option>
+                <option value="FRW">FRW</option>
+              </select>
+            </label>
+            <label className="grid gap-2 text-sm font-medium">
               Stock
               <Input
                 value={form.stock}
                 onChange={(event) => update("stock", event.target.value)}
                 inputMode="numeric"
+                required
               />
             </label>
             <div className="grid gap-2 text-sm font-medium">
@@ -285,6 +355,7 @@ export function ProductBuilder({
               <textarea
                 value={form.tools}
                 onChange={(event) => update("tools", event.target.value)}
+                required
                 className="min-h-32 rounded-md border border-[hsl(var(--border))] bg-transparent p-3 outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
               />
             </label>
@@ -303,18 +374,18 @@ export function ProductBuilder({
               <Badge>{form.type}</Badge>
               <h2 className="mt-3 text-xl font-semibold">{form.name}</h2>
               <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
-                {price(form.price)} - {form.delivery} - {form.stock || 0} in
+                {price(form.price, form.currency)} - {form.delivery} - {form.stock || 0} in
                 stock
               </p>
             </div>
             <div className="grid gap-2">
-              <Button onClick={() => void submit("submitted")} disabled={busy === "submitted"}>
-                <Send className="size-4" />
-                Submit for review
+              <Button onClick={() => void submit("submitted")} disabled={Boolean(busy)}>
+                {busy === "submitted" ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+                {busy === "submitted" ? "Submitting..." : lastSlug && message.includes("submitted") ? "Submitted" : "Submit for review"}
               </Button>
-              <Button variant="outline" onClick={() => void submit("draft")} disabled={busy === "draft"}>
-                <Save className="size-4" />
-                Save draft
+              <Button variant="outline" onClick={() => void submit("draft")} disabled={Boolean(busy)}>
+                {busy === "draft" ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                {busy === "draft" ? "Saving..." : lastSlug && message.includes("draft") ? "Saved draft" : "Save draft"}
               </Button>
             </div>
             {lastSlug ? (
@@ -344,12 +415,15 @@ export function CourseBuilder({
 }) {
   const createCourse = usePlatformStore((state) => state.createCourse);
   const [lastSlug, setLastSlug] = useState<string | null>(null);
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState("");
   const [form, setForm] = useState({
     title: "Professional Digital Course",
     category: "Business",
     level: "Beginner",
     price: "79",
     compareAt: "149",
+    currency: "USD" as StudioCurrency,
     duration: "24 hours",
     lessons: "20",
     certificate: "Professional certificate",
@@ -382,12 +456,35 @@ export function CourseBuilder({
   }
 
   function submit(status: PublishingStatus) {
+    const requiredFields = [
+      ["Course title", form.title],
+      ["Category", form.category],
+      ["Level", form.level],
+      ["Price", form.price],
+      ["Duration", form.duration],
+      ["Lessons", form.lessons],
+      ["Certificate", form.certificate],
+      ["Outcomes", form.outcomes],
+      ["Chapters", form.chapters],
+      ["Tools", form.tools]
+    ];
+    const missing = requiredFields.filter(([, value]) => !String(value ?? "").trim()).map(([label]) => label);
+    if (missing.length) {
+      const nextMessage = `Missing required fields: ${missing.join(", ")}.`;
+      setMessage(nextMessage);
+      toast.error(nextMessage);
+      return;
+    }
+
+    setBusy(status);
+    setMessage(status === "published" ? "Publishing course..." : "Saving course draft...");
     const slug = createCourse({
       title: form.title,
       level: form.level,
       category: form.category,
-      price: price(form.price),
-      compareAt: price(form.compareAt),
+      price: price(form.price, form.currency),
+      compareAt: price(form.compareAt, form.currency),
+      currency: form.currency,
       duration: form.duration,
       lessons: Number(form.lessons) || 0,
       instructor: instructorName,
@@ -401,6 +498,10 @@ export function CourseBuilder({
     });
 
     setLastSlug(slug);
+    setBusy("");
+    const nextMessage = status === "published" ? "Course published." : "Course draft saved.";
+    setMessage(nextMessage);
+    toast.success(nextMessage);
   }
 
   return (
@@ -419,6 +520,8 @@ export function CourseBuilder({
               <Input
                 value={form.title}
                 onChange={(event) => update("title", event.target.value)}
+                required
+                minLength={3}
               />
             </label>
             <label className="grid gap-2 text-sm font-medium">
@@ -426,6 +529,8 @@ export function CourseBuilder({
               <Input
                 value={form.category}
                 onChange={(event) => update("category", event.target.value)}
+                required
+                minLength={2}
               />
             </label>
             <label className="grid gap-2 text-sm font-medium">
@@ -433,6 +538,7 @@ export function CourseBuilder({
               <select
                 value={form.level}
                 onChange={(event) => update("level", event.target.value)}
+                required
                 className="h-10 rounded-md border border-[hsl(var(--border))] bg-transparent px-3"
               >
                 {[
@@ -451,6 +557,7 @@ export function CourseBuilder({
               <Input
                 value={form.certificate}
                 onChange={(event) => update("certificate", event.target.value)}
+                required
               />
             </label>
             <label className="grid gap-2 text-sm font-medium">
@@ -459,6 +566,7 @@ export function CourseBuilder({
                 value={form.price}
                 onChange={(event) => update("price", event.target.value)}
                 inputMode="decimal"
+                required
               />
             </label>
             <label className="grid gap-2 text-sm font-medium">
@@ -470,10 +578,22 @@ export function CourseBuilder({
               />
             </label>
             <label className="grid gap-2 text-sm font-medium">
+              Currency
+              <select
+                value={form.currency}
+                onChange={(event) => setForm((current) => ({ ...current, currency: event.target.value as StudioCurrency }))}
+                className="h-10 rounded-md border border-[hsl(var(--border))] bg-transparent px-3"
+              >
+                <option value="USD">USD</option>
+                <option value="FRW">FRW</option>
+              </select>
+            </label>
+            <label className="grid gap-2 text-sm font-medium">
               Duration
               <Input
                 value={form.duration}
                 onChange={(event) => update("duration", event.target.value)}
+                required
               />
             </label>
             <label className="grid gap-2 text-sm font-medium">
@@ -482,6 +602,7 @@ export function CourseBuilder({
                 value={form.lessons}
                 onChange={(event) => update("lessons", event.target.value)}
                 inputMode="numeric"
+                required
               />
             </label>
             <div className="grid gap-2 text-sm font-medium md:col-span-2">
@@ -512,6 +633,7 @@ export function CourseBuilder({
               <textarea
                 value={form.outcomes}
                 onChange={(event) => update("outcomes", event.target.value)}
+                required
                 className="min-h-32 rounded-md border border-[hsl(var(--border))] bg-transparent p-3 outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
               />
             </label>
@@ -520,6 +642,7 @@ export function CourseBuilder({
               <textarea
                 value={form.chapters}
                 onChange={(event) => update("chapters", event.target.value)}
+                required
                 className="min-h-32 rounded-md border border-[hsl(var(--border))] bg-transparent p-3 outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
               />
             </label>
@@ -528,6 +651,7 @@ export function CourseBuilder({
               <textarea
                 value={form.tools}
                 onChange={(event) => update("tools", event.target.value)}
+                required
                 className="min-h-28 rounded-md border border-[hsl(var(--border))] bg-transparent p-3 outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
               />
             </label>
@@ -543,7 +667,7 @@ export function CourseBuilder({
               <Badge>{form.level}</Badge>
               <h2 className="mt-3 text-xl font-semibold">{form.title}</h2>
               <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
-                {price(form.price)} - {form.duration} - {form.lessons || 0}{" "}
+                {price(form.price, form.currency)} - {form.duration} - {form.lessons || 0}{" "}
                 lessons
               </p>
             </div>
@@ -552,20 +676,20 @@ export function CourseBuilder({
                 <Sparkles className="size-4" />
                 Generate outline and quiz plan
               </Button>
-              <Button onClick={() => submit("published")}>
-                <Send className="size-4" />
-                Publish to courses
+              <Button onClick={() => submit("published")} disabled={Boolean(busy)}>
+                {busy === "published" ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+                {busy === "published" ? "Publishing..." : lastSlug && message.includes("published") ? "Published" : "Publish to courses"}
               </Button>
-              <Button variant="outline" onClick={() => submit("draft")}>
-                <Save className="size-4" />
-                Save draft
+              <Button variant="outline" onClick={() => submit("draft")} disabled={Boolean(busy)}>
+                {busy === "draft" ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                {busy === "draft" ? "Saving..." : lastSlug && message.includes("draft") ? "Saved draft" : "Save draft"}
               </Button>
             </div>
             {lastSlug ? (
               <div className="rounded-md border border-[hsl(var(--border))] p-3 text-sm">
                 <p className="flex items-center gap-2 font-medium text-[hsl(var(--primary))]">
                   <CheckCircle2 className="size-4" />
-                  Course saved
+                  {message || "Course saved"}
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Button asChild size="sm" variant="outline">
@@ -660,6 +784,7 @@ export function InstructorCourseStudio({
     level: "Beginner",
     price: "79",
     compareAt: "149",
+    currency: "USD" as StudioCurrency,
     duration: "24 hours",
     lessons: "20",
     certificate: "Professional certificate",
@@ -908,8 +1033,9 @@ export function InstructorCourseStudio({
       title: form.title,
       level: form.level,
       category: form.category,
-      price: price(form.price),
-      compareAt: price(form.compareAt),
+      price: price(form.price, form.currency),
+      compareAt: price(form.compareAt, form.currency),
+      currency: form.currency,
       duration: form.duration,
       lessons: Number(form.lessons) || splitLines(form.chapters).length,
       instructor: instructorName,
@@ -1362,7 +1488,7 @@ export function InstructorCourseStudio({
                 <span className="font-medium">{course.title}</span>
                 <div className="mt-2 flex items-center justify-between">
                   <StatusBadge status={course.status} />
-                  <PriceDisplay price={course.price} className="text-sm text-[hsl(var(--muted-foreground))]" />
+                  <StudioMoney value={course.price} className="text-sm text-[hsl(var(--muted-foreground))]" />
                 </div>
               </button>
             ))}
@@ -1523,6 +1649,17 @@ export function InstructorCourseStudio({
                           update("price", event.target.value)
                         }
                       />
+                    </label>
+                    <label className="grid gap-2 text-sm font-medium">
+                      Currency
+                      <select
+                        value={form.currency}
+                        onChange={(event) => setForm((current) => ({ ...current, currency: event.target.value as StudioCurrency }))}
+                        className="h-10 rounded-md border border-[hsl(var(--border))] bg-transparent px-3"
+                      >
+                        <option value="USD">USD</option>
+                        <option value="FRW">FRW</option>
+                      </select>
                     </label>
                     <label className="grid gap-2 text-sm font-medium">
                       Duration
@@ -2581,7 +2718,7 @@ export function ProductManager({ initialProducts = [] }: { initialProducts?: Pro
   );
   const deleteProduct = usePlatformStore((state) => state.deleteProduct);
   const [editingSlug, setEditingSlug] = useState("");
-  const [editForm, setEditForm] = useState({ name: "", category: "", price: "", stock: "" });
+  const [editForm, setEditForm] = useState({ name: "", category: "", price: "", currency: "USD" as StudioCurrency, stock: "" });
   const [hiddenSlugs, setHiddenSlugs] = useState<string[]>([]);
   const [busySlug, setBusySlug] = useState("");
   const rows = useMemo(
@@ -2680,6 +2817,7 @@ export function ProductManager({ initialProducts = [] }: { initialProducts?: Pro
       name: product.name,
       category: product.category,
       price: product.price.replace(/^\$/, ""),
+      currency: currencyFromPrice(product.price, product.currency ?? "USD"),
       stock: String(product.stock)
     });
   }
@@ -2689,7 +2827,8 @@ export function ProductManager({ initialProducts = [] }: { initialProducts?: Pro
     updateProduct(editingProduct.slug, {
       name: editForm.name.trim() || editingProduct.name,
       category: editForm.category.trim() || editingProduct.category,
-      price: price(editForm.price),
+      price: price(editForm.price, editForm.currency),
+      currency: editForm.currency,
       stock: Number(editForm.stock) || 0
     });
     setEditingSlug("");
@@ -2704,7 +2843,7 @@ export function ProductManager({ initialProducts = [] }: { initialProducts?: Pro
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Products</h1>
-          <p className="mt-2 text-[hsl(var(--muted-foreground))]">
+          <p className="mt-2 hidden text-[hsl(var(--muted-foreground))] sm:block">
             Manage products created from MrC. Studio.
           </p>
         </div>
@@ -2720,10 +2859,14 @@ export function ProductManager({ initialProducts = [] }: { initialProducts?: Pro
           <CardHeader>
             <CardTitle>Quick edit product</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-[1fr_1fr_10rem_8rem_auto]">
+          <CardContent className="grid gap-3 md:grid-cols-[1fr_1fr_10rem_8rem_8rem_auto]">
             <Input value={editForm.name} onChange={(event) => setEditForm((current) => ({ ...current, name: event.target.value }))} />
             <Input value={editForm.category} onChange={(event) => setEditForm((current) => ({ ...current, category: event.target.value }))} />
             <Input value={editForm.price} onChange={(event) => setEditForm((current) => ({ ...current, price: event.target.value }))} inputMode="decimal" />
+            <select value={editForm.currency} onChange={(event) => setEditForm((current) => ({ ...current, currency: event.target.value as StudioCurrency }))} className="h-10 rounded-md border border-[hsl(var(--border))] bg-transparent px-3 text-sm">
+              <option value="USD">USD</option>
+              <option value="FRW">FRW</option>
+            </select>
             <Input value={editForm.stock} onChange={(event) => setEditForm((current) => ({ ...current, stock: event.target.value }))} inputMode="numeric" />
             <div className="flex gap-2">
               <Button onClick={saveProductEdit}>
@@ -2750,12 +2893,24 @@ export function ProductManager({ initialProducts = [] }: { initialProducts?: Pro
             <tbody className="divide-y divide-[hsl(var(--border))]">
               {rows.length > 0 ? rows.map((product) => (
                 <tr key={product.slug}>
-                  <td className="p-4 font-medium">{product.name}</td>
+                  <td className="p-4 font-medium">
+                    <div className="flex min-w-52 items-center gap-3">
+                      <img
+                        src={product.image ?? product.images?.[0] ?? productImage}
+                        alt={product.name}
+                        className="size-14 rounded-md border border-[hsl(var(--border))] object-cover"
+                      />
+                      <span className="min-w-0">
+                        <span className="block truncate font-semibold">{product.name}</span>
+                        <span className="block truncate text-xs text-[hsl(var(--muted-foreground))]">{product.type ?? "Product"}</span>
+                      </span>
+                    </div>
+                  </td>
                   <td className="p-4 text-[hsl(var(--muted-foreground))]">
                     {product.category}
                   </td>
                   <td className="p-4">
-                    <PriceDisplay price={product.price} className="text-sm" />
+                    <StudioMoney value={product.price} className="text-sm" />
                   </td>
                   <td className="p-4">
                     <StatusBadge status={product.status} />
@@ -3005,7 +3160,7 @@ export function CourseManager({ initialCourses = [] }: { initialCourses?: Course
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Courses</h1>
-          <p className="mt-2 text-[hsl(var(--muted-foreground))]">
+          <p className="mt-2 hidden text-[hsl(var(--muted-foreground))] sm:block">
             Manage courses created from MrC. Studio.
           </p>
         </div>
@@ -3032,19 +3187,28 @@ export function CourseManager({ initialCourses = [] }: { initialCourses?: Course
               {rows.length > 0 ? rows.map((course) => (
                 <tr key={course.slug}>
                   <td className="p-4 font-medium">
-                    <span className="inline-flex items-center gap-2">
-                      <BookOpen className="size-4 text-[hsl(var(--primary))]" />
-                      {course.title}
+                    <span className="flex min-w-64 items-center gap-3">
+                      <img
+                        src={course.image ?? courseImage}
+                        alt={course.title}
+                        className="size-14 rounded-md border border-[hsl(var(--border))] object-cover"
+                      />
+                      <span className="min-w-0">
+                        <span className="flex items-center gap-2">
+                          <BookOpen className="size-4 shrink-0 text-[hsl(var(--primary))]" />
+                          <span className="truncate">{course.title}</span>
+                        </span>
+                        <span className="mt-1 block text-xs font-medium text-[hsl(var(--muted-foreground))]">
+                          {savedLessonCount(course)} lessons saved
+                        </span>
+                      </span>
                     </span>
-                    <p className="mt-1 text-xs font-medium text-[hsl(var(--muted-foreground))]">
-                      {savedLessonCount(course)} lessons saved
-                    </p>
                   </td>
                   <td className="p-4 text-[hsl(var(--muted-foreground))]">
                     {course.category}
                   </td>
                   <td className="p-4">
-                    <PriceDisplay price={course.price} className="text-sm" />
+                    <StudioMoney value={course.price} className="text-sm" />
                   </td>
                   <td className="p-4">
                     <StatusBadge status={course.status} />

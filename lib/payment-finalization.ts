@@ -1,14 +1,98 @@
 import { sendPaymentBillEmail } from "@/lib/billing";
 import { saveCourseEnrollment } from "@/lib/enrollment-service";
 import { connectMongoDB } from "@/lib/mongodb";
+import { recordWalletTransaction } from "@/lib/platform-ledger";
 import Order from "@/models/Order";
 import Product from "@/models/Product";
+import ReferralProfile from "@/models/ReferralProfile";
+import User from "@/models/User";
 import WalletTransaction from "@/models/WalletTransaction";
 
 type LooseRecord = Record<string, unknown>;
 
 function asRecord(value: unknown): LooseRecord {
   return value && typeof value === "object" ? (value as LooseRecord) : {};
+}
+
+async function creditReferralCommission({
+  buyerEmail,
+  buyerId,
+  grossAmount,
+  currency = "FRW",
+  referenceId,
+  sourceLabel
+}: {
+  buyerEmail?: string;
+  buyerId?: unknown;
+  grossAmount: number;
+  currency?: string;
+  referenceId: string;
+  sourceLabel: string;
+}) {
+  const buyer = await User.findOne({
+    $or: [
+      ...(buyerId ? [{ _id: buyerId }] : []),
+      ...(buyerEmail ? [{ email: String(buyerEmail).toLowerCase() }] : [])
+    ]
+  })
+    .select("email referredByUserId referredByEmail referredByCode")
+    .lean();
+
+  const referrerEmail = String(buyer?.referredByEmail ?? "").toLowerCase();
+  if (!referrerEmail || referrerEmail === String(buyer?.email ?? buyerEmail ?? "").toLowerCase()) return null;
+
+  const commissionAmount = Math.round(Number(grossAmount ?? 0) * 0.05 * 100) / 100;
+  if (!Number.isFinite(commissionAmount) || commissionAmount <= 0) return null;
+
+  try {
+    const transaction = await recordWalletTransaction(
+      {
+        id: buyer?.referredByUserId ? String(buyer.referredByUserId) : undefined,
+        email: referrerEmail,
+        name: referrerEmail,
+        role: "client"
+      },
+      {
+        type: "referral_earning",
+        direction: "credit",
+        amount: commissionAmount,
+        currency,
+        status: "completed",
+        description: `Referral commission: ${sourceLabel}`,
+        referenceType: "referral",
+        referenceId,
+        metadata: {
+          buyerEmail: buyer?.email ?? buyerEmail,
+          grossAmount,
+          commissionRate: 0.05,
+          referredByCode: buyer?.referredByCode
+        }
+      }
+    );
+
+    await ReferralProfile.findOneAndUpdate(
+      { userEmail: referrerEmail },
+      {
+        $inc: {
+          conversions: 1,
+          revenue: Number(grossAmount ?? 0),
+          unpaidCommission: commissionAmount
+        },
+        $set: {
+          commissionRate: 0.05
+        }
+      },
+      { upsert: false }
+    );
+
+    return transaction;
+  } catch (error) {
+    if (typeof error === "object" && error && "code" in error && (error as { code?: number }).code === 11000) {
+      return null;
+    }
+
+    throw error;
+  }
 }
 
 export async function markOrderPaid(
@@ -41,6 +125,15 @@ export async function markOrderPaid(
   order.paymentReference = options.paymentReference || order.paymentReference;
   order.providerTransactionId = options.providerTransactionId || order.providerTransactionId;
   await order.save();
+
+  await creditReferralCommission({
+    buyerEmail: order.buyerEmail,
+    buyerId: order.buyerId,
+    grossAmount: Number(order.total ?? 0),
+    currency: order.currency ?? "FRW",
+    referenceId: `order:${order._id}`,
+    sourceLabel: `Marketplace order ${order._id}`
+  });
 
   if (options.transactionId && !order.billSentAt) {
     const delivery = await sendPaymentBillEmail(options.transactionId);
@@ -86,6 +179,15 @@ export async function completeCourseEnrollmentPayment(
   });
 
   if (!result.course || !result.enrollment) throw new Error("Course enrollment could not be completed.");
+
+  await creditReferralCommission({
+    buyerEmail: learnerEmail,
+    buyerId: transaction.userId,
+    grossAmount: Number(transaction.amount ?? 0),
+    currency: String(transaction.currency ?? "FRW"),
+    referenceId: `enrollment:${result.enrollment._id}`,
+    sourceLabel: `Course enrollment: ${result.course.title}`
+  });
 
   const transactionId = options.transactionId ?? String(transaction._id ?? "");
   if (transactionId) {

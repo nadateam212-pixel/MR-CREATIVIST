@@ -887,8 +887,14 @@ export function EasyCoursePublisher({ instructorName = "MR Creativist Instructor
               <p className="font-black">Video Preview</p>
             </div>
             {previewSource.embedUrl ? (
-              <div className="mt-4 aspect-video overflow-hidden rounded-md border border-[hsl(var(--border))] bg-black">
-                <iframe src={previewSource.embedUrl} title="Course video preview" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowFullScreen className="h-full w-full border-0" />
+              <div className="relative mt-4 aspect-video overflow-hidden rounded-md border border-[hsl(var(--border))] bg-black">
+                <iframe
+                  src={previewSource.embedUrl}
+                  title="Course video preview"
+                  allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+                  allowFullScreen
+                  className={previewSource.provider === "google-drive" ? "absolute -top-[7%] left-0 h-[114%] w-full border-0" : "absolute inset-0 h-full w-full border-0"}
+                />
               </div>
             ) : (
               <div className="mt-4 grid aspect-video place-items-center rounded-md border border-dashed border-[hsl(var(--border))] bg-[hsl(var(--muted))]/45 p-5 text-center text-sm text-[hsl(var(--muted-foreground))]">

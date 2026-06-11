@@ -10,7 +10,10 @@ import { createAndSendPasswordReset, resetPasswordWithToken } from "@/lib/passwo
 import { rateLimit } from "@/lib/rate-limit";
 import { forgotPasswordSchema, loginSchema, registerSchema, resetPasswordSchema } from "@/lib/validations";
 import { sendWelcomeEmail } from "@/lib/welcome-email";
+import ReferralProfile from "@/models/ReferralProfile";
 import User from "@/models/User";
+
+const defaultValidatedRoles = ["client", "student", "instructor", "seller", "freelancer", "consultant"];
 
 export type FormState = {
   ok: boolean;
@@ -34,6 +37,30 @@ function sanitizeRedirectTarget(value: unknown) {
   return trimmed;
 }
 
+function normalizeReferralCode(value?: unknown) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+
+  try {
+    const url = new URL(raw);
+    return (
+      url.searchParams.get("referral") ||
+      url.searchParams.get("ref") ||
+      url.searchParams.get("code") ||
+      ""
+    )
+      .trim()
+      .toUpperCase();
+  } catch {
+    return raw.replace(/[^a-z0-9-]+/gi, "").toUpperCase();
+  }
+}
+
+function referralCodeFor(email: string) {
+  const local = email.split("@")[0]?.replace(/[^a-z0-9]+/gi, "").slice(0, 8).toUpperCase() || "MRC";
+  return `MRC-${local}`;
+}
+
 export async function loginAction(_state: FormState, formData: FormData): Promise<FormState> {
   const raw = Object.fromEntries(formData);
   const callbackUrl = sanitizeRedirectTarget(raw.callbackUrl);
@@ -49,48 +76,56 @@ export async function loginAction(_state: FormState, formData: FormData): Promis
     return { ok: false, message: "Too many login attempts. Try again later." };
   }
 
-  try {
-    await signIn("credentials", {
-      email: normalizedEmail,
-      password: parsed.data.password,
-      redirect: false,
-      redirectTo: callbackUrl || "/dashboard"
-    });
-  } catch (error) {
-    if (error instanceof AuthError) {
-      return { ok: false, message: "Email or password is incorrect." };
-    }
-
-    throw error;
-  }
-
   let redirectTo = callbackUrl || "/dashboard";
-  let otpRedirect = "";
+  let nextRedirect = "";
 
   try {
     await connectMongoDB();
-    const user = await User.findOne({ email: normalizedEmail }).select("_id name role emailVerifiedAt").lean();
+    const user = await User.findOne({ email: normalizedEmail }).select("+passwordHash _id name role accountStatus").lean();
+    if (!user?.passwordHash || user.accountStatus === "suspended") {
+      return { ok: false, message: "Email or password is incorrect." };
+    }
+
+    const validPassword = await bcrypt.compare(parsed.data.password, user.passwordHash);
+    if (!validPassword) {
+      return { ok: false, message: "Email or password is incorrect." };
+    }
+
     const role = String(user?.role ?? "client");
 
     if (role === "admin") {
       redirectTo = callbackUrl.startsWith("/admin") ? callbackUrl : "/admin/dashboard";
-    } else if (user && !user.emailVerifiedAt) {
+      try {
+        await signIn("credentials", {
+          email: normalizedEmail,
+          password: parsed.data.password,
+          redirect: false,
+          redirectTo
+        });
+      } catch (error) {
+        if (error instanceof AuthError) {
+          return { ok: false, message: "Email or password is incorrect." };
+        }
+
+        throw error;
+      }
+      nextRedirect = redirectTo;
+    } else {
       const otp = await createAndSendAuthOtp(normalizedEmail, "login", {
         userId: String(user._id),
         name: user.name
       });
 
-      if (otp.delivery.ok) {
-        otpRedirect = `/verify-otp?email=${encodeURIComponent(normalizedEmail)}&mode=login&optional=1&callbackUrl=${encodeURIComponent(redirectTo)}`;
+      if (!otp.delivery.ok) {
+        return { ok: false, message: otp.delivery.message };
       }
+      nextRedirect = `/verify-otp?email=${encodeURIComponent(normalizedEmail)}&mode=login&callbackUrl=${encodeURIComponent(redirectTo)}`;
     }
   } catch {
-    redirectTo = callbackUrl || "/dashboard";
+    return { ok: false, message: "Sign in could not finish. Check your connection and try again." };
   }
 
-  if (otpRedirect) redirect(otpRedirect);
-
-  redirect(redirectTo);
+  redirect(nextRedirect);
 }
 
 export async function registerAction(_state: FormState, formData: FormData): Promise<FormState> {
@@ -110,6 +145,12 @@ export async function registerAction(_state: FormState, formData: FormData): Pro
   }
 
   await connectMongoDB();
+  const referralCode = normalizeReferralCode(parsed.data.referral);
+  const referrer = referralCode
+    ? await ReferralProfile.findOne({ code: referralCode, status: "active" })
+        .select("userId userEmail code")
+        .lean()
+    : null;
   const existingUser = await User.findOne({ email: normalizedEmail }).select("+passwordHash emailVerifiedAt name").lean();
 
   if (existingUser) {
@@ -120,17 +161,10 @@ export async function registerAction(_state: FormState, formData: FormData): Pro
           userId: String(existingUser._id),
           name: existingUser.name
         });
-        await signIn("credentials", {
-          email: normalizedEmail,
-          password: parsed.data.password,
-          redirect: false,
-          redirectTo
-        });
-        redirect(
-          otp.delivery.ok
-            ? `/verify-otp?email=${encodeURIComponent(normalizedEmail)}&mode=register&optional=1&callbackUrl=${encodeURIComponent(redirectTo)}`
-            : redirectTo
-        );
+        if (!otp.delivery.ok) {
+          return { ok: false, message: otp.delivery.message };
+        }
+        redirect(`/verify-otp?email=${encodeURIComponent(normalizedEmail)}&mode=register&callbackUrl=${encodeURIComponent(redirectTo)}`);
       }
     }
 
@@ -143,28 +177,42 @@ export async function registerAction(_state: FormState, formData: FormData): Pro
     email: normalizedEmail,
     passwordHash: hashedPassword,
     role: "client",
-    validatedRoles: ["client"],
-    authProviders: ["credentials"]
+    validatedRoles: defaultValidatedRoles,
+    authProviders: ["credentials"],
+    ...(referrer && referrer.userEmail !== normalizedEmail
+      ? {
+          referredByUserId: referrer.userId,
+          referredByEmail: referrer.userEmail,
+          referredByCode: referrer.code,
+          referredAt: new Date()
+        }
+      : {})
   });
+
+  await ReferralProfile.findOneAndUpdate(
+    { userEmail: normalizedEmail },
+    {
+      $setOnInsert: {
+        userId: user._id,
+        userEmail: normalizedEmail,
+        code: referralCodeFor(normalizedEmail),
+        commissionRate: 0.05,
+        metadata: { source: "registration" }
+      }
+    },
+    { upsert: true }
+  );
 
   const otp = await createAndSendAuthOtp(user.email, "register", {
     userId: String(user._id),
     name: user.name
   });
+  if (!otp.delivery.ok) {
+    return { ok: false, message: otp.delivery.message };
+  }
   await sendWelcomeEmail(user.email, user.name);
 
-  await signIn("credentials", {
-    email: user.email,
-    password: parsed.data.password,
-    redirect: false,
-    redirectTo
-  });
-
-  redirect(
-    otp.delivery.ok
-      ? `/verify-otp?email=${encodeURIComponent(user.email)}&mode=register&optional=1&callbackUrl=${encodeURIComponent(redirectTo)}`
-      : redirectTo
-  );
+  redirect(`/verify-otp?email=${encodeURIComponent(user.email)}&mode=register&callbackUrl=${encodeURIComponent(redirectTo)}`);
 }
 
 export async function verifyOtpAction(_state: OtpFormState, formData: FormData): Promise<OtpFormState> {
@@ -235,7 +283,7 @@ export async function resendOtpAction(_state: OtpFormState, formData: FormData):
     return {
       ok: false,
       email,
-      message: `${otp.delivery.message} You can still sign in with your password.`
+      message: otp.delivery.message
     };
   }
 
@@ -264,7 +312,7 @@ export async function requestPasswordResetAction(
     return {
       ok: false,
       email,
-      message: `${result.delivery.message} You can still sign in with your current password.`
+      message: `${result.delivery.message} Try again after email delivery is configured.`
     };
   }
 

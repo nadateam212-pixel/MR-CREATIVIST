@@ -1,5 +1,17 @@
-import { WorkspacePage } from "@/components/layout/workspace-page";
+import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { auth } from "@/auth";
+import { EarningsReferralsDashboard } from "@/components/platform/earnings-referrals-dashboard";
+import { getEarningsReferralView } from "@/lib/earnings-referrals";
 
-export default function ConsultantEarningsPage() {
-  return <WorkspacePage title="Consultant earnings" description="Hourly revenue, package sales, payout status, refunds, and revenue forecasting." tags={["Revenue", "Payouts", "Forecast"]} />;
+export const metadata: Metadata = {
+  title: "Consultant Earnings"
+};
+
+export default async function ConsultantEarningsPage() {
+  const session = await auth();
+  if (!session?.user) redirect("/login");
+
+  const data = await getEarningsReferralView(session.user);
+  return <EarningsReferralsDashboard wallet={data.wallet} referral={data.referral} invites={data.invites} variant="earnings" />;
 }

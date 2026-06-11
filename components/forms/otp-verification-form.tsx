@@ -45,8 +45,8 @@ export function OtpVerificationForm({
     <div className="space-y-5">
       <div className="rounded-md border border-[hsl(var(--primary))]/25 bg-[hsl(var(--primary))]/10 p-4 text-sm text-[hsl(var(--foreground))]">
         <MailCheck className="mb-3 size-5 text-[hsl(var(--primary))]" />
-        Enter the 6-digit OTP sent to <span className="font-bold">{email}</span>. If it does not arrive, use password
-        sign-in as the fallback.
+        Enter the 6-digit OTP sent to <span className="font-bold">{email}</span>. Use the newest code if you request
+        another one.
       </div>
 
       <form action={verifyAction} className="space-y-4">
@@ -86,11 +86,7 @@ export function OtpVerificationForm({
       </form>
 
       <p className="text-center text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-        Email not arriving?{" "}
-        <Link href="/login" className="font-bold text-[hsl(var(--primary))] hover:text-[hsl(var(--foreground))]">
-          Sign in with password
-        </Link>{" "}
-        or{" "}
+        Email not arriving? Request a new OTP or{" "}
         <Link href="/forgot-password" className="font-bold text-[hsl(var(--primary))] hover:text-[hsl(var(--foreground))]">
           reset your password
         </Link>

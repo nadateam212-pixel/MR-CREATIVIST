@@ -183,7 +183,8 @@ type CourseEngagement = {
   commentCount: number;
 };
 
-function embeddedVideoClass() {
+function embeddedVideoClass(provider?: string) {
+  if (provider === "google-drive") return "absolute -top-[7%] left-0 h-[114%] w-full border-0";
   return "absolute inset-0 h-full w-full border-0";
 }
 
@@ -1542,7 +1543,7 @@ export function CourseLearningWorkspace({
                         allowFullScreen
                         referrerPolicy="strict-origin-when-cross-origin"
                         sandbox="allow-same-origin allow-scripts allow-presentation"
-                        className={embeddedVideoClass()}
+                        className={embeddedVideoClass(activeVideoSource.provider)}
                       />
                       <ProtectedVideoOverlays />
                     </div>

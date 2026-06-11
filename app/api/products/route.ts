@@ -1,4 +1,5 @@
 import Product from "@/models/Product";
+import User from "@/models/User";
 import { jsonError, jsonOk, parsePagination, readJson, requireMongo, requireRole, uniqueSlugFor } from "@/lib/mongo-api";
 import { normalizeProduct, slugify } from "@/lib/platform-db";
 import { productSchema } from "@/lib/mongo-validations";
@@ -18,7 +19,8 @@ export async function GET(request: Request) {
 
     const [items, total] = await Promise.all([
       Product.find(filter)
-        .populate("sellerId", "name email phone profileImage isVerified")
+        .select("name slug type sellerId sellerName price compareAtPrice currency category stock rating downloads delivery tools status isFeatured isVerified createdAt updatedAt")
+        .populate({ path: "sellerId", select: "name email phone profileImage isVerified", model: User })
         .sort({ isFeatured: -1, createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -26,7 +28,7 @@ export async function GET(request: Request) {
       Product.countDocuments(filter)
     ]);
 
-    return jsonOk({ items: items.map(normalizeProduct), total });
+    return jsonOk({ items: items.map((item) => normalizeProduct(item, { includeImages: false })), total });
   } catch (error) {
     return jsonError(error);
   }
@@ -45,7 +47,7 @@ export async function POST(request: Request) {
       studioId: studioTrackId(session.user),
       sellerId: session.user.id,
       sellerName: body.sellerName || session.user.name || session.user.email,
-      status: session.user.role === "admin" ? body.status : body.status === "draft" ? "draft" : "published",
+      status: session.user.role === "admin" ? body.status : body.status === "draft" ? "draft" : "submitted",
       isVerified: session.user.role === "admin" ? body.isVerified : false
     });
     revalidatePublicContent("product", product.slug);

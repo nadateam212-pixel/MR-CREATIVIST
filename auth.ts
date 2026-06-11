@@ -12,6 +12,7 @@ import User from "@/models/User";
 import type { PlatformRole } from "@/types";
 
 const authBaseUrl = getSiteUrl();
+const defaultValidatedRoles = ["client", "student", "instructor", "seller", "freelancer", "consultant"];
 
 if (process.env.NODE_ENV === "production") {
   process.env.AUTH_URL = authBaseUrl;
@@ -166,11 +167,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               email,
               name: firebaseUser.displayName || email.split("@")[0] || "MR Creativist user",
               role: "client",
-              validatedRoles: ["client"]
+              validatedRoles: defaultValidatedRoles,
+              ...(firebaseUser.photoUrl ? { profileImage: firebaseUser.photoUrl } : {})
             },
             $set: {
               firebaseUid: firebaseUser.localId,
-              ...(firebaseUser.photoUrl ? { profileImage: firebaseUser.photoUrl } : {}),
               ...(firebaseUser.emailVerified ? { emailVerifiedAt: new Date() } : {}),
               lastLoginAt: new Date()
             },
@@ -186,26 +187,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     })
   ],
   callbacks: {
-    redirect({ url }) {
-      const siteUrl = getSiteUrl();
-      if (url.startsWith("/")) return `${siteUrl}${url}`;
+    redirect({ url, baseUrl }) {
+      const requestOrigin = baseUrl || getSiteUrl();
+      if (url.startsWith("/")) return `${requestOrigin}${url}`;
 
       try {
         const parsed = new URL(url);
         const target = `${parsed.pathname}${parsed.search}${parsed.hash}`;
 
         if (["localhost", "127.0.0.1", "::1"].includes(parsed.hostname)) {
-          return `${siteUrl}${target}`;
+          return `${requestOrigin}${target}`;
         }
 
-        if (parsed.origin === siteUrl) {
-          return `${siteUrl}${target}`;
+        if (parsed.origin === requestOrigin) {
+          return `${requestOrigin}${target}`;
         }
       } catch {
-        return siteUrl;
+        return requestOrigin;
       }
 
-      return siteUrl;
+      return requestOrigin;
     },
     jwt({ token, user }) {
       if (user) {

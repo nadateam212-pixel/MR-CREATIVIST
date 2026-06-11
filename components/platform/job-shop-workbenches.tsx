@@ -984,9 +984,17 @@ export function ShopBuilder({ initialShops = [], sellerName = "MR Creativist Sel
           {shops.map((shop) => (
             <div key={shop.slug} className="rounded-md border border-[hsl(var(--border))] p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="font-semibold">{shop.name}</p>
-                  <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{shop.category} - {shop.city || shop.country || "Online"}</p>
+                <div className="flex min-w-64 items-center gap-3">
+                  <img
+                    src={shop.coverImage || shop.logo || emptyShopForm.coverImage}
+                    alt={shop.name}
+                    className="size-16 rounded-md border border-[hsl(var(--border))] object-cover"
+                  />
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold">{shop.name}</p>
+                    <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{shop.category} - {shop.city || shop.country || "Online"}</p>
+                    <p className="mt-1 line-clamp-1 text-xs text-[hsl(var(--muted-foreground))]">{shop.tagline ?? shop.description}</p>
+                  </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge className={statusTone(shop.status)}>{shop.status ?? "draft"}</Badge>

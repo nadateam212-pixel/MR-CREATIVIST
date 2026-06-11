@@ -1,4 +1,5 @@
 import Product from "@/models/Product";
+import User from "@/models/User";
 import { jsonError, jsonOk, mongoIdOrSlug, readJson, requireMongo, requireRole, submittedFields, uniqueSlugFor } from "@/lib/mongo-api";
 import { normalizeProduct, slugify } from "@/lib/platform-db";
 import { productSchema } from "@/lib/mongo-validations";
@@ -9,7 +10,7 @@ export async function GET(_: Request, context: { params: Promise<{ productId: st
     await requireMongo();
     const { productId } = await context.params;
     const product = await Product.findOne(mongoIdOrSlug(productId))
-      .populate("sellerId", "name email phone profileImage isVerified")
+      .populate({ path: "sellerId", select: "name email phone profileImage isVerified", model: User })
       .lean();
 
     if (!product) return jsonOk({ error: "Product not found." }, 404);
@@ -37,14 +38,22 @@ export async function PUT(request: Request, context: { params: Promise<{ product
     const body = submittedFields(rawBody, productSchema.partial().parse(rawBody)) as Partial<ReturnType<typeof productSchema.parse>>;
     const patch = {
       ...body,
-      ...(isAdmin ? {} : { status: body.status === "draft" ? "draft" : "published", isVerified: existing.isVerified })
+      ...(isAdmin
+        ? {}
+        : {
+            status:
+              body.status && ["draft", "submitted", "published", "archived"].includes(body.status)
+                ? body.status
+                : existing.status,
+            isVerified: existing.isVerified
+          })
     };
     if (body.slug || body.name) {
       patch.slug = await uniqueSlugFor(Product, body.slug ?? slugify(body.name), existing._id);
     }
 
     const product = await Product.findByIdAndUpdate(existing._id, patch, { returnDocument: "after", runValidators: true })
-      .populate("sellerId", "name email phone profileImage isVerified");
+      .populate({ path: "sellerId", select: "name email phone profileImage isVerified", model: User });
     revalidatePublicContent("product", existing.slug);
     revalidatePublicContent("product", product?.slug);
 
@@ -74,7 +83,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ prod
     }
 
     const product = await Product.findByIdAndUpdate(existing._id, { status: "archived" }, { returnDocument: "after" })
-      .populate("sellerId", "name email phone profileImage isVerified");
+      .populate({ path: "sellerId", select: "name email phone profileImage isVerified", model: User });
     revalidatePublicContent("product", existing.slug);
 
     return jsonOk({ ok: true, item: normalizeProduct(product) });

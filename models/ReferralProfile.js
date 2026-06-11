@@ -6,7 +6,7 @@ const ReferralProfileSchema = new mongoose.Schema(
     userEmail: { type: String, required: true, lowercase: true, trim: true, unique: true },
     code: { type: String, required: true, uppercase: true, trim: true, unique: true, index: true },
     status: { type: String, enum: ["active", "review", "suspended"], default: "active", index: true },
-    commissionRate: { type: Number, min: 0, max: 1, default: 0.1 },
+    commissionRate: { type: Number, min: 0, max: 1, default: 0.05 },
     clicks: { type: Number, min: 0, default: 0 },
     conversions: { type: Number, min: 0, default: 0 },
     revenue: { type: Number, min: 0, default: 0 },

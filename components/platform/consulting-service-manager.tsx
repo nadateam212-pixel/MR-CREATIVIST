@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { PriceDisplay } from "@/components/ui/price-display";
 import { SafeImage } from "@/components/ui/safe-image";
 
 type ConsultingServiceRow = {
@@ -128,6 +127,23 @@ export function ConsultingServiceManager({
 
   async function saveService(event?: FormEvent<HTMLFormElement>, nextStatus?: string) {
     event?.preventDefault();
+    const requiredFields = [
+      ["Service title", form.title],
+      ["Expert name", form.expertName],
+      ["Expert title", form.expertTitle],
+      ["Description", form.description],
+      ["Hourly rate", form.hourlyRate],
+      ["Session label", form.sessionLabel],
+      ["Availability day", form.day],
+      ["Slots", form.slots],
+      ["Hero image", form.heroImage]
+    ];
+    const missing = requiredFields.filter(([, value]) => !String(value ?? "").trim()).map(([label]) => label);
+    if (missing.length) {
+      toast.error(`Missing required fields: ${missing.join(", ")}.`);
+      return;
+    }
+
     const isUpdate = selectedService && selectedId !== "new";
     const body = { ...servicePayload(form), status: nextStatus ?? form.status };
     setBusy(nextStatus ?? "save");
@@ -223,9 +239,16 @@ export function ConsultingServiceManager({
                 onClick={() => selectService(service)}
                 className={selectedId === service.id ? "rounded-md border border-[hsl(var(--primary))] bg-[hsl(var(--primary))]/10 p-3 text-left" : "rounded-md border border-[hsl(var(--border))] p-3 text-left hover:bg-[hsl(var(--muted))]/45"}
               >
-                <p className="font-semibold">{service.title}</p>
-                <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{service.expertTitle}</p>
-                <Badge className={`mt-2 ${statusTone(service.status)}`}>{service.status}</Badge>
+                <span className="flex items-center gap-3">
+                  <span className="relative size-12 shrink-0 overflow-hidden rounded-md border border-[hsl(var(--border))]">
+                    <SafeImage src={service.heroImage ?? service.image ?? defaultHero} alt={service.title} fill sizes="48px" className="object-cover" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate font-semibold">{service.title}</span>
+                    <span className="mt-1 block truncate text-xs text-[hsl(var(--muted-foreground))]">{service.expertTitle}</span>
+                    <Badge className={`mt-2 ${statusTone(service.status)}`}>{service.status}</Badge>
+                  </span>
+                </span>
               </button>
             ))}
             {!services.length ? (
@@ -244,15 +267,15 @@ export function ConsultingServiceManager({
             <form className="grid gap-4 md:grid-cols-2" onSubmit={(event) => void saveService(event)}>
               <label className="grid gap-2 text-sm font-semibold">
                 Service title
-                <Input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} />
+                <Input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} required minLength={3} />
               </label>
               <label className="grid gap-2 text-sm font-semibold">
                 Expert title
-                <Input value={form.expertTitle} onChange={(event) => setForm((current) => ({ ...current, expertTitle: event.target.value }))} />
+                <Input value={form.expertTitle} onChange={(event) => setForm((current) => ({ ...current, expertTitle: event.target.value }))} required minLength={2} />
               </label>
               <label className="grid gap-2 text-sm font-semibold">
                 Expert name
-                <Input value={form.expertName} onChange={(event) => setForm((current) => ({ ...current, expertName: event.target.value }))} />
+                <Input value={form.expertName} onChange={(event) => setForm((current) => ({ ...current, expertName: event.target.value }))} required minLength={2} />
               </label>
               <label className="grid gap-2 text-sm font-semibold">
                 Status
@@ -262,7 +285,7 @@ export function ConsultingServiceManager({
               </label>
               <label className="grid gap-2 text-sm font-semibold">
                 Hourly rate
-                <Input value={form.hourlyRate} onChange={(event) => setForm((current) => ({ ...current, hourlyRate: event.target.value }))} inputMode="decimal" />
+                <Input value={form.hourlyRate} onChange={(event) => setForm((current) => ({ ...current, hourlyRate: event.target.value }))} inputMode="decimal" required />
               </label>
               <label className="grid gap-2 text-sm font-semibold">
                 Currency
@@ -273,7 +296,7 @@ export function ConsultingServiceManager({
               </label>
               <label className="grid gap-2 text-sm font-semibold md:col-span-2">
                 Description
-                <textarea value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} className="min-h-32 rounded-md border border-[hsl(var(--border))] bg-transparent p-3 text-sm" />
+                <textarea value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} required minLength={20} className="min-h-32 rounded-md border border-[hsl(var(--border))] bg-transparent p-3 text-sm" />
               </label>
               <label className="grid gap-2 text-sm font-semibold">
                 Expertise
@@ -285,37 +308,37 @@ export function ConsultingServiceManager({
               </label>
               <label className="grid gap-2 text-sm font-semibold">
                 Session label
-                <Input value={form.sessionLabel} onChange={(event) => setForm((current) => ({ ...current, sessionLabel: event.target.value }))} />
+                <Input value={form.sessionLabel} onChange={(event) => setForm((current) => ({ ...current, sessionLabel: event.target.value }))} required />
               </label>
               <label className="grid gap-2 text-sm font-semibold">
                 Duration minutes
-                <Input value={form.durationMinutes} onChange={(event) => setForm((current) => ({ ...current, durationMinutes: event.target.value }))} inputMode="numeric" />
+                <Input value={form.durationMinutes} onChange={(event) => setForm((current) => ({ ...current, durationMinutes: event.target.value }))} inputMode="numeric" required />
               </label>
               <label className="grid gap-2 text-sm font-semibold">
                 Availability day
-                <Input value={form.day} onChange={(event) => setForm((current) => ({ ...current, day: event.target.value }))} />
+                <Input value={form.day} onChange={(event) => setForm((current) => ({ ...current, day: event.target.value }))} required />
               </label>
               <label className="grid gap-2 text-sm font-semibold">
                 Slots
-                <textarea value={form.slots} onChange={(event) => setForm((current) => ({ ...current, slots: event.target.value }))} className="min-h-20 rounded-md border border-[hsl(var(--border))] bg-transparent p-3 text-sm" />
+                <textarea value={form.slots} onChange={(event) => setForm((current) => ({ ...current, slots: event.target.value }))} required className="min-h-20 rounded-md border border-[hsl(var(--border))] bg-transparent p-3 text-sm" />
               </label>
               <label className="grid gap-2 text-sm font-semibold md:col-span-2">
                 Hero image URL
-                <Input value={form.heroImage} onChange={(event) => setForm((current) => ({ ...current, heroImage: event.target.value }))} />
+                <Input value={form.heroImage} onChange={(event) => setForm((current) => ({ ...current, heroImage: event.target.value }))} required />
               </label>
               <div className="flex flex-wrap gap-2 md:col-span-2">
                 <Button type="submit" disabled={Boolean(busy)}>
-                  <Save className="size-4" />
-                  Save
+                  {busy === "save" ? <Sparkles className="size-4 animate-pulse" /> : <Save className="size-4" />}
+                  {busy === "save" ? "Saving..." : "Save"}
                 </Button>
                 <Button type="button" onClick={() => void saveService(undefined, "published")} disabled={Boolean(busy)}>
-                  <Send className="size-4" />
-                  Publish
+                  {busy === "published" ? <Sparkles className="size-4 animate-pulse" /> : <Send className="size-4" />}
+                  {busy === "published" ? "Publishing..." : "Publish"}
                 </Button>
                 {selectedService ? (
                   <Button type="button" variant="outline" onClick={() => void archiveSelected()} disabled={Boolean(busy)}>
-                    <Archive className="size-4" />
-                    Archive
+                    {busy === "archive" ? <Sparkles className="size-4 animate-pulse" /> : <Archive className="size-4" />}
+                    {busy === "archive" ? "Archiving..." : "Archive"}
                   </Button>
                 ) : null}
               </div>
@@ -336,7 +359,9 @@ export function ConsultingServiceManager({
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">{selectedPreview.description}</p>
-            <PriceDisplay price={`${selectedPreview.currency} ${selectedPreview.hourlyRate}`} className="text-2xl text-[hsl(var(--primary))]" />
+            <p className="text-2xl font-semibold text-[hsl(var(--primary))]">
+              {selectedPreview.currency} {selectedPreview.hourlyRate}
+            </p>
             <div className="flex flex-wrap gap-2">
               {selectedPreview.expertise.slice(0, 4).map((item) => <Badge key={item}>{item}</Badge>)}
             </div>

@@ -7,6 +7,7 @@ type StudioCourse = {
   category: string;
   price: string;
   compareAt?: string;
+  currency?: "USD" | "FRW" | string;
   duration: string;
   instructor: string;
   certificate: string;
@@ -161,6 +162,15 @@ function numberFromPrice(value?: string) {
 
   const numeric = Number(raw.replace(/[^0-9.]/g, ""));
   return Number.isFinite(numeric) ? numeric : 0;
+}
+
+function currencyFromCourse(course: StudioCourse): "USD" | "FRW" {
+  const explicit = String(course.currency ?? "").toUpperCase();
+  if (explicit === "FRW") return "FRW";
+  if (explicit === "USD") return "USD";
+
+  const price = cleanText(course.price).toUpperCase();
+  return price.startsWith("FRW") || price.includes(" FRW") ? "FRW" : "USD";
 }
 
 function validUrl(value?: string) {
@@ -446,7 +456,7 @@ export function buildStudioCoursePayload({
     language: "English",
     price,
     compareAtPrice: compareAtPrice > 0 ? compareAtPrice : undefined,
-    currency: "USD",
+    currency: currencyFromCourse(course),
     image: validUrl(course.image) || fallbackImage,
     trailerUrl: validUrl(course.trailerUrl) || firstVideoUrl || undefined,
     pricingType: price > 0 ? "paid" : "free",

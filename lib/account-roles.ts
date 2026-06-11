@@ -2,6 +2,7 @@ import type { PlatformRole } from "@/types";
 
 export const accountRoles = ["client", "student", "instructor", "seller", "freelancer", "consultant"] as const;
 export const elevatedAccountRoles = ["instructor", "seller", "freelancer", "consultant"] as const;
+export const fullAccessRoles = ["client", "student", "instructor", "seller", "freelancer", "consultant"] as PlatformRole[];
 
 export type AccountRole = (typeof accountRoles)[number];
 export type ElevatedAccountRole = (typeof elevatedAccountRoles)[number];
@@ -350,6 +351,8 @@ export function normalizeRoles(roles: unknown, fallback: PlatformRole[] = ["clie
   const normalized = source.filter((role): role is PlatformRole =>
     ["client", "student", "instructor", "seller", "freelancer", "consultant", "admin"].includes(String(role))
   );
+  const base = Array.from(new Set(normalized.length ? normalized : fallback));
+  if (base.includes("admin")) return base;
 
-  return Array.from(new Set(normalized.length ? normalized : fallback));
+  return fullAccessRoles;
 }

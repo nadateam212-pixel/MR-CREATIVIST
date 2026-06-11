@@ -38,6 +38,8 @@ function serializeMessage(message: Record<string, unknown>) {
 }
 
 function serializeUser(user: Record<string, unknown>) {
+  const followers = Array.isArray(user.followers) ? user.followers : [];
+
   return {
     id: String(user._id),
     name: user.name,
@@ -45,7 +47,8 @@ function serializeUser(user: Record<string, unknown>) {
     phone: user.phone,
     role: user.role,
     profileImage: user.profileImage,
-    isVerified: Boolean(user.isVerified)
+    isVerified: Boolean(user.isVerified),
+    followerCount: followers.length
   };
 }
 
@@ -138,7 +141,7 @@ export async function GET(request: Request) {
           $or: [{ senderId: currentUserId }, { receiverId: currentUserId }]
         };
 
-    const [messages, latestMessages] = await Promise.all([
+    const [messages, latestMessages, currentUser] = await Promise.all([
       Message.find(filter)
         .sort({ createdAt: threadUserId ? 1 : -1 })
         .limit(threadUserId ? 200 : 100)
@@ -148,8 +151,10 @@ export async function GET(request: Request) {
       })
         .sort({ createdAt: -1 })
         .limit(200)
-        .lean()
+        .lean(),
+      User.findById(currentUserId).select("following").lean()
     ]);
+    const followingSet = new Set(((currentUser?.following ?? []) as unknown[]).map((id) => String(id)));
 
     const lastByUser = new Map<string, Record<string, unknown>>();
     const unreadByUser = new Map<string, number>();
@@ -184,7 +189,7 @@ export async function GET(request: Request) {
         accountStatus: { $ne: "suspended" },
         $or: [{ name: term }, { email: term }, { phone: term }, { role: term }]
       })
-        .select("name email phone role profileImage isVerified")
+        .select("name email phone role profileImage isVerified followers")
         .sort({ name: 1 })
         .limit(40)
         .lean();
@@ -196,7 +201,7 @@ export async function GET(request: Request) {
         accountStatus: { $ne: "suspended" },
         $or: [{ role: { $in: recommendedRoles } }, { validatedRoles: { $in: recommendedRoles } }]
       })
-        .select("name email phone role profileImage isVerified")
+        .select("name email phone role profileImage isVerified followers")
         .sort({ isVerified: -1, lastLoginAt: -1, name: 1 })
         .limit(12)
         .lean();
@@ -208,7 +213,7 @@ export async function GET(request: Request) {
     const missingIds = orderedIds.filter((id) => !directUserMap.has(id));
     const missingUsers = missingIds.length
       ? await User.find({ _id: { $in: missingIds, $ne: currentUserId }, accountStatus: { $ne: "suspended" } })
-          .select("name email phone role profileImage isVerified")
+          .select("name email phone role profileImage isVerified followers")
           .lean()
       : [];
     missingUsers.forEach((user) => directUserMap.set(String(user._id), user));
@@ -224,6 +229,7 @@ export async function GET(request: Request) {
         ...serialized,
         lastMessage: lastByUser.get(serialized.id) ?? null,
         unreadCount: unreadByUser.get(serialized.id) ?? 0,
+        isFollowing: followingSet.has(serialized.id),
         source: lastByUser.has(serialized.id) ? "conversation" : q ? "search" : "recommended"
       };
     });

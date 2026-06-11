@@ -53,7 +53,7 @@ export default async function VerifyOtpPage({
             {mode === "register" ? "Verify your account" : "Verify your sign-in"}
           </h1>
           <p className="mt-5 max-w-xl text-base leading-7 text-[hsl(var(--muted-foreground))]">
-            OTP confirms email ownership. If email delivery is delayed, password sign-in remains available.
+            OTP confirms email ownership. Enter the latest code from your email to continue.
           </p>
         </section>
 

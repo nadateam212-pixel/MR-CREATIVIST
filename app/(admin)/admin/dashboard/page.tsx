@@ -1,25 +1,5 @@
 import Link from "next/link";
-import {
-  Activity,
-  Archive,
-  ArrowRight,
-  Award,
-  BarChart3,
-  BookOpen,
-  BriefcaseBusiness,
-  CalendarDays,
-  CreditCard,
-  Headphones,
-  MessageSquare,
-  Newspaper,
-  ReceiptText,
-  Settings,
-  ShieldCheck,
-  ShoppingBag,
-  Sparkles,
-  Users
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { ArrowRight, BarChart3, BookOpen, BriefcaseBusiness, CreditCard, Headphones, ReceiptText, ShieldCheck, ShoppingBag, Sparkles, TrendingUp, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,15 +17,6 @@ import WalletTransaction from "@/models/WalletTransaction";
 
 export const dynamic = "force-dynamic";
 
-type AdminTool = {
-  title: string;
-  href: string;
-  scope: string;
-  actions: string;
-  icon: LucideIcon;
-  countKey?: keyof AdminSummary;
-};
-
 type AdminSummary = {
   users: number;
   courses: number;
@@ -57,28 +28,22 @@ type AdminSummary = {
   bookings: number;
   certificates: number;
   support: number;
+  revenueFRW: number;
+  revenueUSD: number;
 };
 
-const adminTools: AdminTool[] = [
-  { title: "Users", href: "/admin/users", scope: "Accounts", actions: "View, validate, block, role badges", icon: Users, countKey: "users" },
-  { title: "Applications", href: "/admin/account-applications", scope: "Validation", actions: "Approve, reject, request info", icon: ShieldCheck },
-  { title: "Courses", href: "/admin/courses", scope: "Learning", actions: "Review, approve, publish, archive", icon: BookOpen, countKey: "courses" },
-  { title: "Products", href: "/admin/marketplace/products", scope: "Marketplace", actions: "Verify, publish, archive", icon: ShoppingBag, countKey: "products" },
-  { title: "Businesses", href: "/admin/shops", scope: "Directory", actions: "Verify, publish, archive", icon: ShoppingBag, countKey: "businesses" },
-  { title: "Freelancers", href: "/admin/freelancers", scope: "Talent", actions: "Verify, block, archive", icon: BriefcaseBusiness, countKey: "freelancers" },
-  { title: "Jobs", href: "/admin/jobs", scope: "Hiring", actions: "Publish, close, archive", icon: BriefcaseBusiness },
-  { title: "Consulting", href: "/admin/consulting/bookings", scope: "Bookings", actions: "Confirm, cancel, review", icon: CalendarDays, countKey: "bookings" },
-  { title: "Orders", href: "/admin/marketplace/orders", scope: "Commerce", actions: "View, fulfill, refund state", icon: ReceiptText, countKey: "orders" },
-  { title: "Payments", href: "/admin/payments", scope: "Finance", actions: "Inspect transactions", icon: CreditCard, countKey: "payments" },
-  { title: "Messages", href: "/admin/messages", scope: "Inbox", actions: "Reply, assign, close", icon: MessageSquare },
-  { title: "Support", href: "/admin/support", scope: "Tickets", actions: "Resolve, escalate, archive", icon: Headphones, countKey: "support" },
-  { title: "Blogs", href: "/admin/blogs", scope: "Editorial", actions: "Publish, unpublish, archive", icon: Newspaper },
-  { title: "Certificates", href: "/admin/certificates", scope: "Credentials", actions: "Issue, verify, inspect", icon: Award, countKey: "certificates" },
-  { title: "Reports", href: "/admin/reports", scope: "Analytics", actions: "Open reports", icon: BarChart3 },
-  { title: "Health", href: "/admin/health", scope: "System", actions: "Check services", icon: Activity },
-  { title: "Backups", href: "/admin/backups", scope: "System", actions: "Create, export", icon: Archive },
-  { title: "Settings", href: "/admin/settings", scope: "Platform", actions: "Currency, language, policies", icon: Settings }
-];
+function money(value: number, currency: "FRW" | "USD") {
+  if (currency === "FRW") {
+    return `FRW ${new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(Math.round(value))}`;
+  }
+
+  return new Intl.NumberFormat("en-US", { currency: "USD", maximumFractionDigits: 2, style: "currency" }).format(value);
+}
+
+function percent(value: number, total: number) {
+  if (!total) return 0;
+  return Math.max(3, Math.round((value / total) * 100));
+}
 
 async function getAdminSummary(): Promise<AdminSummary> {
   await connectMongoDB();
@@ -92,7 +57,8 @@ async function getAdminSummary(): Promise<AdminSummary> {
     payments,
     bookings,
     certificates,
-    support
+    support,
+    revenueRows
   ] = await Promise.all([
     User.countDocuments({}),
     Course.countDocuments({}),
@@ -103,8 +69,20 @@ async function getAdminSummary(): Promise<AdminSummary> {
     WalletTransaction.countDocuments({}),
     Booking.countDocuments({}),
     CertificateCredential.countDocuments({ status: "issued" }),
-    ContactMessage.countDocuments({ status: { $in: ["new", "read"] } })
+    ContactMessage.countDocuments({ status: { $in: ["new", "read"] } }),
+    WalletTransaction.aggregate([
+      {
+        $match: {
+          status: "completed",
+          direction: "credit",
+          type: { $in: ["deposit", "course_earning", "product_earning", "consulting_earning", "freelance_earning", "referral_earning", "admin_adjustment"] }
+        }
+      },
+      { $group: { _id: "$currency", total: { $sum: "$amount" } } }
+    ])
   ]);
+
+  const revenue = new Map((revenueRows as Array<{ _id: "FRW" | "USD"; total: number }>).map((row) => [row._id, Number(row.total ?? 0)]));
 
   return {
     users,
@@ -116,35 +94,49 @@ async function getAdminSummary(): Promise<AdminSummary> {
     payments,
     bookings,
     certificates,
-    support
+    support,
+    revenueFRW: revenue.get("FRW") ?? 0,
+    revenueUSD: revenue.get("USD") ?? 0
   };
 }
 
 export default async function AdminDashboardPage() {
   const summary = await getAdminSummary();
-  const moderationTotal = summary.courses + summary.products + summary.businesses + summary.freelancers;
+  const studioTotal = summary.courses + summary.products + summary.businesses + summary.freelancers;
+  const contentMix = [
+    { label: "Courses", value: summary.courses, icon: BookOpen, href: "/admin/courses" },
+    { label: "Products", value: summary.products, icon: ShoppingBag, href: "/admin/marketplace/products" },
+    { label: "Businesses", value: summary.businesses, icon: ShieldCheck, href: "/admin/shops" },
+    { label: "Freelancers", value: summary.freelancers, icon: BriefcaseBusiness, href: "/admin/freelancers" }
+  ];
+  const highlights = [
+    { label: "Review users", value: summary.users, href: "/admin/users", icon: Users },
+    { label: "Open support", value: summary.support, href: "/admin/support", icon: Headphones },
+    { label: "Marketplace orders", value: summary.orders, href: "/admin/marketplace/orders", icon: ReceiptText },
+    { label: "Bookings", value: summary.bookings, href: "/admin/consulting/bookings", icon: CreditCard }
+  ];
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <Badge className="border-[hsl(var(--primary))]/35 text-[hsl(var(--primary))]">Admin</Badge>
-          <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">Management console</h1>
+          <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">Admin dashboard</h1>
         </div>
-        <Button asChild variant="outline">
-          <Link href="/">
-            Public site
+        <Button asChild>
+          <Link href="/admin/users">
+            Users
             <ArrowRight className="size-4" />
           </Link>
         </Button>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {[
-          { label: "Accounts", value: summary.users, helper: "Registered users", icon: Users },
-          { label: "Studio records", value: moderationTotal, helper: "Courses, products, businesses, gig owners", icon: Sparkles },
-          { label: "Commerce", value: summary.orders, helper: "Marketplace orders", icon: ReceiptText },
-          { label: "Open support", value: summary.support, helper: "Contact tickets requiring staff", icon: Headphones }
+          { label: "Users", value: summary.users.toLocaleString(), helper: "Total platform accounts", icon: Users },
+          { label: "Revenue", value: money(summary.revenueFRW, "FRW"), helper: `${money(summary.revenueUSD, "USD")} recorded`, icon: TrendingUp },
+          { label: "Orders", value: summary.orders.toLocaleString(), helper: `${summary.payments.toLocaleString()} wallet transactions`, icon: ReceiptText },
+          { label: "Support", value: summary.support.toLocaleString(), helper: "Open messages and tickets", icon: Headphones }
         ].map((metric) => {
           const Icon = metric.icon;
 
@@ -153,70 +145,119 @@ export default async function AdminDashboardPage() {
               <CardContent className="p-4">
                 <Icon className="mb-3 size-5 text-[hsl(var(--primary))]" />
                 <p className="text-xs font-black uppercase tracking-[0.14em] text-[hsl(var(--muted-foreground))]">{metric.label}</p>
-                <p className="mt-2 text-3xl font-black">{metric.value.toLocaleString()}</p>
+                <p className="mt-2 text-2xl font-black">{metric.value}</p>
                 <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{metric.helper}</p>
               </CardContent>
             </Card>
           );
         })}
-      </div>
+      </section>
+
+      <section className="grid gap-5 xl:grid-cols-[1fr_0.85fr]">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle>Data analysis</CardTitle>
+              <Badge>{studioTotal.toLocaleString()} studio records</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {contentMix.map((item) => {
+              const Icon = item.icon;
+
+              return (
+                <Link key={item.label} href={item.href} className="block rounded-md border border-[hsl(var(--border))] p-4 hover:bg-[hsl(var(--muted))]">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <span className="grid size-10 place-items-center rounded-md bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))]">
+                        <Icon className="size-5" />
+                      </span>
+                      <div>
+                        <p className="font-black">{item.label}</p>
+                        <p className="text-sm text-[hsl(var(--muted-foreground))]">{item.value.toLocaleString()} records</p>
+                      </div>
+                    </div>
+                    <ArrowRight className="size-4 text-[hsl(var(--muted-foreground))]" />
+                  </div>
+                  <div className="mt-4 h-2 rounded-full bg-[hsl(var(--muted))]">
+                    <div className="h-full rounded-full bg-[hsl(var(--primary))]" style={{ width: `${percent(item.value, studioTotal)}%` }} />
+                  </div>
+                </Link>
+              );
+            })}
+          </CardContent>
+        </Card>
+
+        <div className="grid gap-5">
+          <Card>
+            <CardHeader>
+              <CardTitle>Commerce health</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+              {[
+                ["Payments", summary.payments],
+                ["Bookings", summary.bookings],
+                ["Certificates", summary.certificates]
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-md border border-[hsl(var(--border))] p-4">
+                  <p className="text-sm text-[hsl(var(--muted-foreground))]">{label}</p>
+                  <p className="mt-2 text-2xl font-black">{Number(value).toLocaleString()}</p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <Sparkles className="size-5 text-[hsl(var(--primary))]" />
+                <CardTitle>Highlights</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {highlights.map((item) => {
+                const Icon = item.icon;
+
+                return (
+                  <Button key={item.label} asChild variant="outline" className="h-auto w-full justify-between p-3">
+                    <Link href={item.href}>
+                      <span className="flex items-center gap-3">
+                        <Icon className="size-4" />
+                        {item.label}
+                      </span>
+                      <span className="font-black">{item.value.toLocaleString()}</span>
+                    </Link>
+                  </Button>
+                );
+              })}
+            </CardContent>
+          </Card>
+        </div>
+      </section>
 
       <Card>
         <CardHeader>
-          <CardTitle>Admin tools</CardTitle>
+          <div className="flex items-center gap-3">
+            <BarChart3 className="size-5 text-[hsl(var(--primary))]" />
+            <CardTitle>Quick actions</CardTitle>
+          </div>
         </CardHeader>
-        <CardContent className="overflow-x-auto p-0">
-          <table className="w-full min-w-[64rem] text-left text-sm">
-            <thead className="border-y border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))]">
-              <tr>
-                <th className="p-4 font-medium">Tool</th>
-                <th className="p-4 font-medium">Scope</th>
-                <th className="p-4 font-medium">Records</th>
-                <th className="p-4 font-medium">Admin actions</th>
-                <th className="p-4 text-right font-medium">Open</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[hsl(var(--border))]">
-              {adminTools.map((tool) => {
-                const Icon = tool.icon;
-
-                return (
-                  <tr key={tool.href}>
-                    <td className="p-4">
-                      <div className="flex items-center gap-3">
-                        <span className="grid size-10 place-items-center rounded-md bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))]">
-                          <Icon className="size-5" />
-                        </span>
-                        <span className="font-black">{tool.title}</span>
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <Badge>{tool.scope}</Badge>
-                    </td>
-                    <td className="p-4 font-black">{tool.countKey ? summary[tool.countKey].toLocaleString() : "-"}</td>
-                    <td className="p-4 text-[hsl(var(--muted-foreground))]">{tool.actions}</td>
-                    <td className="p-4 text-right">
-                      <Button asChild size="sm">
-                        <Link href={tool.href}>
-                          Manage
-                          <ArrowRight className="size-4" />
-                        </Link>
-                      </Button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            ["Users", "/admin/users"],
+            ["Courses", "/admin/courses"],
+            ["Products", "/admin/marketplace/products"],
+            ["Reports", "/admin/reports"]
+          ].map(([label, href]) => (
+            <Button key={href} asChild variant="outline" className="justify-between">
+              <Link href={href}>
+                {label}
+                <ArrowRight className="size-4" />
+              </Link>
+            </Button>
+          ))}
         </CardContent>
       </Card>
-
-      <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4">
-        <div className="flex items-center gap-3">
-          <Sparkles className="size-5 text-[hsl(var(--primary))]" />
-          <p className="font-semibold">Open a tool to see records, approvals, details, and action buttons.</p>
-        </div>
-      </div>
     </div>
   );
 }
