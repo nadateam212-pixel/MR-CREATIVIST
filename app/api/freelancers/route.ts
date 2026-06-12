@@ -17,7 +17,7 @@ export async function GET(request: Request) {
 
     const [items, total] = await Promise.all([
       FreelancerProfile.find(filter)
-        .populate("userId", "name email phone profileImage isVerified")
+        .populate("userId", "name email phone profileImage isVerified socialLinks createdAt")
         .sort({ rating: -1, completedJobs: -1 })
         .skip(skip)
         .limit(limit)

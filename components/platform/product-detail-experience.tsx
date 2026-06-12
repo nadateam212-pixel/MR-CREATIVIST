@@ -5,7 +5,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Download, MessageCircle, MessageSquare, PackageCheck, ShieldCheck, Star, Store, Truck, Wallet } from "lucide-react";
+import { MapPin, MessageCircle, MessageSquare, PackageCheck, ShieldCheck, Star, Store, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { PageShell } from "@/components/layout/page-shell";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +30,8 @@ type ProductDetail = {
   downloads: number;
   delivery: string;
   image: string;
+  images?: string[];
+  location?: string;
   description?: string;
   tools: string[];
   isVerified?: boolean;
@@ -42,6 +44,7 @@ export function ProductDetailExperience({ initialProduct }: { initialProduct: Pr
   const router = useRouter();
   const addToCart = usePlatformStore((state) => state.addToCart);
   const [cartMessage, setCartMessage] = useState("");
+  const [selectedImage, setSelectedImage] = useState(initialProduct?.image ?? "");
   const product = initialProduct;
   const productDescription = product && "description" in product ? product.description : undefined;
 
@@ -94,15 +97,20 @@ export function ProductDetailExperience({ initialProduct }: { initialProduct: Pr
     >
       <div className="grid gap-6 lg:grid-cols-[1fr_24rem]">
         <div className="space-y-6">
-          <div className="overflow-hidden rounded-lg border border-[hsl(var(--border))]">
-            <img src={activeProduct.image} alt={activeProduct.name} className="aspect-video w-full object-cover" />
+          <div className="grid gap-3 md:grid-cols-[6rem_1fr]">
+            <div className="order-2 flex gap-2 overflow-x-auto md:order-1 md:flex-col">
+              {(activeProduct.images?.length ? activeProduct.images : [activeProduct.image]).map((image) => <button key={image} type="button" onClick={() => setSelectedImage(image)} className={selectedImage === image ? "relative aspect-square w-20 shrink-0 overflow-hidden rounded-md border-2 border-[hsl(var(--primary))] md:w-full" : "relative aspect-square w-20 shrink-0 overflow-hidden rounded-md border border-[hsl(var(--border))] md:w-full"}><img src={image} alt="" className="size-full object-cover" /></button>)}
+            </div>
+            <div className="order-1 overflow-hidden rounded-md border border-[hsl(var(--border))] md:order-2">
+              <img src={selectedImage || activeProduct.image} alt={activeProduct.name} className="aspect-[4/3] w-full object-cover" />
+            </div>
           </div>
 
           <section className="grid gap-4 md:grid-cols-4">
             {[
               { label: "Rating", value: activeProduct.rating, icon: Star },
               { label: "Stock", value: activeProduct.stock, icon: PackageCheck },
-              { label: "Delivery", value: activeProduct.delivery, icon: activeProduct.type === "Physical" ? Truck : Download },
+              { label: "Location", value: activeProduct.location || "Kigali, Rwanda", icon: MapPin },
               { label: "Seller", value: activeProduct.seller, icon: Store }
             ].map((metric) => (
               <Card key={metric.label}>
@@ -114,6 +122,11 @@ export function ProductDetailExperience({ initialProduct }: { initialProduct: Pr
               </Card>
             ))}
           </section>
+
+          <Card>
+            <CardHeader><CardTitle>Product description</CardTitle></CardHeader>
+            <CardContent><p className="whitespace-pre-line text-sm leading-7 text-[hsl(var(--muted-foreground))]">{productDescription}</p></CardContent>
+          </Card>
 
           <Card>
             <CardHeader>
@@ -145,7 +158,7 @@ export function ProductDetailExperience({ initialProduct }: { initialProduct: Pr
                 <Badge>{verifiedCheckout ? "Online checkout" : "Contact seller"}</Badge>
               </div>
               <CardTitle className="pt-3">
-                <PriceDisplay price={activeProduct.price} compareAt={activeProduct.compareAt} className="text-3xl text-[hsl(var(--primary))]" />
+                <PriceDisplay price={activeProduct.price} compareAt={activeProduct.compareAt} targetCurrency="FRW" className="text-3xl text-[hsl(var(--primary))]" />
               </CardTitle>
               <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-[hsl(var(--muted-foreground))]">
                 Sold by {activeProduct.seller}

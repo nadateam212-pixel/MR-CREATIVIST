@@ -112,10 +112,9 @@ async function createOrderFromItems(session: CheckoutSession, body: LooseRecord)
   }
 
   const subtotal = orderItems.reduce((total, item) => total + Number(item.unitPrice ?? 0) * Number(item.quantity ?? 1), 0);
-  const requestedDiscount = frw(Number(body.discount ?? 0), String(body.discountCurrency ?? "FRW"));
-  const discount = Math.min(subtotal, Math.max(0, requestedDiscount));
-  const tax = Math.max(0, frw(Number(body.tax ?? 0), String(body.taxCurrency ?? "FRW")));
-  const total = Math.max(0, subtotal - discount + tax);
+  const discount = 0;
+  const tax = 0;
+  const total = subtotal;
 
   const order = await Order.create({
     buyerId: buyer.id,
@@ -292,9 +291,8 @@ export async function processCourseCheckout(session: CheckoutSession, body: Loos
   const course = await Course.findOne(mongoIdOrSlug(String(body.courseId ?? body.slug ?? ""))).lean();
   if (!course) throw new Error("Course not found.");
 
-  const discount = Math.max(0, frw(Number(body.discount ?? 0), String(body.discountCurrency ?? "FRW")));
   const subtotal = frw(Number(course.price ?? 0), String(course.currency ?? "FRW"));
-  const total = Math.max(0, subtotal - Math.min(subtotal, discount));
+  const total = subtotal;
 
   if (total <= 0) {
     const enrollment = await completeCourseEnrollmentPayment({

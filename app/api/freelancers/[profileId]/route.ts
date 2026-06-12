@@ -8,7 +8,7 @@ export async function GET(_: Request, context: { params: Promise<{ profileId: st
     await requireMongo();
     const { profileId } = await context.params;
     const profile = await FreelancerProfile.findOne(mongoIdOrSlug(profileId))
-      .populate("userId", "name email phone profileImage isVerified")
+      .populate("userId", "name email phone profileImage isVerified socialLinks createdAt")
       .lean();
 
     if (!profile) return jsonOk({ error: "Freelancer profile not found." }, 404);
@@ -42,7 +42,7 @@ export async function PUT(request: Request, context: { params: Promise<{ profile
     }
 
     const profile = await FreelancerProfile.findByIdAndUpdate(existing._id, patch, { returnDocument: "after", runValidators: true })
-      .populate("userId", "name email phone profileImage isVerified");
+      .populate("userId", "name email phone profileImage isVerified socialLinks createdAt");
 
     return jsonOk(normalizeFreelancer(profile));
   } catch (error) {
@@ -69,7 +69,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ prof
     }
 
     const profile = await FreelancerProfile.findByIdAndUpdate(existing._id, { status: "archived" }, { returnDocument: "after" })
-      .populate("userId", "name email phone profileImage isVerified");
+      .populate("userId", "name email phone profileImage isVerified socialLinks createdAt");
 
     return jsonOk({ ok: true, item: normalizeFreelancer(profile) });
   } catch (error) {

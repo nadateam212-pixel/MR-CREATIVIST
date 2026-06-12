@@ -19,7 +19,7 @@ export async function GET(request: Request) {
 
     const [items, total] = await Promise.all([
       Product.find(filter)
-        .select("name slug type sellerId sellerName price compareAtPrice currency category stock rating downloads delivery tools status isFeatured isVerified createdAt updatedAt")
+        .select("name slug type sellerId sellerName price compareAtPrice currency category location stock rating downloads delivery images tools status isFeatured isVerified createdAt updatedAt")
         .populate({ path: "sellerId", select: "name email phone profileImage isVerified", model: User })
         .sort({ isFeatured: -1, createdAt: -1 })
         .skip(skip)
@@ -28,7 +28,7 @@ export async function GET(request: Request) {
       Product.countDocuments(filter)
     ]);
 
-    return jsonOk({ items: items.map((item) => normalizeProduct(item, { includeImages: false })), total });
+    return jsonOk({ items: items.map((item) => normalizeProduct(item, { includeImages: true })), total });
   } catch (error) {
     return jsonError(error);
   }

@@ -4,11 +4,10 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { CheckCircle2, CreditCard, GraduationCap, Loader2, ShieldCheck, Tag, Wallet } from "lucide-react";
+import { CheckCircle2, CreditCard, GraduationCap, Loader2, ShieldCheck, Wallet } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { convertMoney, formatConvertedAmount, isFreePrice, parseMoney } from "@/lib/currency";
 import { titleFromCourseSlug } from "@/lib/course-media";
 import { PaymentMethodSelector, type CheckoutPaymentDetails, type CheckoutPaymentMethod } from "@/components/platform/payment-method-selector";
@@ -29,7 +28,6 @@ type EnrollmentCourse = {
 export function CourseEnrollmentPanel({ slug, course }: { slug: string; course?: EnrollmentCourse | null }) {
   const router = useRouter();
   const { data: session } = useSession();
-  const [coupon, setCoupon] = useState("LEARN10");
   const [paymentMethod, setPaymentMethod] = useState<CheckoutPaymentMethod>("mtn_momo");
   const [paymentDetails, setPaymentDetails] = useState<CheckoutPaymentDetails>({
     mobilePhone: "",
@@ -73,11 +71,10 @@ export function CourseEnrollmentPanel({ slug, course }: { slug: string; course?:
   const alreadyEnrolled = resolvedCourse ? enrolledCourseSlugs.includes(resolvedCourse.slug) : false;
   const parsedPrice = parseMoney(resolvedCourse?.price ?? "$0");
   const subtotal = parsedPrice ? convertMoney(parsedPrice.amount, parsedPrice.currency, "USD", preferences.usdToFrw) : 0;
-  const discount = coupon.trim().toUpperCase() === "LEARN10" ? subtotal * 0.1 : 0;
-  const total = subtotal - discount;
+  const total = subtotal;
   const freeCourse = isFreePrice(resolvedCourse?.price ?? "$0");
   const displayMoney = (amount: number) => formatConvertedAmount(amount, "USD", preferences.currency, preferences.usdToFrw);
-  const displayFrw = (amount: number) => formatConvertedAmount(amount, "FRW", preferences.currency, preferences.usdToFrw);
+  const displayFrw = (amount: number) => formatConvertedAmount(amount, "FRW", "FRW", preferences.usdToFrw);
   const displayCourseMoney = (amount: number) => (amount <= 0 ? "Free" : displayMoney(amount));
 
   useEffect(() => {
@@ -123,8 +120,6 @@ export function CourseEnrollmentPanel({ slug, course }: { slug: string; course?:
           paidAmount: total,
           paymentMethod,
           paymentDetails,
-          discount,
-          discountCurrency: "USD",
           buyerName: session.user.name,
           buyerEmail: session.user.email
         })
@@ -193,18 +188,7 @@ export function CourseEnrollmentPanel({ slug, course }: { slug: string; course?:
                   </div>
                 ))}
               </div>
-              <div className="grid gap-3 md:grid-cols-2">
-                <div>
-                  <label className="text-sm font-medium" htmlFor="course-coupon">
-                    Coupon
-                  </label>
-                  <div className="mt-2 flex gap-2">
-                    <Input id="course-coupon" value={coupon} onChange={(event) => setCoupon(event.target.value)} />
-                    <Button variant="outline" size="icon">
-                      <Tag className="size-4" />
-                    </Button>
-                  </div>
-                </div>
+              <div className="grid gap-3">
                 <div>
                   <p className="text-sm font-medium">Payment method</p>
                   <div className="mt-2">
@@ -232,10 +216,6 @@ export function CourseEnrollmentPanel({ slug, course }: { slug: string; course?:
             <div className="flex justify-between">
               <span className="text-[hsl(var(--muted-foreground))]">{t("commerce.coursePrice")}</span>
               <span>{displayCourseMoney(subtotal)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-[hsl(var(--muted-foreground))]">{t("commerce.discount")}</span>
-              <span>{discount <= 0 ? displayMoney(0) : displayMoney(discount)}</span>
             </div>
             <div className="border-t border-[hsl(var(--border))] pt-3 text-base font-semibold">
               <div className="flex justify-between">

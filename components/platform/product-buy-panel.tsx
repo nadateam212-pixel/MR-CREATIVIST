@@ -41,7 +41,7 @@ export function ProductBuyPanel({ product }: { product: BuyProduct }) {
   const parsedPrice = parseMoney(product.price);
   const unitPriceUsd = parsedPrice ? convertMoney(parsedPrice.amount, parsedPrice.currency, "USD", preferences.usdToFrw) : 0;
   const total = unitPriceUsd * quantity;
-  const displayFrw = (amount: number) => formatConvertedAmount(amount, "FRW", preferences.currency, preferences.usdToFrw);
+  const displayFrw = (amount: number) => formatConvertedAmount(amount, "FRW", "FRW", preferences.usdToFrw);
 
   useEffect(() => {
     let active = true;

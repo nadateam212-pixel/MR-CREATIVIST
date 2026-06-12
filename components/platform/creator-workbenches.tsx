@@ -160,6 +160,7 @@ export function ProductBuilder({
   const [lastSlug, setLastSlug] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState("");
+  const [productImages, setProductImages] = useState<string[]>([productImage]);
   const [form, setForm] = useState({
     name: "Digital Creator Product",
     type: "Digital",
@@ -169,7 +170,8 @@ export function ProductBuilder({
     currency: "USD" as StudioCurrency,
     stock: "250",
     delivery: "Instant download",
-    image: productImage,
+    location: "Kigali, Rwanda",
+    description: "A professionally prepared creator product with clear delivery instructions and seller support.",
     tools: "Download file\nLicense key\nBuyer instructions\nSupport notes"
   });
 
@@ -179,7 +181,7 @@ export function ProductBuilder({
 
   function uploadProductImage(file?: File) {
     if (!file) return;
-    readFileAsDataUrl(file, (value) => update("image", value));
+    readFileAsDataUrl(file, (value) => setProductImages((current) => [...current, value]));
   }
 
   async function submit(status: "draft" | "submitted") {
@@ -188,6 +190,8 @@ export function ProductBuilder({
       ["Category", form.category],
       ["Type", form.type],
       ["Delivery", form.delivery],
+      ["Location", form.location],
+      ["Description", form.description],
       ["Price", form.price],
       ["Stock", form.stock],
       ["Included tools", form.tools]
@@ -217,8 +221,9 @@ export function ProductBuilder({
           sellerName,
           stock: Number(form.stock) || 0,
           delivery: form.delivery,
-          images: [safeImage(form.image, productImage)],
-          description: splitLines(form.tools).join(". ") || `${form.name} product from ${sellerName}.`,
+          location: form.location,
+          images: productImages.map((image) => safeImage(image, productImage)),
+          description: form.description,
           tools: splitLines(form.tools),
           tags: splitLines(form.tools).slice(0, 4),
           status
@@ -299,6 +304,10 @@ export function ProductBuilder({
               />
             </label>
             <label className="grid gap-2 text-sm font-medium">
+              Location
+              <Input value={form.location} onChange={(event) => update("location", event.target.value)} required minLength={2} placeholder="Kigali, Rwanda" />
+            </label>
+            <label className="grid gap-2 text-sm font-medium">
               Price
               <Input
                 value={form.price}
@@ -335,21 +344,17 @@ export function ProductBuilder({
                 required
               />
             </label>
-            <div className="grid gap-2 text-sm font-medium">
-              Product image
-              <div className="grid gap-3 rounded-md border border-[hsl(var(--border))] p-3 sm:grid-cols-[9rem_1fr] sm:items-center">
-                <div className="overflow-hidden rounded-md border border-[hsl(var(--border))]">
-                  <img src={safeImage(form.image, productImage)} alt="" className="aspect-video w-full object-cover" />
-                </div>
-                <Button asChild type="button" variant="outline">
-                  <label className="cursor-pointer">
-                    <Upload className="size-4" />
-                    Upload
-                    <input type="file" accept="image/*" className="sr-only" onChange={(event) => uploadProductImage(event.target.files?.[0])} />
-                  </label>
-                </Button>
+            <div className="grid gap-2 text-sm font-medium md:col-span-2">
+              Product gallery
+              <div className="grid grid-cols-2 gap-3 rounded-md border border-[hsl(var(--border))] p-3 sm:grid-cols-4">
+                {productImages.map((image, index) => <div key={`${image}-${index}`} className="relative overflow-hidden rounded-md border border-[hsl(var(--border))]"><img src={safeImage(image, productImage)} alt="" className="aspect-square w-full object-cover" /><button type="button" onClick={() => setProductImages((current) => current.filter((_, itemIndex) => itemIndex !== index))} className="absolute right-1 top-1 grid size-7 place-items-center rounded-md bg-black/70 text-white" aria-label={`Remove image ${index + 1}`}><Trash2 className="size-3.5" /></button>{index === 0 ? <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-white">Cover</span> : null}</div>)}
+                <label className="grid aspect-square cursor-pointer place-items-center rounded-md border border-dashed border-[hsl(var(--border))]"><Plus className="size-5" /><span className="text-xs">Add images</span><input type="file" accept="image/*" multiple className="sr-only" onChange={(event) => Array.from(event.target.files ?? []).forEach(uploadProductImage)} /></label>
               </div>
             </div>
+            <label className="grid gap-2 text-sm font-medium md:col-span-2">
+              Product description
+              <textarea value={form.description} onChange={(event) => update("description", event.target.value)} required minLength={20} className="min-h-32 rounded-md border border-[hsl(var(--border))] bg-transparent p-3 outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]" />
+            </label>
             <label className="grid gap-2 text-sm font-medium md:col-span-2">
               Included tools
               <textarea
@@ -369,12 +374,12 @@ export function ProductBuilder({
           <CardContent className="space-y-4">
             <div className="rounded-lg border border-[hsl(var(--border))] p-4">
               <div className="mb-4 overflow-hidden rounded-md border border-[hsl(var(--border))]">
-                <img src={safeImage(form.image, productImage)} alt={form.name} className="aspect-[4/3] w-full object-cover" />
+                <img src={safeImage(productImages[0], productImage)} alt={form.name} className="aspect-[4/3] w-full object-cover" />
               </div>
               <Badge>{form.type}</Badge>
               <h2 className="mt-3 text-xl font-semibold">{form.name}</h2>
               <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
-                {price(form.price, form.currency)} - {form.delivery} - {form.stock || 0} in
+                {price(form.price, form.currency)} - {form.location} - {form.stock || 0} in
                 stock
               </p>
             </div>

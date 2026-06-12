@@ -24,6 +24,8 @@ function stringList(values: Array<string | undefined>) {
 
 type FreelancerCard = {
   id?: string;
+  profileId?: string;
+  slug?: string;
   name: string;
   role: string;
   specialty: string;
@@ -68,6 +70,7 @@ export default async function FreelancersPage() {
       ? [
           {
             id: currentUser.id,
+            slug: currentUser.id,
             name: currentUser.name ?? "Validated Freelancer",
             role: "Validated MR Creativist freelancer",
             specialty: "Creative Services",
@@ -96,6 +99,7 @@ export default async function FreelancersPage() {
 
     items.push({
       id: ownerId,
+      slug: ownerId,
       name: gig.ownerName ?? "Studio freelancer",
       role: "Studio gig freelancer",
       specialty: gig.category ?? "Creative services",

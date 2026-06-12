@@ -8,22 +8,18 @@ import { toast } from "sonner";
 import {
   BookOpen,
   CheckCircle2,
-  Download,
   Filter,
-  MessageCircle,
-  MessageSquare,
   PackageCheck,
   PlayCircle,
   Search,
   ShoppingCart,
   Star,
   ThumbsUp,
-  Users,
-  Wallet
+  Users
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { PriceDisplay } from "@/components/ui/price-display";
 import { SafeImage } from "@/components/ui/safe-image";
@@ -73,11 +69,14 @@ type CatalogProduct = {
   downloads: number;
   delivery: string;
   image: string;
+  images?: string[];
+  location?: string;
   tools: string[];
   isVerified?: boolean;
   sellerVerified?: boolean;
   sellerEmail?: string;
   sellerPhone?: string;
+  isFeatured?: boolean;
 };
 
 const courseFilterChips = [
@@ -239,18 +238,6 @@ export function CatalogExperience({
     return Boolean(product.isVerified || product.sellerVerified);
   }
 
-  function messageHref(product: CatalogProduct) {
-    if (product.sellerId) return `/messages/${product.sellerId}`;
-    return `/messages?context=product&product=${encodeURIComponent(product.slug)}`;
-  }
-
-  function whatsappHref(product: CatalogProduct) {
-    const phone = product.sellerPhone?.replace(/[^\d+]/g, "");
-    const text = encodeURIComponent(`Hello ${product.seller}, I am interested in ${product.name} on MR Creativist.`);
-
-    return phone ? `https://wa.me/${phone.replace(/^\+/, "")}?text=${text}` : `https://wa.me/?text=${text}`;
-  }
-
   return (
     <div className="bg-[hsl(var(--background))] text-[hsl(var(--foreground))]">
       <section className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:py-8">
@@ -312,7 +299,7 @@ export function CatalogExperience({
           </div>
         ) : null}
 
-        <div className="mt-8 grid gap-5 lg:grid-cols-3">
+        <div className={isCourses ? "mt-8 grid gap-5 lg:grid-cols-3" : "mt-6 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"}>
           {isCourses && filteredCourses.length === 0 ? (
             <Card className="lg:col-span-3">
               <CardContent className="p-8 text-center">
@@ -408,80 +395,20 @@ export function CatalogExperience({
                 const verifiedCheckout = canCheckoutProduct(product);
 
                 return (
-                <Card key={product.slug} className="overflow-hidden">
-                  <div className="relative aspect-[4/3]">
-                    <SafeImage src={product.image} alt={product.name} fill sizes="(min-width: 1024px) 33vw, 100vw" className="object-cover" />
-                  </div>
-                  <CardHeader>
-                    <div className="flex flex-wrap gap-2">
-                      <Badge>{product.type}</Badge>
-                      <Badge>{product.category}</Badge>
+                <Card key={product.slug} className="overflow-hidden rounded-md">
+                  <Link href={productHref} className="block">
+                    <div className="relative aspect-[4/3] bg-[hsl(var(--muted))]">
+                      <SafeImage src={product.image} alt={product.name} fill sizes="(min-width: 1536px) 20vw, (min-width: 1280px) 25vw, 50vw" className="object-cover" />
+                      {product.isFeatured ? <Badge className="absolute left-2 top-2 bg-[hsl(var(--card))]/95 text-[hsl(var(--foreground))]">Just listed</Badge> : null}
                     </div>
-                    <CardTitle className="leading-tight">
-                      <Link href={productHref} className="inline-flex min-w-0 items-center gap-1.5">
-                        <span className="min-w-0">{product.name}</span>
-                        {verifiedCheckout ? <VerifiedMark label="Verified seller account" /> : null}
-                      </Link>
-                    </CardTitle>
-                    <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-[hsl(var(--muted-foreground))]">
-                      <span>{product.seller}</span>
-                      {verifiedCheckout ? <VerifiedMark label="Verified seller" /> : null}
-                    </p>
-                  </CardHeader>
-                  <CardContent className="space-y-5">
-                    <div className="grid grid-cols-3 gap-2 text-sm text-[hsl(var(--muted-foreground))]">
-                      <span className="flex items-center gap-1">
-                        <Star className="size-4 text-amber-500" />
-                        {product.rating}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Download className="size-4" />
-                        {product.downloads ? product.downloads.toLocaleString() : product.stock}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Wallet className="size-4" />
-                        {product.delivery}
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {product.tools.slice(0, 3).map((tool) => (
-                        <Badge key={tool}>{tool}</Badge>
-                      ))}
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <PriceDisplay
-                          price={product.price}
-                          compareAt={product.compareAt}
-                          className="text-xl text-[hsl(var(--primary))]"
-                        />
-                      </div>
-                      <div className="flex flex-wrap justify-end gap-2">
-                        <Button asChild size="sm" variant="outline">
-                          <Link href={productHref}>{t("commerce.view")}</Link>
-                        </Button>
-                        {verifiedCheckout ? (
-                          <Button size="sm" onClick={() => handleAddToCart(product)}>
-                            <ShoppingCart className="size-4" />
-                            {t("commerce.add")}
-                          </Button>
-                        ) : (
-                          <>
-                            <Button asChild size="sm">
-                              <Link href={messageHref(product)}>
-                                <MessageSquare className="size-4" />
-                                Message
-                              </Link>
-                            </Button>
-                            <Button asChild size="sm" variant="outline">
-                              <a href={whatsappHref(product)} target="_blank" rel="noreferrer">
-                                <MessageCircle className="size-4" />
-                                WhatsApp
-                              </a>
-                            </Button>
-                          </>
-                        )}
-                      </div>
+                  </Link>
+                  <CardContent className="space-y-2 p-3">
+                    <PriceDisplay price={product.price} compareAt={product.compareAt} targetCurrency="FRW" className="text-base font-black text-[hsl(var(--foreground))]" compareAtClassName="hidden" />
+                    <Link href={productHref} className="block line-clamp-1 text-sm font-bold hover:text-[hsl(var(--primary))]">{product.name}</Link>
+                    <p className="line-clamp-1 text-xs text-[hsl(var(--muted-foreground))]">{product.location || "Kigali, Rwanda"}</p>
+                    <div className="flex items-center justify-between gap-2 pt-1">
+                      <span className="flex items-center gap-1 text-xs text-[hsl(var(--muted-foreground))]"><Star className="size-3.5 fill-amber-400 text-amber-400" />{product.rating.toFixed(1)}</span>
+                      {verifiedCheckout ? <Button size="icon" className="size-8" aria-label={`Add ${product.name} to cart`} onClick={() => handleAddToCart(product)}><ShoppingCart className="size-4" /></Button> : <Button asChild size="sm" variant="outline" className="h-8"><Link href={productHref}>View</Link></Button>}
                     </div>
                   </CardContent>
                 </Card>

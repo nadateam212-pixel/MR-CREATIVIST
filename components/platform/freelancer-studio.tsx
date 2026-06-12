@@ -22,6 +22,8 @@ import { VerifiedMark } from "@/components/ui/verified-mark";
 
 type Freelancer = {
   id: string;
+  profileId?: string;
+  slug?: string;
   name: string;
   role: string;
   specialty: string;
@@ -247,13 +249,13 @@ export function FreelancerStudio({
                 filteredFreelancers.map((freelancer) => (
                   <article key={freelancer.id} className="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] p-3">
                     <div className="flex gap-3">
-                      <span className="relative size-16 shrink-0 overflow-hidden rounded-md bg-slate-950">
+                      <Link href={`/freelancers/${freelancer.slug ?? freelancer.profileId ?? freelancer.id}`} className="relative size-16 shrink-0 overflow-hidden rounded-md bg-slate-950">
                         <SafeImage src={freelancer.image || "/icons/logo.png"} alt={freelancer.name} fill sizes="64px" className="object-cover" />
-                      </span>
+                      </Link>
                       <div className="min-w-0 flex-1 space-y-2.5">
                         <div className="min-w-0">
                           <p className="flex min-w-0 items-center gap-1.5 font-black leading-tight text-[hsl(var(--foreground))]">
-                            <span className="truncate">{freelancer.name}</span>
+                            <Link href={`/freelancers/${freelancer.slug ?? freelancer.profileId ?? freelancer.id}`} className="truncate hover:text-[hsl(var(--primary))]">{freelancer.name}</Link>
                             {freelancer.isVerified ? <VerifiedMark label="Verified freelancer" /> : null}
                           </p>
                           <p className="mt-1 truncate text-xs font-bold uppercase tracking-[0.12em] text-[hsl(var(--muted-foreground))]">{freelancer.role}</p>

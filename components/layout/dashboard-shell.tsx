@@ -63,7 +63,7 @@ const studioNavItems: NavItem[] = [
 ];
 
 const adminNavItems: NavItem[] = [
-  { href: "/admin/dashboard", label: "Main admin", icon: BarChart3 },
+  { href: "/admin/dashboard", label: "Dashboard", icon: BarChart3 },
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/account-applications", label: "Account applications", icon: ShieldCheck },
   { href: "/admin/messages", label: "Messages", icon: MessageSquare },
@@ -83,6 +83,14 @@ const adminNavItems: NavItem[] = [
   { href: "/admin/health", label: "Health", icon: Activity },
   { href: "/admin/backups", label: "Backups", icon: Archive },
   { href: "/admin/settings", label: "Settings", icon: Settings }
+];
+
+const adminSidebarGroups = [
+  { title: "Overview", items: adminNavItems.slice(0, 1) },
+  { title: "Management", items: adminNavItems.slice(1, 11) },
+  { title: "Finance", items: adminNavItems.slice(11, 16) },
+  { title: "Moderation", items: adminNavItems.slice(16, 18) },
+  { title: "System", items: adminNavItems.slice(18) }
 ];
 
 const utilityNavItems: NavItem[] = [
@@ -261,7 +269,7 @@ function AccountProfileMenu({ user }: { user: Session["user"] }) {
 export function DashboardShell({ children, user }: { children: React.ReactNode; user: Session["user"] }) {
   const pathname = usePathname();
   const workspaceGroup = getWorkspaceGroup(pathname);
-  const sidebarGroups = [workspaceGroup];
+  const sidebarGroups = workspaceGroup.key === "admin" ? adminSidebarGroups : [workspaceGroup];
   const mobileNavItems = uniqueNavItems(sidebarGroups.flatMap((group) => group.items));
   const bottomNavItems = workspaceGroup.items.slice(0, 5);
   const [messageCount, setMessageCount] = useState(0);

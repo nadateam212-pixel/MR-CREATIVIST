@@ -18,6 +18,7 @@ const GigSchema = new mongoose.Schema(
     ownerCity: { type: String, trim: true },
     ownerCountry: { type: String, trim: true },
     image: { type: String, required: true },
+    images: [{ type: String }],
     tags: [{ type: String, trim: true }],
     deliverables: [{ type: String, trim: true }],
     rating: { type: Number, min: 0, max: 5, default: 0 },

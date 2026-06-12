@@ -60,6 +60,7 @@ type AdminPaymentsSnapshot = {
 
 type AdminPaymentsConsoleProps = {
   initialSnapshot: AdminPaymentsSnapshot;
+  initialProviderBalance?: number | null;
 };
 
 type PaymentBillDetail = {
@@ -107,16 +108,20 @@ function dateLabel(value?: string) {
   }).format(new Date(value));
 }
 
-export function AdminPaymentsConsole({ initialSnapshot }: AdminPaymentsConsoleProps) {
+export function AdminPaymentsConsole({ initialSnapshot, initialProviderBalance = null }: AdminPaymentsConsoleProps) {
   const [snapshot, setSnapshot] = useState(initialSnapshot);
   const [status, setStatus] = useState(initialSnapshot.filters.status ?? "all");
   const [type, setType] = useState(initialSnapshot.filters.type ?? "all");
   const [search, setSearch] = useState(initialSnapshot.filters.search ?? "");
   const [recipientEmail, setRecipientEmail] = useState("");
   const [mobilePhone, setMobilePhone] = useState("");
-  const [amount, setAmount] = useState("5000");
+  const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("MR Creativist payout");
-  const [providerBalance, setProviderBalance] = useState("");
+  const [providerBalance, setProviderBalance] = useState<number | null>(
+    typeof initialProviderBalance === "number" && Number.isFinite(initialProviderBalance)
+      ? initialProviderBalance
+      : null
+  );
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
   const [detail, setDetail] = useState<PaymentDetail | null>(null);
@@ -189,23 +194,29 @@ export function AdminPaymentsConsole({ initialSnapshot }: AdminPaymentsConsolePr
     }
   }
 
-  async function checkProviderBalance() {
+  async function checkProviderBalance(showStatus = true) {
     setBusy("balance");
-    setMessage("Checking Intouch balance...");
+    if (showStatus) setMessage("Checking Intouch balance...");
 
     try {
       const response = await fetch("/api/admin/payments/balance", { cache: "no-store" });
       const payload = await response.json();
 
       if (!response.ok) {
-        setMessage(payload.error ?? "Balance check failed.");
+        if (showStatus) setMessage(payload.error ?? "Balance check failed.");
         return;
       }
 
-      setProviderBalance(`${money(Number(payload.balance ?? 0))} (${payload.message ?? payload.code ?? "IntouchPay"})`);
-      setMessage("Provider balance updated.");
+      if (payload.ok === false) {
+        if (showStatus) setMessage(payload.message ?? "Intouch balance is unavailable.");
+        return;
+      }
+
+      const nextBalance = Number(payload.balance ?? 0);
+      setProviderBalance(Number.isFinite(nextBalance) ? nextBalance : 0);
+      if (showStatus) setMessage("Intouch balance updated.");
     } catch {
-      setMessage("Balance check failed. Check the server log.");
+      if (showStatus) setMessage("Balance check failed. Check the server log.");
     } finally {
       setBusy("");
     }
@@ -287,16 +298,30 @@ export function AdminPaymentsConsole({ initialSnapshot }: AdminPaymentsConsolePr
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" onClick={() => void checkProviderBalance()} disabled={busy === "balance"}>
-            <ShieldCheck className="size-4" />
-            Intouch balance
-          </Button>
           <Button type="button" variant="outline" onClick={exportSnapshot}>
             <Download className="size-4" />
             Export
           </Button>
         </div>
       </div>
+
+      <Card className="overflow-hidden border-[hsl(var(--primary))]/30 bg-[linear-gradient(135deg,hsl(var(--primary)/0.12),hsl(var(--card))_45%,hsl(var(--accent)/0.18))]">
+        <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-4">
+            <span className="grid size-12 shrink-0 place-items-center rounded-md border border-[hsl(var(--primary))]/30 bg-white/70 text-[hsl(var(--primary))] shadow-sm">
+              <ShieldCheck className="size-6" />
+            </span>
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-[hsl(var(--muted-foreground))]">Intouch balance</p>
+              <p className="mt-1 text-4xl font-black tracking-tight">{providerBalance === null ? "FRW --" : money(providerBalance)}</p>
+            </div>
+          </div>
+          <Button type="button" variant="outline" onClick={() => void checkProviderBalance()} disabled={busy === "balance"}>
+            <RefreshCw className={`size-4 ${busy === "balance" ? "animate-spin" : ""}`} />
+            Sync
+          </Button>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map((metric) => (
@@ -322,7 +347,7 @@ export function AdminPaymentsConsole({ initialSnapshot }: AdminPaymentsConsolePr
               <Smartphone className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" />
               <Input className="pl-9" value={mobilePhone} onChange={(event) => setMobilePhone(event.target.value)} inputMode="tel" placeholder="MTN number" />
             </div>
-            <Input value={amount} onChange={(event) => setAmount(event.target.value)} inputMode="decimal" />
+            <Input value={amount} onChange={(event) => setAmount(event.target.value)} inputMode="decimal" placeholder="Enter Amount" />
             <Input value={reason} onChange={(event) => setReason(event.target.value)} />
             <Button type="button" className="w-full" disabled={busy === "send"} onClick={() => void sendPayment()}>
               <Send className="size-4" />
@@ -368,10 +393,7 @@ export function AdminPaymentsConsole({ initialSnapshot }: AdminPaymentsConsolePr
                 Apply
               </Button>
             </div>
-            <div className="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--muted))]/35 p-3 text-sm">
-              <p className="font-medium">{providerBalance || `Updated ${dateLabel(snapshot.updatedAt)}`}</p>
-              {message ? <p className="mt-1 text-[hsl(var(--muted-foreground))]">{message}</p> : null}
-            </div>
+            {message ? <p className="text-xs font-medium text-[hsl(var(--muted-foreground))]">{message}</p> : null}
           </CardContent>
         </Card>
       </div>

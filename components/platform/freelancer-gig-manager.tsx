@@ -31,6 +31,7 @@ type StudioGig = {
   ownerCity?: string;
   ownerCountry?: string;
   image: string;
+  images?: string[];
   tags: string[];
   deliverables: string[];
   rating: number;
@@ -100,6 +101,7 @@ export function FreelancerGigManager({
   const [showForm, setShowForm] = useState(false);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState("");
+  const [gigImages, setGigImages] = useState<string[]>([defaultGigImage]);
   const [form, setForm] = useState({
     title: "AI course launch landing page",
     category: "AI Automation",
@@ -142,6 +144,7 @@ export function FreelancerGigManager({
       ownerCity: form.ownerCity,
       ownerCountry: form.ownerCountry,
       image: form.image || defaultGigImage,
+      images: gigImages,
       tags: splitLines(form.tags),
       deliverables: splitLines(form.deliverables),
       rating: selectedGig?.rating ?? 5,
@@ -151,7 +154,7 @@ export function FreelancerGigManager({
       createdAt: selectedGig?.createdAt ?? new Date().toISOString(),
       updatedAt: selectedGig?.updatedAt ?? new Date().toISOString()
     }),
-    [editingSlug, form, freelancerId, freelancerName, selectedGig]
+    [editingSlug, form, freelancerId, freelancerName, gigImages, selectedGig]
   );
 
   function update(field: keyof typeof form, value: string) {
@@ -160,6 +163,7 @@ export function FreelancerGigManager({
 
   function resetForm() {
     setEditingSlug("");
+    setGigImages([defaultGigImage]);
     setForm({
       title: "AI course launch landing page",
       category: "AI Automation",
@@ -182,6 +186,7 @@ export function FreelancerGigManager({
 
   function selectGig(gig: StudioGig) {
     setEditingSlug(gig.slug);
+    setGigImages(gig.images?.length ? gig.images : [gig.image]);
     setForm({
       title: gig.title,
       category: gig.category,
@@ -210,7 +215,7 @@ export function FreelancerGigManager({
       ["Description", form.description],
       ["Price", form.price],
       ["Delivery days", form.deliveryDays],
-      ["Cover image", form.image],
+      ["Cover image", gigImages[0] || form.image],
       ["Deliverables", form.deliverables]
     ];
     const missing = requiredFields.filter(([, value]) => !String(value ?? "").trim()).map(([label]) => label);
@@ -234,7 +239,8 @@ export function FreelancerGigManager({
       ownerAddress: form.ownerAddress,
       ownerCity: form.ownerCity,
       ownerCountry: form.ownerCountry,
-      image: form.image || defaultGigImage,
+      image: gigImages[0] || form.image || defaultGigImage,
+      images: gigImages.length ? gigImages : [form.image || defaultGigImage],
       tags: splitLines(form.tags),
       deliverables: splitLines(form.deliverables),
       status
@@ -322,8 +328,10 @@ export function FreelancerGigManager({
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      update("image", String(reader.result ?? defaultGigImage));
-      setMessage("Gig cover image uploaded.");
+      const value = String(reader.result ?? defaultGigImage);
+      setGigImages((current) => [...current.filter((image) => image !== defaultGigImage), value]);
+      if (!gigImages.length || gigImages[0] === defaultGigImage) update("image", value);
+      setMessage("Service image added to the gallery.");
     };
     reader.readAsDataURL(file);
   }
@@ -451,9 +459,12 @@ export function FreelancerGigManager({
                   <label className="cursor-pointer">
                     <ImagePlus className="size-4" />
                     Upload
-                    <input type="file" accept="image/*" className="sr-only" onChange={(event) => handleImageUpload(event.target.files?.[0])} />
+                    <input type="file" accept="image/*" multiple className="sr-only" onChange={(event) => Array.from(event.target.files ?? []).forEach(handleImageUpload)} />
                   </label>
                 </Button>
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-5">
+                {gigImages.map((image, index) => <div key={`${image}-${index}`} className="relative overflow-hidden rounded-md border border-[hsl(var(--border))]"><button type="button" onClick={() => { setGigImages((current) => [image, ...current.filter((_, itemIndex) => itemIndex !== index)]); update("image", image); }} className="block w-full"><img src={image} alt="" className="aspect-square w-full object-cover" /></button><button type="button" onClick={() => setGigImages((current) => current.filter((_, itemIndex) => itemIndex !== index))} className="absolute right-1 top-1 grid size-6 place-items-center rounded bg-black/70 text-white" aria-label={`Remove service image ${index + 1}`}><Trash2 className="size-3" /></button>{index === 0 ? <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1 text-[10px] text-white">Cover</span> : null}</div>)}
               </div>
             </label>
           </CardContent>

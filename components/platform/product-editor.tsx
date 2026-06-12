@@ -4,7 +4,7 @@
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
-import { Archive, Eye, Loader2, Save, Send, Upload } from "lucide-react";
+import { Archive, Eye, Loader2, Plus, Save, Send, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ type ProductEditorRecord = {
   currency: "USD" | "FRW";
   images: string[];
   category: string;
+  location?: string;
   stock: number;
   delivery: string;
   tools: string[];
@@ -41,6 +42,7 @@ function splitLines(value: string) {
 }
 
 export function ProductEditor({ product }: { product: ProductEditorRecord }) {
+  const [images, setImages] = useState<string[]>(product.images?.filter(Boolean) ?? []);
   const [form, setForm] = useState({
     name: product.name,
     type: product.type || "Digital",
@@ -49,7 +51,7 @@ export function ProductEditor({ product }: { product: ProductEditorRecord }) {
     price: String(product.price ?? 0),
     compareAtPrice: product.compareAtPrice ? String(product.compareAtPrice) : "",
     currency: product.currency,
-    image: product.images[0] ?? "",
+    location: product.location ?? "Kigali, Rwanda",
     stock: String(product.stock ?? 0),
     delivery: product.delivery,
     tools: (product.tools ?? []).join("\n"),
@@ -83,8 +85,8 @@ export function ProductEditor({ product }: { product: ProductEditorRecord }) {
       const imageUrl = payload.asset?.secureUrl ?? payload.asset?.url;
       if (!imageUrl) throw new Error("Upload did not return an image URL.");
 
-      update("image", imageUrl);
-      setMessage("Image uploaded. Save the product to keep it.");
+      setImages((current) => [...current, imageUrl]);
+      setMessage("Image added to the gallery. Save the product to keep it.");
       toast.success("Image uploaded.");
     } catch (error) {
       const nextMessage = error instanceof Error ? error.message : "Image upload failed.";
@@ -102,7 +104,7 @@ export function ProductEditor({ product }: { product: ProductEditorRecord }) {
       ["Description", form.description],
       ["Price", form.price],
       ["Delivery", form.delivery],
-      ["Image", form.image]
+      ["Image", images[0]]
     ]
       .filter(([, value]) => !String(value ?? "").trim())
       .map(([label]) => label);
@@ -129,7 +131,8 @@ export function ProductEditor({ product }: { product: ProductEditorRecord }) {
           price: Number(form.price) || 0,
           compareAtPrice: form.compareAtPrice ? Number(form.compareAtPrice) || 0 : undefined,
           currency: form.currency,
-          images: [form.image],
+          images,
+          location: form.location,
           stock: Number(form.stock) || 0,
           delivery: form.delivery,
           tools: splitLines(form.tools),
@@ -237,6 +240,10 @@ export function ProductEditor({ product }: { product: ProductEditorRecord }) {
                 <Input value={form.delivery} onChange={(event) => update("delivery", event.target.value)} required minLength={2} />
               </label>
               <label className="grid gap-2 text-sm font-semibold md:col-span-2">
+                Product location
+                <Input value={form.location} onChange={(event) => update("location", event.target.value)} required minLength={2} placeholder="Kigali, Rwanda" />
+              </label>
+              <label className="grid gap-2 text-sm font-semibold md:col-span-2">
                 Included tools
                 <textarea value={form.tools} onChange={(event) => update("tools", event.target.value)} className="min-h-28 rounded-md border border-[hsl(var(--border))] bg-transparent p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]" />
               </label>
@@ -269,20 +276,24 @@ export function ProductEditor({ product }: { product: ProductEditorRecord }) {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="overflow-hidden rounded-md border border-[hsl(var(--border))]">
-              {form.image ? <img src={form.image} alt={form.name} className="aspect-[4/3] w-full object-cover" /> : null}
+              {images[0] ? <img src={images[0]} alt={form.name} className="aspect-[4/3] w-full object-cover" /> : <div className="grid aspect-[4/3] place-items-center text-sm text-[hsl(var(--muted-foreground))]">Add a cover image</div>}
             </div>
             <Button asChild variant="outline" className="w-full">
               <label className="cursor-pointer">
                 {busy === "upload" ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
-                {busy === "upload" ? "Uploading..." : "Upload image"}
-                <input type="file" accept="image/*" className="sr-only" onChange={(event) => void uploadImage(event.target.files?.[0])} />
+                {busy === "upload" ? "Uploading..." : "Add gallery image"}
+                <input type="file" accept="image/*" multiple className="sr-only" onChange={(event) => Array.from(event.target.files ?? []).forEach((file) => void uploadImage(file))} />
               </label>
             </Button>
+            <div className="grid grid-cols-3 gap-2">
+              {images.map((image, index) => <div key={`${image}-${index}`} className="group relative overflow-hidden rounded-md border border-[hsl(var(--border))]"><img src={image} alt="" className="aspect-square w-full object-cover" /><button type="button" onClick={() => setImages((current) => current.filter((_, itemIndex) => itemIndex !== index))} className="absolute right-1 top-1 grid size-7 place-items-center rounded-md bg-black/70 text-white" aria-label={`Remove image ${index + 1}`}><Trash2 className="size-3.5" /></button>{index === 0 ? <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-white">Cover</span> : null}</div>)}
+              <label className="grid aspect-square cursor-pointer place-items-center rounded-md border border-dashed border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))]"><Plus className="size-5" /><input type="file" accept="image/*" className="sr-only" onChange={(event) => void uploadImage(event.target.files?.[0])} /></label>
+            </div>
             <div className="rounded-md border border-[hsl(var(--border))] p-4">
               <Badge>{form.type}</Badge>
               <h2 className="mt-3 text-xl font-semibold">{form.name || "Product name"}</h2>
               <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
-                {form.currency} {Number(form.price || 0).toLocaleString()} - {form.delivery || "Delivery"} - {form.stock || 0} in stock
+                FRW {Number(form.price || 0).toLocaleString()} - {form.location || "Kigali, Rwanda"} - {form.stock || 0} in stock
               </p>
             </div>
           </CardContent>

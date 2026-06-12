@@ -8,22 +8,25 @@ export function PriceDisplay({
   price,
   compareAt,
   className,
-  compareAtClassName
+  compareAtClassName,
+  targetCurrency
 }: {
   price: string;
   compareAt?: string;
   className?: string;
   compareAtClassName?: string;
+  targetCurrency?: "USD" | "FRW";
 }) {
   const { currency, usdToFrw } = useUserPreferences();
+  const displayCurrency = targetCurrency ?? currency;
   const compareAtAmount = compareAt ? parseMoney(compareAt)?.amount : 0;
 
   return (
     <div className="flex items-baseline gap-2">
-      <span className={cn("text-lg font-semibold", className)}>{formatConvertedPrice(price, currency, usdToFrw)}</span>
+      <span className={cn("text-lg font-semibold", className)}>{formatConvertedPrice(price, displayCurrency, usdToFrw)}</span>
       {compareAt && compareAtAmount && compareAtAmount > 0 ? (
         <span className={cn("text-sm text-[hsl(var(--muted-foreground))] line-through", compareAtClassName)}>
-          {formatConvertedPrice(compareAt, currency, usdToFrw)}
+          {formatConvertedPrice(compareAt, displayCurrency, usdToFrw)}
         </span>
       ) : null}
     </div>

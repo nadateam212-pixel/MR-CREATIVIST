@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { BadgeCheck, CheckCircle2, EllipsisVertical, ExternalLink, Eye, FileCheck2, KeyRound, MessageSquare, Search, Share2, ShieldCheck, ShieldOff, UserCog, UserPlus, XCircle } from "lucide-react";
+import { BadgeCheck, CheckCircle2, EllipsisVertical, ExternalLink, Eye, FileCheck2, KeyRound, MessageSquare, Search, Share2, ShieldCheck, ShieldOff, Trash2, UserCog, UserPlus, Users, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -66,7 +66,17 @@ function initials(value?: string) {
     .toUpperCase();
 }
 
-function UserRoleRow({ user, onSave }: { user: AdminUser; onSave: (user: AdminUser) => void }) {
+function UserRoleRow({
+  user,
+  onSave,
+  selected,
+  onToggle
+}: {
+  user: AdminUser;
+  onSave: (user: AdminUser) => void;
+  selected: boolean;
+  onToggle: () => void;
+}) {
   const [activeRole, setActiveRole] = useState<PlatformRole>(user.role);
   const [accountStatus, setAccountStatus] = useState(user.accountStatus);
   const [isVerified, setIsVerified] = useState(Boolean(user.isVerified));
@@ -140,7 +150,7 @@ function UserRoleRow({ user, onSave }: { user: AdminUser; onSave: (user: AdminUs
     <>
       <tr className="border-b border-[hsl(var(--border))] last:border-b-0">
         <td className="p-4">
-          <input type="checkbox" aria-label={`Select ${user.name}`} className="size-4 rounded border-[hsl(var(--border))]" />
+          <input type="checkbox" checked={selected} onChange={onToggle} aria-label={`Select ${user.name}`} className="size-4 rounded border-[hsl(var(--border))]" />
         </td>
         <td className="p-4">
           <div className="flex min-w-56 items-center gap-3">
@@ -286,6 +296,9 @@ export function AdminAccountsManager({
   const [roleFilter, setRoleFilter] = useState("all");
   const [accountFilter, setAccountFilter] = useState("all");
   const [verificationFilter, setVerificationFilter] = useState("all");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkRole, setBulkRole] = useState<PlatformRole>("client");
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const filteredUsers = useMemo(() => {
     const search = query.trim().toLowerCase();
@@ -306,6 +319,62 @@ export function AdminAccountsManager({
 
   function updateUser(updatedUser: AdminUser) {
     setUsers((current) => current.map((user) => (user.id === updatedUser.id ? updatedUser : user)));
+  }
+
+  function toggleUser(userId: string) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+  }
+
+  function toggleAllVisible() {
+    const visibleIds = filteredUsers.map((user) => user.id);
+    const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      visibleIds.forEach((id) => (allSelected ? next.delete(id) : next.add(id)));
+      return next;
+    });
+  }
+
+  async function applyBulkAction(action: "verify" | "activate" | "suspend" | "delete" | "change_role") {
+    const userIds = Array.from(selectedIds);
+    if (!userIds.length) return;
+    if (action === "delete" && !window.confirm(`Permanently delete ${userIds.length} selected user account(s)?`)) return;
+
+    setBulkBusy(true);
+    try {
+      const response = await fetch("/api/admin/users/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userIds, action, role: action === "change_role" ? bulkRole : undefined })
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "Bulk user action failed.");
+
+      const affected = new Set<string>(payload.affectedIds ?? []);
+      if (action === "delete") {
+        setUsers((current) => current.filter((user) => !affected.has(user.id)));
+      } else {
+        setUsers((current) =>
+          current.map((user) => {
+            if (!affected.has(user.id)) return user;
+            if (action === "verify") return { ...user, isVerified: true };
+            if (action === "activate" || action === "suspend") return { ...user, accountStatus: action === "activate" ? "active" : "suspended" };
+            return { ...user, role: bulkRole, validatedRoles: Array.from(new Set([...user.validatedRoles, bulkRole])) };
+          })
+        );
+      }
+      setSelectedIds(new Set(payload.protectedIds ?? []));
+      toast.success(payload.message ?? `${affected.size} users updated.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Bulk user action failed.");
+    } finally {
+      setBulkBusy(false);
+    }
   }
 
   async function reviewApplication(applicationId: string, status: AccountApplication["status"]) {
@@ -333,7 +402,7 @@ export function AdminAccountsManager({
       <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">{mode === "applications" ? "Account applications" : "Users Management"}</h1>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className={mode === "applications" ? "mt-3 flex flex-wrap gap-2" : "mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4"}>
             {(mode === "applications"
               ? [
                   ["Pending", applications.filter((application) => application.status === "pending").length],
@@ -346,10 +415,17 @@ export function AdminAccountsManager({
                   ["Active", users.filter((user) => user.accountStatus === "active").length],
                   ["Verified", users.filter((user) => user.isVerified).length],
                   ["Suspended", users.filter((user) => user.accountStatus === "suspended").length]
-                ]).map(([label, value]) => (
-              <Badge key={String(label)} className="px-3 py-1">
-                {label}: {Number(value).toLocaleString()}
-              </Badge>
+                ]).map(([label, value], index) => (
+              mode === "applications" ? (
+                <Badge key={String(label)} className="px-3 py-1">{label}: {Number(value).toLocaleString()}</Badge>
+              ) : (
+                <div key={String(label)} className="flex min-w-48 items-center gap-3 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 shadow-sm">
+                  <span className="grid size-10 place-items-center rounded-md bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))]">
+                    {index === 0 ? <Users className="size-5" /> : index === 1 ? <CheckCircle2 className="size-5 text-emerald-500" /> : index === 2 ? <BadgeCheck className="size-5 text-cyan-500" /> : <ShieldOff className="size-5 text-rose-500" />}
+                  </span>
+                  <span><span className="block text-xs font-semibold text-[hsl(var(--muted-foreground))]">{label} users</span><span className="mt-1 block text-2xl font-black">{Number(value).toLocaleString()}</span></span>
+                </div>
+              )
             ))}
           </div>
         </div>
@@ -403,13 +479,36 @@ export function AdminAccountsManager({
             </Button>
           </section>
 
+          {selectedIds.size ? (
+            <section className="flex flex-col gap-3 rounded-md border border-emerald-500/35 bg-emerald-500/10 p-3 xl:flex-row xl:items-center">
+              <p className="min-w-32 text-sm font-black text-emerald-700 dark:text-emerald-300">{selectedIds.size} selected</p>
+              <div className="flex flex-1 flex-wrap gap-2">
+                <Button size="sm" variant="outline" onClick={() => void applyBulkAction("verify")} disabled={bulkBusy}><BadgeCheck className="size-4" />Verify</Button>
+                <select value={bulkRole} onChange={(event) => setBulkRole(event.target.value as PlatformRole)} className="h-9 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-3 text-sm capitalize">
+                  {roleOptions.map((role) => <option key={role} value={role}>{role}</option>)}
+                </select>
+                <Button size="sm" variant="outline" onClick={() => void applyBulkAction("change_role")} disabled={bulkBusy}><UserCog className="size-4" />Change role</Button>
+                <Button size="sm" variant="outline" onClick={() => void applyBulkAction("activate")} disabled={bulkBusy}><CheckCircle2 className="size-4" />Activate</Button>
+                <Button size="sm" variant="outline" onClick={() => void applyBulkAction("suspend")} disabled={bulkBusy}><ShieldOff className="size-4" />Suspend</Button>
+                <Button size="sm" variant="outline" className="text-[hsl(var(--destructive))]" onClick={() => void applyBulkAction("delete")} disabled={bulkBusy}><Trash2 className="size-4" />Delete</Button>
+                <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())} disabled={bulkBusy}><XCircle className="size-4" />Clear</Button>
+              </div>
+            </section>
+          ) : null}
+
           <Card className="overflow-hidden">
             <CardContent className="overflow-x-auto p-0">
               <table className="w-full min-w-[76rem] text-left text-sm">
                 <thead className="border-b border-[hsl(var(--border))] bg-[hsl(var(--muted))]/35 text-[hsl(var(--muted-foreground))]">
                   <tr>
                     <th className="w-12 p-4">
-                      <input type="checkbox" aria-label="Select all users" className="size-4 rounded border-[hsl(var(--border))]" />
+                      <input
+                        type="checkbox"
+                        checked={filteredUsers.length > 0 && filteredUsers.every((user) => selectedIds.has(user.id))}
+                        onChange={toggleAllVisible}
+                        aria-label="Select all visible users"
+                        className="size-4 rounded border-[hsl(var(--border))]"
+                      />
                     </th>
                     <th className="p-4 font-medium">Name</th>
                     <th className="p-4 font-medium">Email</th>
@@ -423,7 +522,7 @@ export function AdminAccountsManager({
                 </thead>
                 <tbody>
                   {filteredUsers.map((user) => (
-                    <UserRoleRow key={user.id} user={user} onSave={updateUser} />
+                    <UserRoleRow key={user.id} user={user} onSave={updateUser} selected={selectedIds.has(user.id)} onToggle={() => toggleUser(user.id)} />
                   ))}
                 </tbody>
               </table>

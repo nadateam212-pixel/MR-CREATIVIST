@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { CheckCircle2, CreditCard, Download, MessageSquare, Minus, PackageCheck, Plus, ShieldCheck, ShoppingCart, Tag, Wallet } from "lucide-react";
+import { CheckCircle2, CreditCard, Download, MessageSquare, Minus, PackageCheck, Plus, ShieldCheck, ShoppingCart, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,7 +30,6 @@ type CheckoutProduct = {
 };
 
 export function CheckoutWorkbench({ mode = "cart", products = [] }: { mode?: "cart" | "checkout"; products?: CheckoutProduct[] }) {
-  const [coupon, setCoupon] = useState("CREATOR15");
   const [paymentMethod, setPaymentMethod] = useState<CheckoutPaymentMethod>("mtn_momo");
   const [paymentDetails, setPaymentDetails] = useState<CheckoutPaymentDetails>({
     mobilePhone: "",
@@ -68,12 +67,10 @@ export function CheckoutWorkbench({ mode = "cart", products = [] }: { mode?: "ca
     });
 
   const subtotal = cartProducts.reduce((total, product) => total + product.subtotal, 0);
-  const discount = coupon.trim().toUpperCase() === "CREATOR15" ? subtotal * 0.15 : 0;
-  const tax = (subtotal - discount) * 0.04;
-  const total = Math.max(0, subtotal - discount + tax);
+  const total = subtotal;
   const suggestedProducts = useMemo(() => marketplaceProducts.slice(0, 3), [marketplaceProducts]);
   const displayMoney = (amount: number) => formatConvertedAmount(amount, "USD", preferences.currency, preferences.usdToFrw);
-  const displayFrw = (amount: number) => formatConvertedAmount(amount, "FRW", preferences.currency, preferences.usdToFrw);
+  const displayFrw = (amount: number) => formatConvertedAmount(amount, "FRW", "FRW", preferences.usdToFrw);
   const canCheckoutProduct = (product: CheckoutProduct) => Boolean(product.isVerified || product.sellerVerified);
   const unverifiedCartProducts = cartProducts.filter((product) => !canCheckoutProduct(product));
   const buyerName = buyer.name || session?.user?.name || "";
@@ -132,10 +129,6 @@ export function CheckoutWorkbench({ mode = "cart", products = [] }: { mode?: "ca
           buyerEmail,
           paymentMethod,
           paymentDetails,
-          discount,
-          discountCurrency: "USD",
-          tax,
-          taxCurrency: "USD",
           items: cartProducts.map((product) => ({
             productId: "id" in product && product.id ? product.id : product.slug,
             quantity: product.quantity
@@ -273,31 +266,11 @@ export function CheckoutWorkbench({ mode = "cart", products = [] }: { mode?: "ca
                 <span className="text-[hsl(var(--muted-foreground))]">{t("commerce.subtotal")}</span>
                 <span>{displayMoney(subtotal)}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-[hsl(var(--muted-foreground))]">{t("commerce.discount")}</span>
-                <span>{displayMoney(discount)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[hsl(var(--muted-foreground))]">{t("commerce.tax")}</span>
-                <span>{displayMoney(tax)}</span>
-              </div>
               <div className="border-t border-[hsl(var(--border))] pt-3 text-base font-semibold">
                 <div className="flex justify-between">
                   <span>{t("commerce.total")}</span>
                   <span>{displayMoney(total)}</span>
                 </div>
-              </div>
-            </div>
-
-            <div className="grid gap-2">
-              <label className="text-sm font-medium" htmlFor="coupon">
-                Coupon
-              </label>
-              <div className="flex gap-2">
-                <Input id="coupon" value={coupon} onChange={(event) => setCoupon(event.target.value)} />
-                <Button variant="outline" size="icon">
-                  <Tag className="size-4" />
-                </Button>
               </div>
             </div>
 

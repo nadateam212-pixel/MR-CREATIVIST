@@ -95,6 +95,15 @@ const responseCodeDescriptions: Record<string, string> = {
   "403": "IntouchPay rejected this server IP address."
 };
 
+const htmlResponseMessage =
+  "IntouchPay returned a verification page instead of balance data. Check the IntouchPay proxy, credentials, or server IP allowlist.";
+
+function looksLikeHtmlResponse(value: string) {
+  return /<!doctype html|<html[\s>]|<body[\s>]|<script[\s>]|<form[\s>]/i.test(
+    value
+  );
+}
+
 function stripSlashes(value: string) {
   return value.replace(/\/+$/, "");
 }
@@ -200,6 +209,11 @@ function asString(value: unknown) {
   return String(value ?? "").trim();
 }
 
+function safeProviderDetail(value: unknown) {
+  const detail = asString(value);
+  return looksLikeHtmlResponse(detail) ? htmlResponseMessage : detail;
+}
+
 function truthy(value: unknown) {
   if (value === true) return true;
   const normalized = asString(value).toLowerCase();
@@ -238,7 +252,7 @@ function normalizeResponse(
   const code = asString(
     field(data, "responsecode", "code", "statuscode", "statusCode")
   );
-  const detail = asString(
+  const detail = safeProviderDetail(
     field(
       data,
       "message",
@@ -280,6 +294,17 @@ async function readIntouchResponse(
   try {
     payload = raw ? (JSON.parse(raw) as IntouchPayload) : {};
   } catch {
+    if (looksLikeHtmlResponse(raw)) {
+      const code = response.ok ? "html" : String(response.status);
+      return {
+        ok: false,
+        code,
+        message: explainIntouchFailure(raw, code),
+        data: {},
+        raw
+      };
+    }
+
     payload = { message: raw };
   }
 
@@ -310,6 +335,10 @@ function explainIntouchFailure(message: string, code?: string) {
 
   if (ipMatch) {
     return `IntouchPay rejected server IP ${ipMatch[1]}. Ask IntouchPay to whitelist this IP for the MR Creativist account, or deploy from an already-approved server.`;
+  }
+
+  if (looksLikeHtmlResponse(message)) {
+    return (code && responseCodeDescriptions[code]) || htmlResponseMessage;
   }
 
   return fallback || "IntouchPay response received.";

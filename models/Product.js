@@ -14,6 +14,7 @@ const ProductSchema = new mongoose.Schema(
     currency: { type: String, enum: ["USD", "FRW"], default: "USD" },
     images: [{ type: String, required: true }],
     category: { type: String, required: true, trim: true, index: true },
+    location: { type: String, trim: true, maxlength: 180, default: "Kigali, Rwanda" },
     stock: { type: Number, min: 0, default: 0 },
     rating: { type: Number, min: 0, max: 5, default: 0 },
     downloads: { type: Number, min: 0, default: 0 },

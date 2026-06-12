@@ -45,6 +45,7 @@ export const courseSchema = z.object({
   instructorName: z.string().min(2).max(120),
   level: z.enum(["Beginner", "Intermediate", "Advanced", "All levels", "Expert"]).default("Beginner"),
   category: z.string().min(2).max(120),
+  location: z.string().min(2).max(180).default("Kigali, Rwanda"),
   subcategory: z.string().max(120).optional(),
   language: z.enum(["Kinyarwanda", "English", "French", "Other"]).default("English"),
   price: z.coerce.number().min(0),
@@ -253,10 +254,10 @@ export const freelancerProfileSchema = z.object({
   languages: z.array(z.string().min(2)).min(1),
   skills: z.array(z.string().min(2)).min(1),
   verifiedBadges: z.array(z.string().min(2)).default([]),
-  image: z.url(),
+  image: assetUrl,
   bio: z.string().max(2000).optional(),
   gigs: z.array(z.object({ title: z.string(), price: z.coerce.number().min(0), deliveryDays: z.coerce.number().int().min(1) })).default([]),
-  portfolio: z.array(z.object({ title: z.string(), url: z.url(), image: z.url().optional() })).default([]),
+  portfolio: z.array(z.object({ title: z.string().min(1).max(180), url: assetUrl, image: optionalAssetUrl })).default([]),
   status: reviewStatus.default("draft"),
   isVerified: z.boolean().default(false)
 });
@@ -276,6 +277,7 @@ export const gigSchema = z.object({
   ownerCity: z.string().max(120).optional(),
   ownerCountry: z.string().max(120).optional(),
   image: assetUrl,
+  images: z.array(assetUrl).default([]),
   tags: z.array(z.string().min(2).max(80)).default([]),
   deliverables: z.array(z.string().min(2).max(180)).default([]),
   rating: z.coerce.number().min(0).max(5).default(0),

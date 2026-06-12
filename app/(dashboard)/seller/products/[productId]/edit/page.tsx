@@ -49,6 +49,7 @@ export default async function EditProductPage({
         currency: product.currency ?? "USD",
         images: product.images ?? [],
         category: product.category ?? "",
+        location: product.location ?? "Kigali, Rwanda",
         stock: Number(product.stock ?? 0),
         delivery: product.delivery ?? "",
         tools: product.tools ?? [],
