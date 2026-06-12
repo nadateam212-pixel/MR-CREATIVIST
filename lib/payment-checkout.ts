@@ -82,6 +82,7 @@ async function productAllowsCheckout(product: LooseRecord) {
 async function createOrderFromItems(session: CheckoutSession, body: LooseRecord) {
   const buyer = buyerFrom(session, body);
   const items = Array.isArray(body.items) ? body.items : [];
+  const paymentDetails = asRecord(body.paymentDetails);
   if (!items.length) throw new Error("At least one item is required.");
 
   const orderItems: Array<{
@@ -130,7 +131,10 @@ async function createOrderFromItems(session: CheckoutSession, body: LooseRecord)
     status: "pending",
     metadata: {
       checkoutSource: body.source ?? "checkout",
-      originalPaymentMethod: body.paymentMethod
+      originalPaymentMethod: body.paymentMethod,
+      buyerPhone: body.buyerPhone ?? body.phone ?? paymentDetails.mobilePhone,
+      billingAddress: body.billingAddress ?? body.address,
+      shippingAddress: body.shippingAddress
     }
   });
 
@@ -281,6 +285,7 @@ export async function processCourseCheckout(session: CheckoutSession, body: Loos
   await connectMongoDB();
 
   const buyer = buyerFrom(session, body);
+  const buyerAddress = body.billingAddress ?? body.address;
   const paymentMethod = normalizePaymentMethod(body.paymentMethod);
   if (paymentMethod === "stripe") throw new Error("Stripe card payments are coming soon.");
 
@@ -300,7 +305,8 @@ export async function processCourseCheckout(session: CheckoutSession, body: Loos
         courseId: String(course._id),
         courseTitle: course.title,
         learnerName: buyer.name,
-        learnerEmail: buyer.email
+        learnerEmail: buyer.email,
+        billingAddress: buyerAddress
       }
     });
 
@@ -320,7 +326,8 @@ export async function processCourseCheckout(session: CheckoutSession, body: Loos
         courseId: String(course._id),
         courseTitle: course.title,
         learnerName: buyer.name,
-        learnerEmail: buyer.email
+        learnerEmail: buyer.email,
+        billingAddress: buyerAddress
       }
     });
     const transaction = await recordWalletTransaction(
@@ -340,7 +347,8 @@ export async function processCourseCheckout(session: CheckoutSession, body: Loos
           courseId: String(course._id),
           courseTitle: course.title,
           learnerName: buyer.name,
-          learnerEmail: buyer.email
+          learnerEmail: buyer.email,
+          billingAddress: buyerAddress
         }
       }
     );
@@ -376,7 +384,8 @@ export async function processCourseCheckout(session: CheckoutSession, body: Loos
           courseId: String(course._id),
           courseTitle: course.title,
           learnerName: buyer.name,
-          learnerEmail: buyer.email
+          learnerEmail: buyer.email,
+          billingAddress: buyerAddress
         }
       }
     );
@@ -423,6 +432,7 @@ export async function processCourseCheckout(session: CheckoutSession, body: Loos
         courseTitle: course.title,
         learnerName: buyer.name,
         learnerEmail: buyer.email,
+        billingAddress: buyerAddress,
         paypalAmount,
         paypalCurrency: paypalCurrency()
       }

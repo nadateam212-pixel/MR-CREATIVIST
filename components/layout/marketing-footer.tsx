@@ -98,7 +98,7 @@ export function MarketingFooter() {
                 {brand.phones.map((phone) => (
                   <a
                     key={phone}
-                    href={`tel:${phone.replaceAll(" ", "")}`}
+                    href={`tel:${phone.replace(/[^\d+]/g, "")}`}
                     className="hover:text-[hsl(var(--foreground))]"
                   >
                     {phone}

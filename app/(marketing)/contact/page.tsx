@@ -30,7 +30,7 @@ export default function ContactPage() {
                 <div>
                   <p className="font-black uppercase">PHONE</p>
                   {brand.phones.map((phone) => (
-                    <a key={phone} href={`tel:${phone.replaceAll(" ", "")}`} className="block text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--primary))]">
+                    <a key={phone} href={`tel:${phone.replace(/[^\d+]/g, "")}`} className="block text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--primary))]">
                       {phone}
                     </a>
                   ))}

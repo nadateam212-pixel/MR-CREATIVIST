@@ -126,7 +126,7 @@ export function LoginForm({ callbackUrl = "" }: { callbackUrl?: string }) {
         </div>
         <Button type="submit" className="w-full" disabled={pending}>
           {pending ? <Loader2 className="size-4 animate-spin" /> : null}
-          Continue with OTP
+          Sign in
         </Button>
       </form>
     </div>

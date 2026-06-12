@@ -125,7 +125,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         await connectMongoDB();
 
-        const existingUser = await User.exists({ email });
+        const previousUser = await User.findOne({ email }).select("emailVerifiedAt").lean();
         const user = await User.findOneAndUpdate(
           { email },
           {
@@ -139,7 +139,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         ).lean();
 
         if (!user || user.accountStatus === "suspended") return null;
-        if (!existingUser) await sendWelcomeEmail(user.email, user.name);
+        if (purpose === "register" && !previousUser?.emailVerifiedAt) {
+          void sendWelcomeEmail(user.email, user.name);
+        }
 
         return serializeUser(user);
       }

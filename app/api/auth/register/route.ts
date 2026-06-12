@@ -4,7 +4,6 @@ import connectMongoDB from "@/lib/mongodb";
 import { rateLimit } from "@/lib/rate-limit";
 import { apiError, apiOk, ApiError } from "@/lib/api";
 import { registerSchema } from "@/lib/validations";
-import { sendWelcomeEmail } from "@/lib/welcome-email";
 import ReferralProfile from "@/models/ReferralProfile";
 import User from "@/models/User";
 
@@ -137,7 +136,6 @@ export async function POST(request: Request) {
     if (!otp.delivery.ok) {
       throw new ApiError(otp.delivery.message || "OTP email could not be sent.", 503);
     }
-    await sendWelcomeEmail(user.email, user.name);
 
     return apiOk(
       {

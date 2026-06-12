@@ -2,6 +2,7 @@ import { z } from "zod";
 import { createAndSendAuthOtp, verifyAuthOtp } from "@/lib/auth-otp";
 import { apiError, apiOk, ApiError } from "@/lib/api";
 import connectMongoDB from "@/lib/mongodb";
+import { sendWelcomeEmail } from "@/lib/welcome-email";
 import User from "@/models/User";
 
 const verifySchema = z.object({
@@ -17,7 +18,7 @@ export async function POST(request: Request) {
     const email = body.email.toLowerCase();
 
     await connectMongoDB();
-    const user = await User.findOne({ email }).select("_id name").lean();
+    const user = await User.findOne({ email }).select("_id name email emailVerifiedAt").lean();
     if (!user) throw new ApiError("No account exists for this email.", 404);
 
     if (body.action === "send") {
@@ -40,6 +41,9 @@ export async function POST(request: Request) {
     if (!result.ok) throw new ApiError(result.message ?? "OTP verification failed.", 422);
 
     await User.updateOne({ _id: user._id }, { emailVerifiedAt: new Date() });
+    if (body.purpose === "register" && !user.emailVerifiedAt) {
+      void sendWelcomeEmail(user.email, user.name);
+    }
 
     return apiOk({ ok: true, message: "Email verified." });
   } catch (error) {

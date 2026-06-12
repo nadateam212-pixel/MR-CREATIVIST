@@ -9,7 +9,6 @@ import connectMongoDB from "@/lib/mongodb";
 import { createAndSendPasswordReset, resetPasswordWithToken } from "@/lib/password-reset";
 import { rateLimit } from "@/lib/rate-limit";
 import { forgotPasswordSchema, loginSchema, registerSchema, resetPasswordSchema } from "@/lib/validations";
-import { sendWelcomeEmail } from "@/lib/welcome-email";
 import ReferralProfile from "@/models/ReferralProfile";
 import User from "@/models/User";
 
@@ -210,7 +209,6 @@ export async function registerAction(_state: FormState, formData: FormData): Pro
   if (!otp.delivery.ok) {
     return { ok: false, message: otp.delivery.message };
   }
-  await sendWelcomeEmail(user.email, user.name);
 
   redirect(`/verify-otp?email=${encodeURIComponent(user.email)}&mode=register&callbackUrl=${encodeURIComponent(redirectTo)}`);
 }

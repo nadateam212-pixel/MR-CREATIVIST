@@ -28,7 +28,7 @@ export default function SupportPage() {
           </a>
         </Button>
         <Button asChild variant="outline" className="h-12 justify-start">
-          <a href={`tel:${brand.phones[0].replaceAll(" ", "")}`}>
+          <a href={`tel:${brand.phones[0].replace(/[^\d+]/g, "")}`}>
             <Phone className="size-4" />
             {brand.phones[0]}
           </a>
