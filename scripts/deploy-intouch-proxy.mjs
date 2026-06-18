@@ -1,7 +1,7 @@
 import { Buffer } from "node:buffer";
 import { readFile } from "node:fs/promises";
 
-const CPANEL_URL =
+const DEFAULT_CPANEL_URL =
   "https://www.mrcreativist.ca:2083/execute/Fileman/upload_files";
 const PROXY_FILE_NAME = "intouch-proxy.php";
 
@@ -15,6 +15,13 @@ function cleanEnvValue(value = "") {
     return trimmed.slice(1, -1).trim();
   }
   return trimmed;
+}
+
+function cleanProxySecret(value = "") {
+  return cleanEnvValue(value).replace(
+    /^(?:INTOUCH_PROXY_SECRET|PROXY_SECRET)\s*=\s*/i,
+    ""
+  ).trim();
 }
 
 async function readDotEnv() {
@@ -149,8 +156,22 @@ function intouch_call(string $path, array $fields, bool $json = false): array
         ];
     }
 
-    $decoded = json_decode((string) $raw, true);
-    $payload = is_array($decoded) ? $decoded : ['message' => (string) $raw];
+    $rawString = (string) $raw;
+    if (preg_match('/<!doctype html|<html[\s>]|<body[\s>]|<script[\s>]|<form[\s>]/i', $rawString)) {
+        $isBotVerification = preg_match('/bot verification|lsrecaptcha|recaptcha|captcha|imunify|verify you are human/i', $rawString) === 1;
+        return [
+            'success' => false,
+            'responsecode' => $isBotVerification ? 'proxy-bot-verification' : 'proxy-html',
+            'message' => $isBotVerification
+                ? 'The IntouchPay upstream request returned a bot verification page instead of JSON.'
+                : 'The IntouchPay upstream request returned HTML instead of JSON.',
+            'detail' => trim(preg_replace('/\s+/', ' ', strip_tags($rawString))),
+            'proxy_http_status' => $httpStatus,
+        ];
+    }
+
+    $decoded = json_decode($rawString, true);
+    $payload = is_array($decoded) ? $decoded : ['message' => $rawString];
     $payload['proxy_http_status'] = $httpStatus;
 
     if ($httpStatus >= 400 && !isset($payload['responsecode'])) {
@@ -255,7 +276,7 @@ async function main() {
     "CPANEL_PASSWORD",
     process.env.CPANEL_PASSWORD
   );
-  const proxySecret = cleanEnvValue(
+  const proxySecret = cleanProxySecret(
     await readFile(".intouch-proxy-secret.local", "utf8")
   );
 
@@ -283,11 +304,21 @@ async function main() {
   const auth = Buffer.from(`${cpanelUser}:${cpanelPassword}`, "utf8").toString(
     "base64"
   );
-  const response = await fetch(CPANEL_URL, {
-    method: "POST",
-    headers: { Authorization: `Basic ${auth}` },
-    body: form
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30_000);
+  const cpanelUrl = cleanEnvValue(process.env.CPANEL_URL) || DEFAULT_CPANEL_URL;
+  let response;
+
+  try {
+    response = await fetch(cpanelUrl, {
+      method: "POST",
+      headers: { Authorization: `Basic ${auth}` },
+      body: form,
+      signal: controller.signal
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
 
   const text = await response.text();
   let payload;

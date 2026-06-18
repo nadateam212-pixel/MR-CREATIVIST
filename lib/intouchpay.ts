@@ -96,7 +96,9 @@ const responseCodeDescriptions: Record<string, string> = {
 };
 
 const htmlResponseMessage =
-  "IntouchPay returned a verification page instead of balance data. Check the IntouchPay proxy, credentials, or server IP allowlist.";
+  "IntouchPay returned an HTML page instead of JSON. Check the IntouchPay proxy URL, hosting bot protection, credentials, or server IP allowlist.";
+const proxyBotVerificationMessage =
+  "The IntouchPay proxy URL is blocked by the hosting bot verification page before PHP runs. Disable bot protection for intouch-proxy.php or move the proxy to a clean JSON endpoint.";
 
 function looksLikeHtmlResponse(value: string) {
   return /<!doctype html|<html[\s>]|<body[\s>]|<script[\s>]|<form[\s>]/i.test(
@@ -104,8 +106,20 @@ function looksLikeHtmlResponse(value: string) {
   );
 }
 
+function looksLikeBotVerification(value: string) {
+  return /bot verification|lsrecaptcha|recaptcha|captcha|imunify|verify you are human/i.test(
+    value
+  );
+}
+
 function stripSlashes(value: string) {
   return value.replace(/\/+$/, "");
+}
+
+function cleanProxySecret(value: string) {
+  return value
+    .replace(/^(?:INTOUCH_PROXY_SECRET|PROXY_SECRET)\s*=\s*/i, "")
+    .trim();
 }
 
 function intouchBaseUrl() {
@@ -123,10 +137,13 @@ function intouchConfig() {
 }
 
 function intouchProxyConfig() {
+  const rawSecret = env("INTOUCH_PROXY_SECRET");
+
   return {
     enabled: envBoolean("INTOUCH_USE_PROXY", false),
     url: stripSlashes(env("INTOUCH_PROXY_URL")),
-    secret: env("INTOUCH_PROXY_SECRET")
+    secret: cleanProxySecret(rawSecret),
+    rawSecret
   };
 }
 
@@ -214,6 +231,25 @@ function safeProviderDetail(value: unknown) {
   return looksLikeHtmlResponse(detail) ? htmlResponseMessage : detail;
 }
 
+function transportFailure(
+  transport: "direct" | "proxy",
+  error: unknown,
+  timeoutMs: number
+): IntouchResponse {
+  const timedOut = error instanceof Error && error.name === "AbortError";
+  const detail = error instanceof Error ? error.message : "Network request failed.";
+
+  return {
+    ok: false,
+    code: timedOut ? `${transport}-timeout` : `${transport}-network`,
+    message: timedOut
+      ? `IntouchPay ${transport === "proxy" ? "proxy" : "request"} timed out after ${timeoutMs} ms.`
+      : `IntouchPay ${transport === "proxy" ? "proxy" : "request"} could not be reached. ${detail}`,
+    data: { transport },
+    raw: ""
+  };
+}
+
 function truthy(value: unknown) {
   if (value === true) return true;
   const normalized = asString(value).toLowerCase();
@@ -275,9 +311,8 @@ function normalizeResponse(
       truthy(field(data, "success")) ||
       Boolean(code && successfulResponseCodes.has(code)) ||
       (Number(field(data, "proxy_http_status")) === 200 &&
-        (field(data, "balance", "availablebalance", "availableBalance") !==
-          undefined ||
-          !code)),
+        field(data, "balance", "availablebalance", "availableBalance") !==
+          undefined),
     code,
     message,
     data,
@@ -333,6 +368,10 @@ function explainIntouchFailure(message: string, code?: string) {
     /IP\s+([0-9a-f:.]+)\s+is\s+Not\s+Allowed\s+to\s+Perform\s+this\s+Operation/i
   );
 
+  if (looksLikeBotVerification(message)) {
+    return proxyBotVerificationMessage;
+  }
+
   if (ipMatch) {
     return `IntouchPay rejected server IP ${ipMatch[1]}. Ask IntouchPay to whitelist this IP for the MR Creativist account, or deploy from an already-approved server.`;
   }
@@ -352,12 +391,18 @@ async function postForm(path: string, fields: Record<string, string>) {
   try {
     const response = await fetch(`${config.baseUrl}${path}`, {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      headers: {
+        Accept: "application/json, text/plain;q=0.9, */*;q=0.8",
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": "MR-Creativist-Intouch/1.0"
+      },
       body: new URLSearchParams(fields),
       signal: controller.signal
     });
 
     return readIntouchResponse(response);
+  } catch (error) {
+    return transportFailure("direct", error, config.timeoutMs);
   } finally {
     clearTimeout(timeout);
   }
@@ -371,12 +416,18 @@ async function postJson(path: string, fields: Record<string, string>) {
   try {
     const response = await fetch(`${config.baseUrl}${path}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        Accept: "application/json, text/plain;q=0.9, */*;q=0.8",
+        "Content-Type": "application/json",
+        "User-Agent": "MR-Creativist-Intouch/1.0"
+      },
       body: JSON.stringify(fields),
       signal: controller.signal
     });
 
     return readIntouchResponse(response);
+  } catch (error) {
+    return transportFailure("direct", error, config.timeoutMs);
   } finally {
     clearTimeout(timeout);
   }
@@ -393,17 +444,43 @@ async function postProxy(action: string, fields: Record<string, string>) {
   );
 
   try {
-    const response = await fetch(config.url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-intouch-proxy-secret": config.secret
-      },
-      body: JSON.stringify({ action, ...fields }),
-      signal: controller.signal
-    });
+    const secrets = Array.from(
+      new Set([config.secret, config.rawSecret].filter(Boolean))
+    );
+    let unauthorizedResponse: IntouchResponse | null = null;
 
-    return readIntouchResponse(response);
+    for (const secret of secrets) {
+      const response = await fetch(config.url, {
+        method: "POST",
+        headers: {
+          Accept: "application/json, text/plain;q=0.9, */*;q=0.8",
+          "Content-Type": "application/json",
+          "User-Agent": "MR-Creativist-IntouchProxy/1.0",
+          "X-Requested-With": "XMLHttpRequest",
+          "x-intouch-proxy-secret": secret
+        },
+        body: JSON.stringify({ action, ...fields }),
+        signal: controller.signal
+      });
+      const parsed = await readIntouchResponse(response);
+
+      if (
+        response.status !== 401 &&
+        !/unauthorized proxy request/i.test(parsed.message)
+      ) {
+        return parsed;
+      }
+
+      unauthorizedResponse = parsed;
+    }
+
+    return unauthorizedResponse;
+  } catch (error) {
+    return transportFailure(
+      "proxy",
+      error,
+      envNumber("INTOUCH_TIMEOUT_MS", 20_000)
+    );
   } finally {
     clearTimeout(timeout);
   }

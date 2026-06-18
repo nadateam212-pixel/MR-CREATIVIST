@@ -5,7 +5,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { MapPin, MessageCircle, MessageSquare, PackageCheck, ShieldCheck, Star, Store, Wallet } from "lucide-react";
+import { MapPin, MessageSquare, PackageCheck, Phone, ShieldCheck, Star, Store, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { PageShell } from "@/components/layout/page-shell";
 import { Badge } from "@/components/ui/badge";
@@ -66,9 +66,8 @@ export function ProductDetailExperience({ initialProduct }: { initialProduct: Pr
 
   const activeProduct = product as ProductDetail;
   const verifiedCheckout = Boolean(activeProduct.isVerified || activeProduct.sellerVerified);
-  const whatsappText = encodeURIComponent(`Hello ${activeProduct.seller}, I am interested in ${activeProduct.name} on MR Creativist.`);
   const whatsappPhone = activeProduct.sellerPhone?.replace(/[^\d+]/g, "").replace(/^\+/, "");
-  const whatsappHref = whatsappPhone ? `https://wa.me/${whatsappPhone}?text=${whatsappText}` : `https://wa.me/?text=${whatsappText}`;
+  const callHref = whatsappPhone ? `tel:${whatsappPhone}` : "";
   const sellerMessageHref = activeProduct.sellerId
     ? `/messages/${activeProduct.sellerId}`
     : `/messages?context=product&product=${encodeURIComponent(activeProduct.slug)}`;
@@ -176,6 +175,27 @@ export function ProductDetailExperience({ initialProduct }: { initialProduct: Pr
                     <PackageCheck className="size-4" />
                     Add and view cart
                   </Button>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <Button asChild className="w-full" variant="outline">
+                      <Link href={sellerMessageHref}>
+                        <MessageSquare className="size-4" />
+                        Message seller
+                      </Link>
+                    </Button>
+                    {callHref ? (
+                      <Button asChild className="w-full" variant="outline">
+                        <a href={callHref}>
+                          <Phone className="size-4" />
+                          Call seller
+                        </a>
+                      </Button>
+                    ) : (
+                      <Button className="w-full" variant="outline" disabled>
+                        <Phone className="size-4" />
+                        Call seller
+                      </Button>
+                    )}
+                  </div>
                 </>
               ) : (
                 <div className="grid gap-2">
@@ -185,12 +205,19 @@ export function ProductDetailExperience({ initialProduct }: { initialProduct: Pr
                       Message seller
                     </Link>
                   </Button>
-                  <Button asChild className="w-full" variant="outline">
-                    <a href={whatsappHref} target="_blank" rel="noreferrer">
-                      <MessageCircle className="size-4" />
-                      Contact on WhatsApp
-                    </a>
-                  </Button>
+                  {callHref ? (
+                    <Button asChild className="w-full" variant="outline">
+                      <a href={callHref}>
+                        <Phone className="size-4" />
+                        Call seller
+                      </a>
+                    </Button>
+                  ) : (
+                    <Button className="w-full" variant="outline" disabled>
+                      <Phone className="size-4" />
+                      Call seller
+                    </Button>
+                  )}
                 </div>
               )}
               {cartMessage ? (
@@ -201,7 +228,7 @@ export function ProductDetailExperience({ initialProduct }: { initialProduct: Pr
               <p className="text-sm leading-6 text-[hsl(var(--muted-foreground))]">
                 {verifiedCheckout
                   ? "Supports wallet, card, PayPal, mobile money, coupons, invoices, refunds, and seller payout attribution."
-                  : "Online checkout opens after the seller account is verified. Use message or WhatsApp to agree on delivery directly."}
+                  : "Online checkout opens after the seller account is verified. Use message or call to agree on delivery directly."}
               </p>
             </CardContent>
           </Card>

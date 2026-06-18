@@ -9,7 +9,9 @@ import {
   BookOpen,
   CheckCircle2,
   Filter,
+  MessageSquare,
   PackageCheck,
+  Phone,
   PlayCircle,
   Search,
   ShoppingCart,
@@ -105,6 +107,17 @@ function initials(value: string) {
     .join("")
     .slice(0, 2)
     .toUpperCase();
+}
+
+function sellerMessageHref(product: CatalogProduct) {
+  return product.sellerId
+    ? `/messages/${product.sellerId}`
+    : `/messages?context=product&product=${encodeURIComponent(product.slug)}`;
+}
+
+function sellerCallHref(product: CatalogProduct) {
+  const phone = String(product.sellerPhone ?? "").replace(/[^\d+]/g, "");
+  return phone ? `tel:${phone}` : "";
 }
 
 export function CatalogExperience({
@@ -406,6 +419,27 @@ export function CatalogExperience({
                     <PriceDisplay price={product.price} compareAt={product.compareAt} targetCurrency="FRW" className="text-base font-black text-[hsl(var(--foreground))]" compareAtClassName="hidden" />
                     <Link href={productHref} className="block line-clamp-1 text-sm font-bold hover:text-[hsl(var(--primary))]">{product.name}</Link>
                     <p className="line-clamp-1 text-xs text-[hsl(var(--muted-foreground))]">{product.location || "Kigali, Rwanda"}</p>
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <Button asChild size="sm" variant="outline" className="h-8 min-w-0 px-2 text-xs">
+                        <Link href={sellerMessageHref(product)} aria-label={`Message seller about ${product.name}`}>
+                          <MessageSquare className="size-3.5" />
+                          Message
+                        </Link>
+                      </Button>
+                      {sellerCallHref(product) ? (
+                        <Button asChild size="sm" variant="outline" className="h-8 min-w-0 px-2 text-xs">
+                          <a href={sellerCallHref(product)} aria-label={`Call seller about ${product.name}`}>
+                            <Phone className="size-3.5" />
+                            Call
+                          </a>
+                        </Button>
+                      ) : (
+                        <Button size="sm" variant="outline" className="h-8 min-w-0 px-2 text-xs" disabled aria-label={`Seller phone unavailable for ${product.name}`}>
+                          <Phone className="size-3.5" />
+                          Call
+                        </Button>
+                      )}
+                    </div>
                     <div className="flex items-center justify-between gap-2 pt-1">
                       <span className="flex items-center gap-1 text-xs text-[hsl(var(--muted-foreground))]"><Star className="size-3.5 fill-amber-400 text-amber-400" />{product.rating.toFixed(1)}</span>
                       {verifiedCheckout ? <Button size="icon" className="size-8" aria-label={`Add ${product.name} to cart`} onClick={() => handleAddToCart(product)}><ShoppingCart className="size-4" /></Button> : <Button asChild size="sm" variant="outline" className="h-8"><Link href={productHref}>View</Link></Button>}
