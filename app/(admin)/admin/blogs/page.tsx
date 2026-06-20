@@ -10,7 +10,7 @@ export default async function AdminBlogsPage() {
   const posts = await getBlogPosts({ all: true, limit: 36 });
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-8">
+    <div className="content-frame space-y-8">
       <div>
         <p className="text-sm font-black uppercase tracking-[0.18em] text-[hsl(var(--primary))]">Blogs and news</p>
         <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">Publish public blogs, news and information</h1>

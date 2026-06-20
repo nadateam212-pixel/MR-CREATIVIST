@@ -4,6 +4,16 @@ import { absoluteUrl } from "@/lib/site-url";
 
 type IntouchPayload = Record<string, unknown>;
 
+type ProxyAttempt = {
+  url: string;
+  host?: string;
+  status?: number;
+  ok: boolean;
+  code: string;
+  message: string;
+  elapsedMs: number;
+};
+
 export type IntouchResponse = {
   ok: boolean;
   code: string;
@@ -116,6 +126,13 @@ function stripSlashes(value: string) {
   return value.replace(/\/+$/, "");
 }
 
+function splitEnvList(value: string) {
+  return value
+    .split(/[\n,]+/)
+    .map((item) => stripSlashes(item.trim()))
+    .filter(Boolean);
+}
+
 function cleanProxySecret(value: string) {
   return value
     .replace(/^(?:INTOUCH_PROXY_SECRET|PROXY_SECRET)\s*=\s*/i, "")
@@ -138,10 +155,16 @@ function intouchConfig() {
 
 function intouchProxyConfig() {
   const rawSecret = env("INTOUCH_PROXY_SECRET");
+  const primaryUrl = stripSlashes(env("INTOUCH_PROXY_URL"));
+  const urls = [
+    ...splitEnvList(env("INTOUCH_PROXY_URLS")),
+    ...(primaryUrl ? [primaryUrl] : [])
+  ];
 
   return {
     enabled: envBoolean("INTOUCH_USE_PROXY", false),
-    url: stripSlashes(env("INTOUCH_PROXY_URL")),
+    urls: Array.from(new Set(urls)),
+    host: env("INTOUCH_PROXY_HOST"),
     secret: cleanProxySecret(rawSecret),
     rawSecret
   };
@@ -168,9 +191,9 @@ function assertProxyConfig() {
   const config = intouchProxyConfig();
 
   if (!config.enabled) return null;
-  if (!config.url)
+  if (!config.urls.length)
     throw new Error(
-      "INTOUCH_PROXY_URL is required when INTOUCH_USE_PROXY=true."
+      "INTOUCH_PROXY_URL or INTOUCH_PROXY_URLS is required when INTOUCH_USE_PROXY=true."
     );
   if (!config.secret)
     throw new Error(
@@ -248,6 +271,30 @@ function transportFailure(
     data: { transport },
     raw: ""
   };
+}
+
+function isRetryableProxyFailure(response: IntouchResponse) {
+  if (response.ok) return false;
+  if (/unauthorized proxy request/i.test(response.message)) return false;
+
+  const code = response.code.toLowerCase();
+  const transport = asString(field(response.data, "transport")).toLowerCase();
+
+  return (
+    transport === "proxy" ||
+    code.startsWith("proxy-") ||
+    code === "html" ||
+    /proxy URL|bot verification|html page instead of json/i.test(
+      response.message
+    )
+  );
+}
+
+function shouldTryDirectAfterProxyFailure(response: IntouchResponse) {
+  return (
+    envBoolean("INTOUCH_ALLOW_DIRECT_FALLBACK", false) &&
+    isRetryableProxyFailure(response)
+  );
 }
 
 function truthy(value: unknown) {
@@ -433,56 +480,167 @@ async function postJson(path: string, fields: Record<string, string>) {
   }
 }
 
+function mergeProxyFailure(
+  previous: IntouchResponse | null,
+  current: IntouchResponse
+) {
+  if (!previous) return current;
+  if (previous.ok) return previous;
+  if (current.ok) return current;
+  if (/unauthorized proxy request/i.test(current.message)) return current;
+
+  return previous;
+}
+
+function shouldAttachProxyHost(url: string, host: string) {
+  if (!host) return false;
+
+  try {
+    const hostname = new URL(url).hostname;
+    return /^[\d.]+$/.test(hostname) || hostname.includes(":");
+  } catch {
+    return false;
+  }
+}
+
+function proxyUrlLabel(url: string) {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.protocol}//${parsed.host}${parsed.pathname}`;
+  } catch {
+    return url;
+  }
+}
+
+function summarizeProxyAttempts(attempts: ProxyAttempt[]) {
+  if (!attempts.length) return "";
+
+  return attempts
+    .map((attempt) => {
+      const status = attempt.status ? `HTTP ${attempt.status}` : attempt.code;
+      return `${attempt.url}: ${status} ${attempt.message}`;
+    })
+    .join(" | ")
+    .slice(0, 900);
+}
+
+function withProxyAttempts(
+  response: IntouchResponse,
+  attempts: ProxyAttempt[]
+): IntouchResponse {
+  if (!attempts.length) return response;
+
+  const data: IntouchPayload = {
+    ...response.data,
+    proxy_attempts: attempts
+  };
+
+  if (response.ok || !isRetryableProxyFailure(response)) {
+    return { ...response, data };
+  }
+
+  const summary = summarizeProxyAttempts(attempts);
+
+  return {
+    ...response,
+    data,
+    message: summary
+      ? `IntouchPay proxy endpoints failed. ${summary}`
+      : response.message
+  };
+}
+
 async function postProxy(action: string, fields: Record<string, string>) {
   const config = assertProxyConfig();
   if (!config) return null;
-
-  const controller = new AbortController();
-  const timeout = setTimeout(
-    () => controller.abort(),
+  const timeoutMs = envNumber(
+    "INTOUCH_PROXY_TIMEOUT_MS",
     envNumber("INTOUCH_TIMEOUT_MS", 20_000)
   );
+  const attempts: ProxyAttempt[] = [];
 
   try {
     const secrets = Array.from(
       new Set([config.secret, config.rawSecret].filter(Boolean))
     );
-    let unauthorizedResponse: IntouchResponse | null = null;
+    let lastFailure: IntouchResponse | null = null;
 
-    for (const secret of secrets) {
-      const response = await fetch(config.url, {
-        method: "POST",
-        headers: {
-          Accept: "application/json, text/plain;q=0.9, */*;q=0.8",
-          "Content-Type": "application/json",
-          "User-Agent": "MR-Creativist-IntouchProxy/1.0",
-          "X-Requested-With": "XMLHttpRequest",
-          "x-intouch-proxy-secret": secret
-        },
-        body: JSON.stringify({ action, ...fields }),
-        signal: controller.signal
-      });
-      const parsed = await readIntouchResponse(response);
+    for (const url of config.urls) {
+      for (const secret of secrets) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), timeoutMs);
+        const startedAt = Date.now();
+        const host = shouldAttachProxyHost(url, config.host)
+          ? config.host
+          : "";
 
-      if (
-        response.status !== 401 &&
-        !/unauthorized proxy request/i.test(parsed.message)
-      ) {
-        return parsed;
+        try {
+          const headers: Record<string, string> = {
+            Accept: "application/json, text/plain;q=0.9, */*;q=0.8",
+            "Content-Type": "application/json",
+            "User-Agent": "MR-Creativist-IntouchProxy/1.0",
+            "X-Requested-With": "XMLHttpRequest",
+            "x-intouch-proxy-secret": secret
+          };
+
+          if (host) {
+            headers.Host = host;
+          }
+
+          const response = await fetch(url, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ action, ...fields }),
+            signal: controller.signal
+          });
+          const parsed = await readIntouchResponse(response);
+          attempts.push({
+            url: proxyUrlLabel(url),
+            host: host || undefined,
+            status: response.status,
+            ok: parsed.ok,
+            code: parsed.code || String(response.status),
+            message: parsed.message,
+            elapsedMs: Date.now() - startedAt
+          });
+
+          if (
+            response.status !== 401 &&
+            !/unauthorized proxy request/i.test(parsed.message)
+          ) {
+            if (parsed.ok || !isRetryableProxyFailure(parsed)) {
+              return withProxyAttempts(parsed, attempts);
+            }
+
+            lastFailure = mergeProxyFailure(lastFailure, parsed);
+            break;
+          }
+
+          lastFailure = parsed;
+        } catch (error) {
+          const failure = transportFailure("proxy", error, timeoutMs);
+          attempts.push({
+            url: proxyUrlLabel(url),
+            host: host || undefined,
+            ok: false,
+            code: failure.code,
+            message: failure.message,
+            elapsedMs: Date.now() - startedAt
+          });
+          lastFailure = mergeProxyFailure(
+            lastFailure,
+            failure
+          );
+          break;
+        } finally {
+          clearTimeout(timeout);
+        }
       }
-
-      unauthorizedResponse = parsed;
     }
 
-    return unauthorizedResponse;
+    return lastFailure ? withProxyAttempts(lastFailure, attempts) : null;
   } catch (error) {
-    return transportFailure(
-      "proxy",
-      error,
-      envNumber("INTOUCH_TIMEOUT_MS", 20_000)
-    );
-  } finally {
-    clearTimeout(timeout);
+    return withProxyAttempts(transportFailure("proxy", error, timeoutMs), attempts);
   }
 }
 
@@ -576,7 +734,7 @@ export async function requestIntouchPayment(input: IntouchPaymentInput) {
     callbackurl: input.callbackUrl || getIntouchCallbackUrl()
   };
   const proxyResponse = await postProxy("requestpayment", proxyFields);
-  if (proxyResponse)
+  if (proxyResponse && !shouldTryDirectAfterProxyFailure(proxyResponse))
     return { ...proxyResponse, requestTransactionId, mobilePhone };
 
   const response = await postForm("/api/requestpayment/", {
@@ -602,7 +760,7 @@ export async function requestIntouchDeposit(input: IntouchDepositInput) {
     requesttransactionid: requestTransactionId
   };
   const proxyResponse = await postProxy("requestdeposit", proxyFields);
-  if (proxyResponse)
+  if (proxyResponse && !shouldTryDirectAfterProxyFailure(proxyResponse))
     return { ...proxyResponse, requestTransactionId, mobilePhone };
 
   const response = await postForm("/api/requestdeposit/", {
@@ -624,7 +782,8 @@ export async function getIntouchTransactionStatus(input: IntouchStatusInput) {
     transactionid: input.transactionId ?? ""
   };
   const proxyResponse = await postProxy("gettransactionstatus", proxyFields);
-  if (proxyResponse) return proxyResponse;
+  if (proxyResponse && !shouldTryDirectAfterProxyFailure(proxyResponse))
+    return proxyResponse;
 
   return postJson("/api/gettransactionstatus/", {
     ...signedFields(),
@@ -634,7 +793,7 @@ export async function getIntouchTransactionStatus(input: IntouchStatusInput) {
 
 export async function getIntouchBalance() {
   const proxyResponse = await postProxy("getbalance", {});
-  if (proxyResponse) {
+  if (proxyResponse && !shouldTryDirectAfterProxyFailure(proxyResponse)) {
     const balance = Number(
       field(
         proxyResponse.data,

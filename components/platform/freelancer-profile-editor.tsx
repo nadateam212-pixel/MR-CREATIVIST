@@ -143,7 +143,7 @@ export function FreelancerProfileEditor({ initialProfile, user }: { initialProfi
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-5">
+    <div className="content-frame space-y-5">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div><Badge>{form.status.replaceAll("_", " ")}</Badge><h1 className="mt-2 text-3xl font-black">Freelancer profile</h1><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Complete the public profile clients see before they hire you.</p></div>
         {slug ? <Button asChild variant="outline"><Link href={`/freelancers/${slug}`}><Eye className="size-4" />View public profile</Link></Button> : null}

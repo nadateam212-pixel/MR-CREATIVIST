@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function AdminMessagesPage() {
   return (
-    <div className="mx-auto w-full max-w-7xl">
+    <div className="content-frame">
       <MessageCenter />
     </div>
   );

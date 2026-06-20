@@ -25,7 +25,7 @@ export default async function LoginPage({
 
   return (
     <main className="min-h-screen bg-[hsl(var(--background))] text-[hsl(var(--foreground))]">
-      <div className="mx-auto grid min-h-screen w-full max-w-7xl px-4 py-4 sm:px-6 sm:py-8 lg:grid-cols-[0.92fr_1.08fr] lg:items-center lg:gap-10">
+      <div className="app-frame grid min-h-screen py-4 sm:py-8 lg:grid-cols-[0.92fr_1.08fr] lg:items-center lg:gap-10">
         <section className="hidden flex-col items-center justify-center text-center lg:flex lg:min-h-[calc(100vh-4rem)]">
           <Link href="/" className="mb-8 inline-flex items-center gap-2 text-sm font-bold text-[hsl(var(--primary))] hover:text-[hsl(var(--foreground))]">
             <ArrowLeft className="size-4" />

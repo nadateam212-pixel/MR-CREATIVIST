@@ -291,7 +291,7 @@ export function CourseStudioTools({
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6">
+    <div className="content-frame space-y-6">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <div className="flex flex-wrap gap-2">

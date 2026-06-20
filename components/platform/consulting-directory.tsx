@@ -86,7 +86,7 @@ export function ConsultingDirectory({ consultants }: { consultants: Consultant[]
 
   return (
     <>
-      <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
+      <section className="app-frame py-12">
         <div className="relative mb-8">
           <Search className="absolute left-4 top-1/2 size-5 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" />
           <Input

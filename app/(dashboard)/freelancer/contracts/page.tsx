@@ -29,7 +29,7 @@ export default async function FreelancerContractsPage() {
   ];
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-5">
+    <div className="content-frame space-y-5">
       <header>
         <Badge>Freelance operations</Badge>
         <h1 className="mt-2 text-3xl font-black">Contracts</h1>

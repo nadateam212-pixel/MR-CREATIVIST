@@ -343,7 +343,7 @@ export function FreelancerGigManager({
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6">
+    <div className="content-frame space-y-6">
       <div className="flex justify-end">
         <Button type="button" onClick={resetForm}>
           <Upload className="size-4" />

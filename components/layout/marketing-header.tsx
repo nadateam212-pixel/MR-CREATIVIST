@@ -25,7 +25,7 @@ export function MarketingHeader() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-[hsl(var(--border))] bg-[hsl(var(--background))]/96 text-[hsl(var(--foreground))] shadow-sm backdrop-blur-xl">
-      <nav className="mx-auto max-w-7xl px-4 sm:px-6">
+      <nav className="app-frame">
         <div className="flex h-20 items-center justify-between gap-5">
           <Link
             href="/"

@@ -5,7 +5,7 @@ import { brand } from "@/lib/brand";
 
 export default function ContactPage() {
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+    <div className="app-frame py-6">
       <div className="mb-5">
         <p className="text-xs font-black uppercase tracking-[0.18em] text-[hsl(var(--primary))]">Contact</p>
         <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">Message MR Creativist</h1>

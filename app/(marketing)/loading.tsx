@@ -2,7 +2,7 @@ const skeletonCards = Array.from({ length: 6 }, (_, index) => index);
 
 export default function MarketingLoading() {
   return (
-    <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6">
+    <div className="app-frame py-5">
       <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
         <div className="h-12 animate-pulse rounded-md bg-[hsl(var(--muted))]" />
         <div className="h-12 w-full animate-pulse rounded-md bg-[hsl(var(--muted))] lg:w-36" />

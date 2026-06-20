@@ -132,7 +132,7 @@ export default async function AdminFreelancersPage() {
   }));
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-8">
+    <div className="content-frame space-y-8">
       <div>
         <p className="text-sm font-black uppercase tracking-[0.18em] text-[hsl(var(--primary))]">Freelancer control</p>
         <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">List and manage freelancers</h1>

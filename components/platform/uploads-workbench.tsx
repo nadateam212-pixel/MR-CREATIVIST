@@ -116,7 +116,7 @@ export function UploadsWorkbench({ initialAssets = [] }: { initialAssets?: Uploa
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6">
+    <div className="content-frame space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Uploads</h1>

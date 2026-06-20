@@ -68,7 +68,7 @@ export function MarketingFooter() {
 
   return (
     <footer className="border-t border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))]">
-      <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 lg:grid-cols-[1.35fr_1.65fr]">
+      <div className="app-frame grid gap-10 py-14 lg:grid-cols-[1.35fr_1.65fr]">
         <div>
           <div className="flex items-center gap-3">
             <span className="relative flex size-14 overflow-hidden rounded-md bg-white">
@@ -138,7 +138,7 @@ export function MarketingFooter() {
       </div>
 
       <div className="border-t border-[hsl(var(--border))]">
-        <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-6 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
+        <div className="app-frame flex flex-col gap-5 py-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center gap-3 sm:gap-5">
             <div className="flex flex-wrap gap-2">
               {Object.entries(brand.socials).map(([item, href]) => (

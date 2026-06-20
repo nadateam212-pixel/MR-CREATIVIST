@@ -177,7 +177,7 @@ export default async function HomePage() {
   const liveRecordCount = courses.length + products.length + freelancers.length + jobs.length + shops.length + gigs.length;
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6">
+    <div className="app-frame py-5">
       <section
         className="overflow-hidden rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] shadow-lg"
         style={{ boxShadow: "0 20px 60px hsl(var(--primary) / 0.12)" }}
@@ -193,7 +193,7 @@ export default async function HomePage() {
                 <p className="text-lg font-black uppercase tracking-wide">{brand.name}</p>
               </div>
             </div>
-            <h1 className="max-w-3xl text-3xl font-black leading-tight tracking-tight sm:text-4xl xl:text-5xl">
+            <h1 className="max-w-3xl text-3xl font-black leading-tight tracking-tight sm:text-4xl">
               Learn. Work. Sell. Grow.
             </h1>
             <div className="mt-4 flex flex-wrap gap-3">
@@ -232,7 +232,7 @@ export default async function HomePage() {
 
       <section className="mt-6">
         <SectionTitle title="Featured Courses" href="/courses" />
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="card-grid-fill grid-courses">
           {courseItems.map((course) => (
             <Link key={textValue(course.slug, course.title)} href={`/courses/${textValue(course.slug)}`}>
               <Card className="overflow-hidden border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] transition-colors hover:bg-[hsl(var(--muted))]/45">
@@ -246,7 +246,7 @@ export default async function HomePage() {
                   </span>
                 </div>
                 <CardContent className="p-4">
-                  <p className="line-clamp-2 min-h-10 font-bold">{textValue(course.title, "Course")}</p>
+                  <p className="line-clamp-2 min-h-10 font-bold leading-5">{textValue(course.title, "Course")}</p>
                   <p className="mt-1 inline-flex max-w-full items-center gap-1 text-xs text-[hsl(var(--muted-foreground))]">
                     <span className="truncate">{textValue(course.instructor, "MR Creativist")}</span>
                     {"instructorVerified" in course && course.instructorVerified ? <VerifiedMark label="Verified instructor" className="size-3.5" /> : null}
@@ -268,7 +268,7 @@ export default async function HomePage() {
 
       <section className="mt-6">
         <SectionTitle title="Top Freelancers" href="/freelancers" />
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <div className="card-grid-fill grid-freelancers">
           {freelancerItems.map((freelancer) => (
             <Card key={textValue(freelancer.name, freelancer.slug)} className="overflow-hidden border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))]">
               <div className="relative h-40">
@@ -298,7 +298,7 @@ export default async function HomePage() {
 
       <section className="mt-6">
         <SectionTitle title="Popular Products" href="/marketplace" />
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+        <div className="card-grid-fill grid-products">
           {productItems.map((product) => (
             <Link key={textValue(product.slug, product.name)} href={`/marketplace/product/${textValue(product.slug)}`}>
               <Card className="overflow-hidden border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))]">
@@ -315,7 +315,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="mt-6 grid gap-5 xl:grid-cols-3">
+      <section className="card-grid-fit grid-mini-records mt-6">
         <MiniRecordGrid title="Recent Job" href="/jobs" records={jobItems} icon={BriefcaseBusiness} />
         <MiniRecordGrid title="Top Business" href="/business-directory" records={shopItems} icon={Building2} />
         <MiniRecordGrid title="Top Gigs" href="/freelancers" records={gigItems} icon={Sparkles} />

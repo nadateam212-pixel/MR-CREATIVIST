@@ -146,7 +146,7 @@ export function EarningsReferralsDashboard({ wallet: initialWallet, referral, in
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6">
+    <div className="content-frame space-y-6">
       <section className={`grid gap-4 ${showEarnings && showReferrals ? "lg:grid-cols-[1.15fr_0.85fr]" : ""}`}>
         {showEarnings ? (
           <Card>

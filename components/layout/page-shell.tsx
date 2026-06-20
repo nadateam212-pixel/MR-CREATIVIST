@@ -14,7 +14,7 @@ export function PageShell({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6">
+    <div className="app-frame py-6">
       <div className="max-w-3xl">
         {eyebrow ? <p className="text-xs font-black uppercase tracking-[0.16em] text-[hsl(var(--primary))]">{eyebrow}</p> : null}
         <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">{title}</h1>

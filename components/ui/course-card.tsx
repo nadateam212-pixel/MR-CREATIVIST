@@ -45,7 +45,7 @@ export function CourseCard({
           ) : null}
         </div>
         <CardContent className="space-y-3 p-4">
-          <h3 className="line-clamp-2 text-lg font-semibold">{course.title}</h3>
+          <h3 className="line-clamp-2 min-h-14 text-lg font-semibold leading-7">{course.title}</h3>
           {course.instructor ? (
             <p className="inline-flex max-w-full items-center gap-1 text-sm font-medium text-[hsl(var(--muted-foreground))]">
               <span className="truncate">{course.instructor}</span>

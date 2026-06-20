@@ -47,7 +47,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
   ];
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-5">
+    <div className="content-frame space-y-5">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <Badge>{user.accountStatus ?? "active"}</Badge>

@@ -253,7 +253,7 @@ export function CatalogExperience({
 
   return (
     <div className="bg-[hsl(var(--background))] text-[hsl(var(--foreground))]">
-      <section className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:py-8">
+      <section className="app-frame py-5 lg:py-8">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-black tracking-tight sm:text-3xl">
             {isCourses ? t("course.catalog") : t("nav.marketplace")}
@@ -312,9 +312,9 @@ export function CatalogExperience({
           </div>
         ) : null}
 
-        <div className={isCourses ? "mt-8 grid gap-5 lg:grid-cols-3" : "mt-6 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"}>
+        <div className={isCourses ? "card-grid-fill grid-catalog-courses mt-8" : "card-grid-fill grid-catalog-products mt-6"}>
           {isCourses && filteredCourses.length === 0 ? (
-            <Card className="lg:col-span-3">
+            <Card className="col-span-full">
               <CardContent className="p-8 text-center">
                 <BookOpen className="mx-auto mb-3 size-8 text-[hsl(var(--primary))]" />
                 <h2 className="text-xl font-semibold">{t("course.noCourses")}</h2>
@@ -324,7 +324,7 @@ export function CatalogExperience({
               </CardContent>
             </Card>
           ) : !isCourses && filteredProducts.length === 0 ? (
-            <Card className="lg:col-span-3">
+            <Card className="col-span-full">
               <CardContent className="p-8 text-center">
                 <ShoppingCart className="mx-auto mb-3 size-8 text-[hsl(var(--primary))]" />
                 <h2 className="text-xl font-semibold">{t("market.noProducts")}</h2>
@@ -344,7 +344,7 @@ export function CatalogExperience({
                 const instructorVerified = "instructorVerified" in course ? course.instructorVerified : false;
 
                 return (
-                  <Card key={course.slug} className="overflow-hidden">
+                  <Card key={course.slug} className="h-full overflow-hidden">
                     <Link href={courseHref} className="block">
                       <div className="relative aspect-video">
                       <SafeImage
@@ -352,7 +352,7 @@ export function CatalogExperience({
                         fallbackSrc={courseImageForCategory(course.category)}
                         alt={course.title}
                         fill
-                        sizes="(min-width: 1024px) 33vw, 100vw"
+                        sizes="(min-width: 1024px) 22rem, 100vw"
                         className="object-cover"
                       />
                         <span className="absolute bottom-2 right-2 rounded bg-black/85 px-2 py-1 text-xs font-black text-white">
@@ -408,35 +408,35 @@ export function CatalogExperience({
                 const verifiedCheckout = canCheckoutProduct(product);
 
                 return (
-                <Card key={product.slug} className="overflow-hidden rounded-md">
+                <Card key={product.slug} className="h-full overflow-hidden rounded-md">
                   <Link href={productHref} className="block">
                     <div className="relative aspect-[4/3] bg-[hsl(var(--muted))]">
-                      <SafeImage src={product.image} alt={product.name} fill sizes="(min-width: 1536px) 20vw, (min-width: 1280px) 25vw, 50vw" className="object-cover" />
+                      <SafeImage src={product.image} alt={product.name} fill sizes="(min-width: 1024px) 14rem, 50vw" className="object-cover" />
                       {product.isFeatured ? <Badge className="absolute left-2 top-2 bg-[hsl(var(--card))]/95 text-[hsl(var(--foreground))]">Just listed</Badge> : null}
                     </div>
                   </Link>
                   <CardContent className="space-y-2 p-3">
                     <PriceDisplay price={product.price} compareAt={product.compareAt} targetCurrency="FRW" className="text-base font-black text-[hsl(var(--foreground))]" compareAtClassName="hidden" />
-                    <Link href={productHref} className="block line-clamp-1 text-sm font-bold hover:text-[hsl(var(--primary))]">{product.name}</Link>
+                    <Link href={productHref} className="block line-clamp-2 min-h-10 text-sm font-bold leading-5 hover:text-[hsl(var(--primary))]">{product.name}</Link>
                     <p className="line-clamp-1 text-xs text-[hsl(var(--muted-foreground))]">{product.location || "Kigali, Rwanda"}</p>
                     <div className="grid grid-cols-2 gap-2 pt-1">
                       <Button asChild size="sm" variant="outline" className="h-8 min-w-0 px-2 text-xs">
                         <Link href={sellerMessageHref(product)} aria-label={`Message seller about ${product.name}`}>
                           <MessageSquare className="size-3.5" />
-                          Message
+                          <span className="truncate">Message</span>
                         </Link>
                       </Button>
                       {sellerCallHref(product) ? (
                         <Button asChild size="sm" variant="outline" className="h-8 min-w-0 px-2 text-xs">
                           <a href={sellerCallHref(product)} aria-label={`Call seller about ${product.name}`}>
                             <Phone className="size-3.5" />
-                            Call
+                            <span className="truncate">Call</span>
                           </a>
                         </Button>
                       ) : (
                         <Button size="sm" variant="outline" className="h-8 min-w-0 px-2 text-xs" disabled aria-label={`Seller phone unavailable for ${product.name}`}>
                           <Phone className="size-3.5" />
-                          Call
+                          <span className="truncate">Call</span>
                         </Button>
                       )}
                     </div>

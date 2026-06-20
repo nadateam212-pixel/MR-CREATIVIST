@@ -2,7 +2,7 @@ import { Buffer } from "node:buffer";
 import { readFile } from "node:fs/promises";
 
 const DEFAULT_CPANEL_URL =
-  "https://www.mrcreativist.ca:2083/execute/Fileman/upload_files";
+  "https://myhosting.zubahost.com:2083/execute/Fileman/upload_files";
 const PROXY_FILE_NAME = "intouch-proxy.php";
 
 function cleanEnvValue(value = "") {
@@ -44,6 +44,13 @@ function phpString(value) {
 function requireValue(name, value) {
   if (!value) throw new Error(`Missing ${name}.`);
   return value;
+}
+
+function saveUrlForUploadUrl(cpanelUrl) {
+  return cpanelUrl.replace(
+    /\/execute\/Fileman\/upload_files(?:\?.*)?$/i,
+    "/execute/Fileman/save_file_content"
+  );
 }
 
 function buildProxy({ username, accountNo, partnerPassword, proxySecret }) {
@@ -269,6 +276,42 @@ respond(400, ['success' => false, 'message' => 'Unknown proxy action.']);
 `;
 }
 
+async function saveProxyContent({ cpanelUrl, auth, php, signal }) {
+  const form = new URLSearchParams();
+  form.set("dir", "public_html");
+  form.set("file", PROXY_FILE_NAME);
+  form.set("from_charset", "UTF-8");
+  form.set("to_charset", "UTF-8");
+  form.set("content", php);
+
+  const response = await fetch(saveUrlForUploadUrl(cpanelUrl), {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${auth}`,
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body: form,
+    signal
+  });
+  const text = await response.text();
+  let payload;
+  try {
+    payload = JSON.parse(text);
+  } catch {
+    throw new Error(
+      `cPanel save returned non-JSON response: ${text.slice(0, 200)}`
+    );
+  }
+
+  if (!response.ok || payload.status !== 1) {
+    throw new Error(
+      `cPanel save failed: ${JSON.stringify(payload).slice(0, 500)}`
+    );
+  }
+
+  return payload;
+}
+
 async function main() {
   const env = await readDotEnv();
   const cpanelUser = requireValue("CPANEL_USER", process.env.CPANEL_USER);
@@ -328,6 +371,16 @@ async function main() {
     throw new Error(
       `cPanel upload returned non-JSON response: ${text.slice(0, 200)}`
     );
+  }
+
+  const existsFailure = JSON.stringify(payload).includes(
+    "already exists"
+  );
+
+  if ((!response.ok || payload.status !== 1) && existsFailure) {
+    await saveProxyContent({ cpanelUrl, auth, php, signal: controller.signal });
+    console.log(`Updated ${PROXY_FILE_NAME} in public_html.`);
+    return;
   }
 
   if (!response.ok || payload.status !== 1) {

@@ -288,7 +288,7 @@ export function AIToolsGalleryPro() {
 
   return (
     <div className="min-h-screen bg-[hsl(var(--background))] text-[hsl(var(--foreground))]">
-      <div className="mx-auto grid max-w-7xl px-3 py-3 sm:px-6 lg:grid-cols-[18rem_1fr] lg:py-6">
+      <div className="app-frame grid py-3 lg:grid-cols-[18rem_1fr] lg:py-6">
         <aside className="hidden border-b border-[hsl(var(--border))] bg-[hsl(var(--background))] pb-5 lg:sticky lg:top-20 lg:block lg:h-[calc(100vh-5rem)] lg:border-b-0 lg:border-r lg:pr-4">
           <div className="flex items-center gap-3 px-1">
             <div className="flex size-10 items-center justify-center rounded-md bg-[hsl(var(--primary))]/15 text-[hsl(var(--primary))]">

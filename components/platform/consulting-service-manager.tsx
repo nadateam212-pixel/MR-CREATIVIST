@@ -194,7 +194,7 @@ export function ConsultingServiceManager({
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6">
+    <div className="content-frame space-y-6">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-sm font-black uppercase tracking-[0.18em] text-[hsl(var(--primary))]">Consulting studio</p>

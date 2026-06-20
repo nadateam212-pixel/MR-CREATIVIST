@@ -25,7 +25,7 @@ export function FreelancerDetailExperience({ profile, gigs }: { profile: Profile
 
   return (
     <div className="border-y border-[hsl(var(--border))] bg-[hsl(var(--muted))]/25">
-      <div className="mx-auto max-w-7xl space-y-5 px-4 py-6 sm:px-6">
+      <div className="app-frame space-y-5 py-6">
         <section className="grid gap-5 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5 lg:grid-cols-[9rem_1fr_15rem]">
           <div className="relative aspect-square overflow-hidden rounded-full border border-[hsl(var(--border))]"><SafeImage src={profile.image || "/icons/logo.png"} alt={profile.name} fill sizes="144px" className="object-cover" /></div>
           <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-black">{profile.name}</h1>{profile.isVerified ? <VerifiedMark label="Verified freelancer" /> : null}<Badge className="border-emerald-500/35 text-emerald-600">Available for work</Badge></div><p className="mt-1 font-semibold text-[hsl(var(--muted-foreground))]">{profile.role}</p><p className="mt-3 flex items-center gap-2 text-sm"><MapPin className="size-4" />{profile.location}</p><div className="mt-3 flex flex-wrap gap-2"><Badge><Star className="mr-1 size-3 fill-amber-400 text-amber-400" />{profile.rating.toFixed(1)}</Badge><Badge>{profile.specialty}</Badge><Badge>FRW {Number(profile.rate || 0).toLocaleString()} / hour</Badge></div><p className="mt-4 max-w-3xl text-sm leading-6 text-[hsl(var(--muted-foreground))]">{profile.bio || `${profile.name} provides professional ${profile.specialty.toLowerCase()} services through MR Creativist.`}</p></div>

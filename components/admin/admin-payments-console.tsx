@@ -88,6 +88,16 @@ type PaymentDetail = {
   bill: PaymentBillDetail;
 };
 
+type ProxyAttemptDiagnostic = {
+  url?: string;
+  host?: string;
+  status?: number;
+  ok?: boolean;
+  code?: string;
+  message?: string;
+  elapsedMs?: number;
+};
+
 const statusOptions = ["all", "pending", "completed", "failed", "cancelled"];
 const typeOptions = ["all", "deposit", "withdrawal", "transfer_in", "transfer_out", "admin_payout", "purchase", "refund"];
 
@@ -108,6 +118,17 @@ function dateLabel(value?: string) {
   }).format(new Date(value));
 }
 
+function proxyDiagnostics(payload: unknown): ProxyAttemptDiagnostic[] {
+  const value = payload as { data?: { proxy_attempts?: unknown } };
+  const attempts = value?.data?.proxy_attempts;
+
+  if (!Array.isArray(attempts)) return [];
+
+  return attempts
+    .map((attempt) => attempt as ProxyAttemptDiagnostic)
+    .filter((attempt) => attempt.url || attempt.message || attempt.code);
+}
+
 export function AdminPaymentsConsole({ initialSnapshot, initialProviderBalance = null }: AdminPaymentsConsoleProps) {
   const [snapshot, setSnapshot] = useState(initialSnapshot);
   const [status, setStatus] = useState(initialSnapshot.filters.status ?? "all");
@@ -124,6 +145,7 @@ export function AdminPaymentsConsole({ initialSnapshot, initialProviderBalance =
   );
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
+  const [providerDiagnostics, setProviderDiagnostics] = useState<ProxyAttemptDiagnostic[]>([]);
   const [detail, setDetail] = useState<PaymentDetail | null>(null);
 
   const stats = useMemo(
@@ -201,6 +223,8 @@ export function AdminPaymentsConsole({ initialSnapshot, initialProviderBalance =
     try {
       const response = await fetch("/api/admin/payments/balance", { cache: "no-store" });
       const payload = await response.json();
+      const diagnostics = proxyDiagnostics(payload);
+      setProviderDiagnostics(diagnostics);
 
       if (!response.ok) {
         if (showStatus) setMessage(payload.error ?? "Balance check failed.");
@@ -214,8 +238,10 @@ export function AdminPaymentsConsole({ initialSnapshot, initialProviderBalance =
 
       const nextBalance = Number(payload.balance ?? 0);
       setProviderBalance(Number.isFinite(nextBalance) ? nextBalance : 0);
+      setProviderDiagnostics([]);
       if (showStatus) setMessage("Intouch balance updated.");
     } catch {
+      setProviderDiagnostics([]);
       if (showStatus) setMessage("Balance check failed. Check the server log.");
     } finally {
       setBusy("");
@@ -288,7 +314,7 @@ export function AdminPaymentsConsole({ initialSnapshot, initialProviderBalance =
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6">
+    <div className="content-frame space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <Badge className="border-[hsl(var(--primary))]/35 text-[hsl(var(--primary))]">Finance</Badge>
@@ -394,6 +420,26 @@ export function AdminPaymentsConsole({ initialSnapshot, initialProviderBalance =
               </Button>
             </div>
             {message ? <p className="text-xs font-medium text-[hsl(var(--muted-foreground))]">{message}</p> : null}
+            {providerDiagnostics.length ? (
+              <div className="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--muted))]/30 p-3 text-xs">
+                <p className="font-black uppercase tracking-[0.14em] text-[hsl(var(--muted-foreground))]">Proxy diagnostics</p>
+                <div className="mt-2 space-y-2">
+                  {providerDiagnostics.map((attempt, index) => (
+                    <div key={`${attempt.url ?? "proxy"}-${index}`} className="break-words">
+                      <p className="font-semibold text-[hsl(var(--foreground))]">
+                        {attempt.url ?? "Proxy endpoint"}
+                        {attempt.host ? ` · Host ${attempt.host}` : ""}
+                      </p>
+                      <p className="mt-1 text-[hsl(var(--muted-foreground))]">
+                        {[attempt.status ? `HTTP ${attempt.status}` : attempt.code, attempt.elapsedMs ? `${attempt.elapsedMs} ms` : "", attempt.message]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       </div>

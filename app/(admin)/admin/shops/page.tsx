@@ -51,7 +51,7 @@ export default async function AdminShopsPage() {
   }));
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6">
+    <div className="content-frame space-y-6">
       <div>
         <p className="text-sm font-black uppercase tracking-[0.18em] text-[hsl(var(--primary))]">Business moderation</p>
         <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">Businesses</h1>

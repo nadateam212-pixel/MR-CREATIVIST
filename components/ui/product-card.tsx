@@ -13,7 +13,7 @@ export function ProductCard({ product }: { product: { name: string; slug: string
         </div>
         <CardContent className="space-y-3 p-4">
           <Badge>{product.type}</Badge>
-          <h3 className="text-lg font-semibold">{product.name}</h3>
+          <h3 className="line-clamp-2 min-h-14 text-lg font-semibold leading-7">{product.name}</h3>
           <PriceDisplay price={product.price} />
         </CardContent>
       </Card>

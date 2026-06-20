@@ -22,14 +22,14 @@ const values = [
 export default function AboutPage() {
   return (
     <div>
-      <section className="mx-auto max-w-7xl px-4 py-5 sm:px-6">
+      <section className="app-frame py-5">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.18em] text-[hsl(var(--primary))]">About</p>
           <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">MR Creativist</h1>
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 py-5 sm:px-6">
+      <section className="app-frame py-5">
         <div className="grid gap-5 md:grid-cols-3">
           {values.map((value) => (
             <Card key={value.title}>
@@ -43,7 +43,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 pb-16 sm:px-6">
+      <section className="app-frame pb-16">
         <div className="grid gap-4 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-8 text-[hsl(var(--foreground))] md:grid-cols-4">
           {[
             ["5+", "YEARS OF DIGITAL WORK"],

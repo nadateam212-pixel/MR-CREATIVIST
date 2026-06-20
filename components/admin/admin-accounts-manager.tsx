@@ -398,7 +398,7 @@ export function AdminAccountsManager({
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6">
+    <div className="content-frame space-y-6">
       <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">{mode === "applications" ? "Account applications" : "Users Management"}</h1>

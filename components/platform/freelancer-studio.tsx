@@ -137,7 +137,7 @@ export function FreelancerStudio({
 
   return (
     <div className="border-y border-[hsl(var(--border))] bg-[hsl(var(--muted))]/25">
-      <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+      <section className="app-frame py-6">
         <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.18em] text-[hsl(var(--primary))]">Freelancers</p>

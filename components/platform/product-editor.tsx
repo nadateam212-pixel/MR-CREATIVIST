@@ -164,7 +164,7 @@ export function ProductEditor({ product }: { product: ProductEditorRecord }) {
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6">
+    <div className="content-frame space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <Badge>{form.status.replaceAll("_", " ")}</Badge>

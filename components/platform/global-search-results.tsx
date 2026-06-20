@@ -85,7 +85,7 @@ export function GlobalSearchResults({ initialQuery = "" }: { initialQuery?: stri
   }, [submittedQuery]);
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6">
+    <div className="app-frame py-6">
       <section className="grid gap-4 border-b border-[hsl(var(--border))] pb-5">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.18em] text-[hsl(var(--primary))]">Search</p>

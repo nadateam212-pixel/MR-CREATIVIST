@@ -2,7 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 
 export default function CoursesLoading() {
   return (
-    <div className="mx-auto grid max-w-7xl gap-5 px-4 py-12 sm:px-6 lg:grid-cols-3">
+    <div className="app-frame card-grid-fill grid-catalog-courses py-12">
       {Array.from({ length: 6 }).map((_, index) => (
         <Card key={index} className="overflow-hidden">
           <div className="aspect-[4/3] animate-pulse bg-[hsl(var(--muted))]" />

@@ -9,7 +9,7 @@ export default async function ConsultingPage() {
   return (
     <div>
       <section className="border-b border-[hsl(var(--border))] bg-[hsl(var(--muted))]/35 text-[hsl(var(--foreground))]">
-        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-5 sm:flex-row sm:items-end sm:justify-between sm:px-6">
+        <div className="app-frame flex flex-col gap-3 py-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.18em] text-[hsl(var(--primary))]">Consulting</p>
             <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">Available experts</h1>

@@ -463,7 +463,7 @@ export function EasyCoursePublisher({ instructorName = "MR Creativist Instructor
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-5">
+    <div className="content-frame space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">

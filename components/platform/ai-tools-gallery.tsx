@@ -81,7 +81,7 @@ export function AIToolsGallery({ tools }: { tools: AIToolItem[] }) {
 
   if (tools.length === 0) {
     return (
-      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
+      <section className="app-frame py-16">
         <Card>
           <CardContent className="p-8 text-center">
             <Sparkles className="mx-auto mb-3 size-8 text-[hsl(var(--primary))]" />
@@ -95,7 +95,7 @@ export function AIToolsGallery({ tools }: { tools: AIToolItem[] }) {
 
   return (
     <>
-      <section className="mx-auto grid max-w-7xl gap-5 px-4 py-16 sm:px-6 md:grid-cols-2 lg:grid-cols-3">
+      <section className="app-frame card-grid-fill grid-catalog-courses py-16">
         {tools.map((tool) => {
           const Icon = iconMap[(tool.icon as keyof typeof iconMap) ?? "sparkles"] ?? Sparkles;
 
@@ -124,7 +124,7 @@ export function AIToolsGallery({ tools }: { tools: AIToolItem[] }) {
       </section>
 
       <section className="border-t border-[hsl(var(--border))] bg-[hsl(var(--muted))]/35">
-        <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
+        <div className="app-frame py-12">
           <Card>
             <CardHeader>
               <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[hsl(var(--primary))]">Live demo</p>
