@@ -1,9 +1,23 @@
 import { Buffer } from "node:buffer";
 import { readFile } from "node:fs/promises";
 
-const DEFAULT_CPANEL_URL =
-  "https://myhosting.zubahost.com:2083/execute/Fileman/upload_files";
+const DEFAULT_CPANEL_URLS = [
+  "https://myhosting.zubahost.com:2083/execute/Fileman/upload_files",
+  "https://194.163.174.55:2083/execute/Fileman/upload_files",
+  "https://cpanel.mrcreativist.ca:2083/execute/Fileman/upload_files",
+  "http://myhosting.zubahost.com:2082/execute/Fileman/upload_files",
+  "http://194.163.174.55:2082/execute/Fileman/upload_files",
+  "http://cpanel.mrcreativist.ca:2082/execute/Fileman/upload_files"
+];
 const PROXY_FILE_NAME = "intouch-proxy.php";
+const CLEAN_PROXY_DIR = "intouch-pay";
+const CLEAN_PROXY_FILE_NAME = "index.php";
+const HTACCESS_FILE_NAME = ".htaccess";
+const CPANEL_FETCH_ATTEMPTS = 3;
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 function cleanEnvValue(value = "") {
   const trimmed = String(value).trim();
@@ -22,6 +36,13 @@ function cleanProxySecret(value = "") {
     /^(?:INTOUCH_PROXY_SECRET|PROXY_SECRET)\s*=\s*/i,
     ""
   ).trim();
+}
+
+function splitList(value = "") {
+  return String(value)
+    .split(/[\n,]+/)
+    .map((item) => cleanEnvValue(item))
+    .filter(Boolean);
 }
 
 async function readDotEnv() {
@@ -51,6 +72,45 @@ function saveUrlForUploadUrl(cpanelUrl) {
     /\/execute\/Fileman\/upload_files(?:\?.*)?$/i,
     "/execute/Fileman/save_file_content"
   );
+}
+
+function api2UrlForUploadUrl(cpanelUrl) {
+  const url = new URL(cpanelUrl);
+  url.pathname = "/json-api/cpanel";
+  url.search = "";
+  return String(url);
+}
+
+async function fetchWithRetry(url, options) {
+  let lastError;
+
+  for (let attempt = 1; attempt <= CPANEL_FETCH_ATTEMPTS; attempt += 1) {
+    try {
+      return await fetch(url, options);
+    } catch (error) {
+      lastError = error;
+      const detail = error?.cause?.code || error?.message || "request failed";
+      console.warn(
+        `cPanel request failed (${attempt}/${CPANEL_FETCH_ATTEMPTS}) ${url}: ${detail}`
+      );
+      if (attempt < CPANEL_FETCH_ATTEMPTS) await sleep(5000 * attempt);
+    }
+  }
+
+  throw lastError;
+}
+
+function buildHtaccess() {
+  return `<IfModule LiteSpeed>
+RewriteEngine On
+RewriteRule .* - [E=verifycaptcha:off]
+</IfModule>
+
+<IfModule mod_headers.c>
+Header always set Cache-Control "no-store"
+Header always set X-Robots-Tag "noindex, nofollow"
+</IfModule>
+`;
 }
 
 function buildProxy({ username, accountNo, partnerPassword, proxySecret }) {
@@ -276,15 +336,15 @@ respond(400, ['success' => false, 'message' => 'Unknown proxy action.']);
 `;
 }
 
-async function saveProxyContent({ cpanelUrl, auth, php, signal }) {
+async function saveFileContent({ cpanelUrl, auth, dir, file, content, signal }) {
   const form = new URLSearchParams();
-  form.set("dir", "public_html");
-  form.set("file", PROXY_FILE_NAME);
+  form.set("dir", dir);
+  form.set("file", file);
   form.set("from_charset", "UTF-8");
   form.set("to_charset", "UTF-8");
-  form.set("content", php);
+  form.set("content", content);
 
-  const response = await fetch(saveUrlForUploadUrl(cpanelUrl), {
+  const response = await fetchWithRetry(saveUrlForUploadUrl(cpanelUrl), {
     method: "POST",
     headers: {
       Authorization: `Basic ${auth}`,
@@ -305,11 +365,93 @@ async function saveProxyContent({ cpanelUrl, auth, php, signal }) {
 
   if (!response.ok || payload.status !== 1) {
     throw new Error(
-      `cPanel save failed: ${JSON.stringify(payload).slice(0, 500)}`
+      `cPanel save failed for ${dir}/${file}: ${JSON.stringify(payload).slice(0, 500)}`
     );
   }
 
   return payload;
+}
+
+async function createDirectory({ cpanelUrl, cpanelUser, auth, path, name, signal }) {
+  const form = new URLSearchParams();
+  form.set("cpanel_jsonapi_user", cpanelUser);
+  form.set("cpanel_jsonapi_apiversion", "2");
+  form.set("cpanel_jsonapi_module", "Fileman");
+  form.set("cpanel_jsonapi_func", "mkdir");
+  form.set("path", path);
+  form.set("name", name);
+  form.set("permissions", "0755");
+
+  const response = await fetchWithRetry(api2UrlForUploadUrl(cpanelUrl), {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${auth}`,
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body: form,
+    signal
+  });
+  const text = await response.text();
+  let payload;
+  try {
+    payload = JSON.parse(text);
+  } catch {
+    throw new Error(
+      `cPanel mkdir returned non-JSON response: ${text.slice(0, 200)}`
+    );
+  }
+
+  const serialized = JSON.stringify(payload);
+  const result =
+    payload?.cpanelresult?.event?.result ??
+    payload?.result?.status ??
+    payload?.status;
+
+  if (!response.ok || (result !== 1 && !/already exists|file exists/i.test(serialized))) {
+    throw new Error(
+      `cPanel mkdir failed for ${path}/${name}: ${serialized.slice(0, 500)}`
+    );
+  }
+
+  return payload;
+}
+
+async function deployProxyFiles({ cpanelUrl, cpanelUser, auth, php, signal }) {
+  await createDirectory({
+    cpanelUrl,
+    cpanelUser,
+    auth,
+    path: "public_html",
+    name: CLEAN_PROXY_DIR,
+    signal
+  });
+
+  await Promise.all([
+    saveFileContent({
+      cpanelUrl,
+      auth,
+      dir: "public_html",
+      file: PROXY_FILE_NAME,
+      content: php,
+      signal
+    }),
+    saveFileContent({
+      cpanelUrl,
+      auth,
+      dir: `public_html/${CLEAN_PROXY_DIR}`,
+      file: CLEAN_PROXY_FILE_NAME,
+      content: php,
+      signal
+    }),
+    saveFileContent({
+      cpanelUrl,
+      auth,
+      dir: `public_html/${CLEAN_PROXY_DIR}`,
+      file: HTACCESS_FILE_NAME,
+      content: buildHtaccess(),
+      signal
+    })
+  ]);
 }
 
 async function main() {
@@ -336,60 +478,42 @@ async function main() {
     proxySecret: requireValue("INTOUCH_PROXY_SECRET", proxySecret)
   });
 
-  const form = new FormData();
-  form.set("dir", "public_html");
-  form.set(
-    "file-1",
-    new Blob([php], { type: "application/x-httpd-php" }),
-    PROXY_FILE_NAME
-  );
-
   const auth = Buffer.from(`${cpanelUser}:${cpanelPassword}`, "utf8").toString(
     "base64"
   );
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30_000);
-  const cpanelUrl = cleanEnvValue(process.env.CPANEL_URL) || DEFAULT_CPANEL_URL;
-  let response;
+  const cpanelUrls = [
+    ...splitList(process.env.CPANEL_URLS),
+    cleanEnvValue(process.env.CPANEL_URL),
+    ...DEFAULT_CPANEL_URLS
+  ].filter(Boolean);
+  const uniqueCpanelUrls = Array.from(new Set(cpanelUrls));
+  let lastError;
 
-  try {
-    response = await fetch(cpanelUrl, {
-      method: "POST",
-      headers: { Authorization: `Basic ${auth}` },
-      body: form,
-      signal: controller.signal
-    });
-  } finally {
-    clearTimeout(timeout);
+  for (const cpanelUrl of uniqueCpanelUrls) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 90_000);
+
+    try {
+      console.log(`Trying cPanel endpoint: ${cpanelUrl}`);
+      await deployProxyFiles({
+        cpanelUrl,
+        cpanelUser,
+        auth,
+        php,
+        signal: controller.signal
+      });
+      clearTimeout(timeout);
+      console.log(`Deployed ${PROXY_FILE_NAME} and ${CLEAN_PROXY_DIR}/${CLEAN_PROXY_FILE_NAME}.`);
+      return;
+    } catch (error) {
+      lastError = error;
+      console.warn(`cPanel endpoint failed: ${error?.message || error}`);
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
-  const text = await response.text();
-  let payload;
-  try {
-    payload = JSON.parse(text);
-  } catch {
-    throw new Error(
-      `cPanel upload returned non-JSON response: ${text.slice(0, 200)}`
-    );
-  }
-
-  const existsFailure = JSON.stringify(payload).includes(
-    "already exists"
-  );
-
-  if ((!response.ok || payload.status !== 1) && existsFailure) {
-    await saveProxyContent({ cpanelUrl, auth, php, signal: controller.signal });
-    console.log(`Updated ${PROXY_FILE_NAME} in public_html.`);
-    return;
-  }
-
-  if (!response.ok || payload.status !== 1) {
-    throw new Error(
-      `cPanel upload failed: ${JSON.stringify(payload).slice(0, 500)}`
-    );
-  }
-
-  console.log(`Uploaded ${PROXY_FILE_NAME} to public_html.`);
+  throw lastError || new Error("No cPanel endpoint succeeded.");
 }
 
 main().catch((error) => {

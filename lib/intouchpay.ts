@@ -577,8 +577,12 @@ async function postProxy(action: string, fields: Record<string, string>) {
         try {
           const headers: Record<string, string> = {
             Accept: "application/json, text/plain;q=0.9, */*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Cache-Control": "no-cache",
             "Content-Type": "application/json",
-            "User-Agent": "MR-Creativist-IntouchProxy/1.0",
+            "User-Agent":
+              env("INTOUCH_PROXY_USER_AGENT") ||
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
             "X-Requested-With": "XMLHttpRequest",
             "x-intouch-proxy-secret": secret
           };

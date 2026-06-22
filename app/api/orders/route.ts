@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import Order from "@/models/Order";
 import { jsonError, jsonOk, parsePagination, readJson, requireMongo } from "@/lib/mongo-api";
+import { publicPaymentErrorMessage } from "@/lib/payment-errors";
 import { processProductCheckout } from "@/lib/payment-checkout";
 
 export async function GET(request: Request) {
@@ -35,7 +36,7 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     return Response.json(
-      { error: error instanceof Error ? error.message : "Order could not be processed." },
+      { error: publicPaymentErrorMessage(error, "Order could not be processed.") },
       { status: 422 }
     );
   }

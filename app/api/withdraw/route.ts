@@ -1,4 +1,5 @@
 import { auth } from "@/auth";
+import { publicPaymentErrorMessage } from "@/lib/payment-errors";
 import { handleWalletAction } from "@/lib/platform-ledger";
 import { parseJson } from "@/lib/resource-api";
 
@@ -17,6 +18,9 @@ export async function POST(request: Request) {
     const snapshot = await handleWalletAction(session.user, { ...body, action: "withdraw" });
     return Response.json(snapshot, { status: 201 });
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : "Withdrawal request failed." }, { status: 422 });
+    return Response.json(
+      { error: publicPaymentErrorMessage(error, "Withdrawal request failed.") },
+      { status: 422 }
+    );
   }
 }

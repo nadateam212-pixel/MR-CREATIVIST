@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { PriceDisplay } from "@/components/ui/price-display";
 import { convertMoney, formatConvertedAmount, parseMoney } from "@/lib/currency";
+import { publicPaymentErrorMessage } from "@/lib/payment-errors";
 import { PaymentMethodSelector, type CheckoutPaymentDetails, type CheckoutPaymentMethod } from "@/components/platform/payment-method-selector";
 import { useI18n } from "@/hooks/use-i18n";
 import { usePlatformStore } from "@/hooks/use-platform-store";
@@ -153,7 +154,10 @@ export function CheckoutWorkbench({ mode = "cart", products = [] }: { mode?: "ca
       clearCart();
       setOrderComplete(true);
     } catch (error) {
-      const nextMessage = error instanceof Error ? error.message : "Order completed on this device. Please try again if it does not appear in your orders.";
+      const nextMessage = publicPaymentErrorMessage(
+        error,
+        "Order completed on this device. Please try again if it does not appear in your orders."
+      );
       setOrderStatus(nextMessage);
       toast.error(nextMessage);
     } finally {

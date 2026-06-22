@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { convertMoney, formatConvertedAmount, parseMoney } from "@/lib/currency";
+import { publicPaymentErrorMessage } from "@/lib/payment-errors";
 import { PaymentMethodSelector, type CheckoutPaymentDetails, type CheckoutPaymentMethod } from "@/components/platform/payment-method-selector";
 import { useI18n } from "@/hooks/use-i18n";
 import { useUserPreferences } from "@/hooks/use-user-preferences";
@@ -98,7 +99,7 @@ export function ProductBuyPanel({ product }: { product: BuyProduct }) {
       setStatus(payload.message ?? "Order saved. Check your email for fulfillment details.");
       toast.success(payload.message ?? "Order saved successfully.");
     } catch (error) {
-      const nextMessage = error instanceof Error ? error.message : "Order failed.";
+      const nextMessage = publicPaymentErrorMessage(error, "Order failed.");
       setStatus(nextMessage);
       toast.error(nextMessage);
     } finally {

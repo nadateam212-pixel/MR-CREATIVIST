@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { convertMoney, formatConvertedAmount, isFreePrice, parseMoney } from "@/lib/currency";
 import { titleFromCourseSlug } from "@/lib/course-media";
+import { publicPaymentErrorMessage } from "@/lib/payment-errors";
 import { PaymentMethodSelector, type CheckoutPaymentDetails, type CheckoutPaymentMethod } from "@/components/platform/payment-method-selector";
 import { useI18n } from "@/hooks/use-i18n";
 import { usePlatformStore } from "@/hooks/use-platform-store";
@@ -143,7 +144,12 @@ export function CourseEnrollmentPanel({ slug, course }: { slug: string; course?:
       enrollCourse(resolvedCourse.slug);
       setComplete(true);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Enrollment saved on this device. Please try again if it does not appear in your dashboard.");
+      setStatus(
+        publicPaymentErrorMessage(
+          error,
+          "Enrollment saved on this device. Please try again if it does not appear in your dashboard."
+        )
+      );
     } finally {
       setSubmitting(false);
     }

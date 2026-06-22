@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { friendlyMongoError, isMongoConnectionError } from "@/lib/mongodb";
+import { publicPaymentErrorMessage } from "@/lib/payment-errors";
 import { getWalletSnapshot, handleWalletAction } from "@/lib/platform-ledger";
 import { parseJson } from "@/lib/resource-api";
 
@@ -10,7 +11,10 @@ export async function GET() {
   try {
     return Response.json(await getWalletSnapshot(session.user));
   } catch (error) {
-    return Response.json({ error: friendlyMongoError(error), degraded: true }, { status: 503 });
+    return Response.json(
+      { error: publicPaymentErrorMessage(error, friendlyMongoError(error)), degraded: true },
+      { status: 503 }
+    );
   }
 }
 
@@ -22,6 +26,12 @@ export async function POST(request: Request) {
     const body = await parseJson(request);
     return Response.json(await handleWalletAction(session.user, body), { status: 201 });
   } catch (error) {
-    return Response.json({ error: friendlyMongoError(error), degraded: isMongoConnectionError(error) }, { status: 422 });
+    return Response.json(
+      {
+        error: publicPaymentErrorMessage(error, friendlyMongoError(error)),
+        degraded: isMongoConnectionError(error)
+      },
+      { status: 422 }
+    );
   }
 }

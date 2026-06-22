@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import {
+  AlertCircle,
   ArrowDownToLine,
   ArrowUpFromLine,
   Banknote,
+  CheckCircle2,
   CreditCard,
   Download,
   RefreshCw,
@@ -18,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { formatConvertedAmount, type SupportedCurrency } from "@/lib/currency";
+import { publicPaymentErrorMessage } from "@/lib/payment-errors";
 import { useUserPreferences } from "@/hooks/use-user-preferences";
 
 type WalletTransaction = {
@@ -73,6 +76,14 @@ function transactionLabel(value: string) {
   return value.replaceAll("_", " ");
 }
 
+function walletStatusMessage(value: string) {
+  return publicPaymentErrorMessage(value, value).trim();
+}
+
+function isProblemStatus(value: string) {
+  return /failed|unavailable|offline|temporarily|error|retry/i.test(value);
+}
+
 export function WalletWorkbench({ initialSnapshot, initialError = "" }: WalletWorkbenchProps) {
   const [wallet, setWallet] = useState<WalletSnapshot>(initialSnapshot ?? fallbackSnapshot);
   const [databaseReady, setDatabaseReady] = useState(Boolean(initialSnapshot) || !initialError);
@@ -82,7 +93,7 @@ export function WalletWorkbench({ initialSnapshot, initialError = "" }: WalletWo
   const [depositPhone, setDepositPhone] = useState("");
   const [withdrawPhone, setWithdrawPhone] = useState("");
   const [recipient, setRecipient] = useState("");
-  const [status, setStatus] = useState(initialError);
+  const [status, setStatus] = useState(walletStatusMessage(initialError));
   const [busy, setBusy] = useState("");
   const preferences = useUserPreferences();
   const displayMoney = (value: number, currency = wallet.currency) =>
@@ -103,7 +114,7 @@ export function WalletWorkbench({ initialSnapshot, initialError = "" }: WalletWo
 
       if (!response.ok) {
         setDatabaseReady(false);
-        setStatus(payload.error ?? "Wallet refresh failed.");
+        setStatus(walletStatusMessage(payload.error ?? "Wallet refresh failed."));
         return;
       }
 
@@ -136,7 +147,7 @@ export function WalletWorkbench({ initialSnapshot, initialError = "" }: WalletWo
 
       if (!response.ok) {
         setDatabaseReady(!payload.degraded);
-        setStatus(payload.error ?? "Transaction failed.");
+        setStatus(walletStatusMessage(payload.error ?? "Transaction failed."));
         return;
       }
 
@@ -166,7 +177,7 @@ export function WalletWorkbench({ initialSnapshot, initialError = "" }: WalletWo
     <div className="space-y-6">
       <section>
         <Card className="overflow-hidden border-[hsl(var(--primary))]/25">
-          <CardHeader className="bg-[linear-gradient(135deg,hsl(var(--primary)/0.12),hsl(var(--card))_45%,hsl(var(--accent)/0.18))]">
+          <CardHeader className="space-y-4 bg-[linear-gradient(135deg,hsl(var(--primary)/0.10),hsl(var(--card))_48%,hsl(var(--accent)/0.14))]">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <p className="text-sm font-medium text-[hsl(var(--muted-foreground))]">Available wallet balance</p>
@@ -182,7 +193,22 @@ export function WalletWorkbench({ initialSnapshot, initialError = "" }: WalletWo
                 </Button>
               </div>
             </div>
-            {status ? <p className="mt-3 text-sm font-medium text-[hsl(var(--muted-foreground))]">{status}</p> : null}
+            {status ? (
+              <div
+                className={`flex min-w-0 items-start gap-3 rounded-md border p-3 text-sm ${
+                  isProblemStatus(status)
+                    ? "border-amber-500/35 bg-amber-500/10 text-amber-900"
+                    : "border-[hsl(var(--primary))]/25 bg-[hsl(var(--primary)/0.08)] text-[hsl(var(--foreground))]"
+                }`}
+              >
+                {isProblemStatus(status) ? (
+                  <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                ) : (
+                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[hsl(var(--primary))]" />
+                )}
+                <p className="line-clamp-2 min-w-0 font-medium leading-6">{status}</p>
+              </div>
+            ) : null}
           </CardHeader>
           <CardContent className="grid gap-4 p-6 sm:grid-cols-3">
             {totals.map((metric) => (
