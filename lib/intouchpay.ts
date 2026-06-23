@@ -734,6 +734,20 @@ function isTemporaryServiceFailure(response: IntouchResponse): boolean {
   );
 }
 
+function isIntouchResponse(value: unknown): value is IntouchResponse {
+  if (!value || typeof value !== "object") return false;
+  const response = value as Partial<IntouchResponse>;
+
+  return (
+    typeof response.ok === "boolean" &&
+    typeof response.code === "string" &&
+    typeof response.message === "string" &&
+    response.data !== null &&
+    typeof response.data === "object" &&
+    typeof response.raw === "string"
+  );
+}
+
 async function retryWithBackoff<T>(
   fn: () => Promise<T>,
   maxAttempts = 3,
@@ -747,11 +761,8 @@ async function retryWithBackoff<T>(
 
       // Check if response indicates temporary failure
       if (
-        result &&
-        typeof result === "object" &&
-        "ok" in result &&
-        !result.ok &&
-        isTemporaryServiceFailure(result as IntouchResponse)
+        isIntouchResponse(result) &&
+        isTemporaryServiceFailure(result)
       ) {
         if (attempt < maxAttempts - 1) {
           const delayMs = baseDelayMs * Math.pow(2, attempt);
