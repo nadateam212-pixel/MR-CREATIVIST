@@ -733,7 +733,7 @@ export async function requestIntouchPayment(input: IntouchPaymentInput) {
     input.requestTransactionId || createIntouchRequestId("MRC-RCV");
   const proxyFields = {
     amount: String(Math.round(Number(input.amount))),
-    mobilephone: mobilePhone,
+    mobilephoneno: mobilePhone,
     requesttransactionid: requestTransactionId,
     callbackurl: input.callbackUrl || getIntouchCallbackUrl()
   };
@@ -760,7 +760,7 @@ export async function requestIntouchDeposit(input: IntouchDepositInput) {
     withdrawcharge: "1",
     reason: input.reason || "MR Creativist payout",
     sid: "1",
-    mobilephone: mobilePhone,
+    mobilephoneno: mobilePhone,
     requesttransactionid: requestTransactionId
   };
   const proxyResponse = await postProxy("requestdeposit", proxyFields);

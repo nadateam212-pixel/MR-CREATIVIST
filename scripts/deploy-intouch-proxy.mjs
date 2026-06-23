@@ -14,6 +14,8 @@ const CLEAN_PROXY_DIR = "intouch-pay";
 const CLEAN_PROXY_FILE_NAME = "index.php";
 const HTACCESS_FILE_NAME = ".htaccess";
 const CPANEL_FETCH_ATTEMPTS = 3;
+const ROOT_HTACCESS_BLOCK_START = "# BEGIN MR CREATIVIST INTOUCHPAY PROXY";
+const ROOT_HTACCESS_BLOCK_END = "# END MR CREATIVIST INTOUCHPAY PROXY";
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -74,6 +76,19 @@ function saveUrlForUploadUrl(cpanelUrl) {
   );
 }
 
+function contentUrlForUploadUrl(cpanelUrl, dir, file) {
+  const url = new URL(
+    cpanelUrl.replace(
+      /\/execute\/Fileman\/upload_files(?:\?.*)?$/i,
+      "/execute/Fileman/get_file_content"
+    )
+  );
+  url.searchParams.set("dir", dir);
+  url.searchParams.set("file", file);
+  url.searchParams.set("from_charset", "UTF-8");
+  return String(url);
+}
+
 function api2UrlForUploadUrl(cpanelUrl) {
   const url = new URL(cpanelUrl);
   url.pathname = "/json-api/cpanel";
@@ -113,10 +128,40 @@ Header always set X-Robots-Tag "noindex, nofollow"
 `;
 }
 
+function buildRootHtaccess(existing = "") {
+  const block = `${ROOT_HTACCESS_BLOCK_START}
+<IfModule LiteSpeed>
+RewriteEngine On
+RewriteRule .* - [E=verifycaptcha:off]
+</IfModule>
+
+<FilesMatch '^(intouch-proxy\\.php)$'>
+Order allow,deny
+Allow from all
+</FilesMatch>
+
+<IfModule mod_headers.c>
+<FilesMatch '^(intouch-proxy\\.php)$'>
+Header always set Cache-Control "no-store"
+Header always set X-Robots-Tag "noindex, nofollow"
+</FilesMatch>
+</IfModule>
+${ROOT_HTACCESS_BLOCK_END}`;
+  const withoutExistingBlock = String(existing)
+    .replace(
+      new RegExp(
+        `${ROOT_HTACCESS_BLOCK_START.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[\\s\\S]*?${ROOT_HTACCESS_BLOCK_END.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*`,
+        "g"
+      ),
+      ""
+    )
+    .trimStart();
+
+  return `${block}\n\n${withoutExistingBlock}`.trimEnd() + "\n";
+}
+
 function buildProxy({ username, accountNo, partnerPassword, proxySecret }) {
   return `<?php
-declare(strict_types=1);
-
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 
@@ -127,14 +172,14 @@ const INTOUCH_PARTNER_PASSWORD = '${phpString(partnerPassword)}';
 const PROXY_SECRET = '${phpString(proxySecret)}';
 const REQUEST_TIMEOUT_SECONDS = 25;
 
-function respond(int $status, array $payload): void
+function respond($status, $payload)
 {
     http_response_code($status);
     echo json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     exit;
 }
 
-function read_input(): array
+function read_input()
 {
     $raw = file_get_contents('php://input') ?: '';
     $json = json_decode($raw, true);
@@ -146,12 +191,12 @@ function read_input(): array
     return $_POST ?: [];
 }
 
-function utc_timestamp(): string
+function utc_timestamp()
 {
     return gmdate('YmdHis');
 }
 
-function signed_fields(): array
+function signed_fields()
 {
     $timestamp = utc_timestamp();
 
@@ -163,26 +208,26 @@ function signed_fields(): array
     ];
 }
 
-function normalize_phone(string $value): string
+function normalize_phone($value)
 {
     $digits = preg_replace('/\\D+/', '', $value) ?: '';
 
-    if (strlen($digits) === 12 && str_starts_with($digits, '250')) {
+    if (strlen($digits) === 12 && strpos($digits, '250') === 0) {
         return $digits;
     }
 
-    if (strlen($digits) === 10 && str_starts_with($digits, '0')) {
+    if (strlen($digits) === 10 && strpos($digits, '0') === 0) {
         return '25' . $digits;
     }
 
-    if (strlen($digits) === 9 && str_starts_with($digits, '7')) {
+    if (strlen($digits) === 9 && strpos($digits, '7') === 0) {
         return '250' . $digits;
     }
 
     return $digits;
 }
 
-function required_string(array $input, array $keys): string
+function required_string($input, $keys)
 {
     foreach ($keys as $key) {
         if (array_key_exists($key, $input) && trim((string) $input[$key]) !== '') {
@@ -193,7 +238,16 @@ function required_string(array $input, array $keys): string
     return '';
 }
 
-function intouch_call(string $path, array $fields, bool $json = false): array
+function proxy_secret_matches($expected, $provided)
+{
+    if (function_exists('hash_equals')) {
+        return hash_equals($expected, $provided);
+    }
+
+    return (string) $expected === (string) $provided;
+}
+
+function intouch_call($path, $fields, $json = false)
 {
     $ch = curl_init(INTOUCH_BASE_URL . $path);
     $body = $json ? json_encode($fields, JSON_UNESCAPED_SLASHES) : http_build_query($fields);
@@ -252,7 +306,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     respond(200, [
         'success' => true,
         'message' => 'MR Creativist IntouchPay proxy is ready.',
-        'server_ip_hint' => $_SERVER['SERVER_ADDR'] ?? null,
+        'server_ip_hint' => isset($_SERVER['SERVER_ADDR']) ? $_SERVER['SERVER_ADDR'] : null,
     ]);
 }
 
@@ -260,8 +314,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     respond(405, ['success' => false, 'message' => 'Method not allowed.']);
 }
 
-$providedSecret = $_SERVER['HTTP_X_INTOUCH_PROXY_SECRET'] ?? '';
-if ($providedSecret === '' || !hash_equals(PROXY_SECRET, $providedSecret)) {
+$providedSecret = isset($_SERVER['HTTP_X_INTOUCH_PROXY_SECRET']) ? $_SERVER['HTTP_X_INTOUCH_PROXY_SECRET'] : '';
+if ($providedSecret === '' || !proxy_secret_matches(PROXY_SECRET, $providedSecret)) {
     respond(401, ['success' => false, 'message' => 'Unauthorized proxy request.']);
 }
 
@@ -272,7 +326,7 @@ if ($action === 'ping') {
     respond(200, [
         'success' => true,
         'message' => 'MR Creativist IntouchPay proxy is ready.',
-        'server_ip_hint' => $_SERVER['SERVER_ADDR'] ?? null,
+        'server_ip_hint' => isset($_SERVER['SERVER_ADDR']) ? $_SERVER['SERVER_ADDR'] : null,
         'php_version' => PHP_VERSION,
     ]);
 }
@@ -296,7 +350,7 @@ if ($action === 'gettransactionstatus') {
 
 if ($action === 'requestpayment' || $action === 'requestdeposit') {
     $amount = (int) round((float) required_string($input, ['amount']));
-    $mobilePhone = normalize_phone(required_string($input, ['mobilePhone', 'mobilephone', 'mtnNumber', 'phone']));
+    $mobilePhone = normalize_phone(required_string($input, ['mobilephoneno', 'mobilePhone', 'mobilephone', 'mtnNumber', 'phone']));
     $requestTransactionId = required_string($input, ['requestTransactionId', 'requesttransactionid', 'request_transaction_id']);
 
     if ($amount <= 0) {
@@ -315,7 +369,7 @@ if ($action === 'requestpayment' || $action === 'requestdeposit') {
         $callbackUrl = required_string($input, ['callbackUrl', 'callbackurl', 'callback_url']);
         respond(200, intouch_call('/api/requestpayment/', signed_fields() + [
             'amount' => (string) $amount,
-            'mobilephone' => $mobilePhone,
+            'mobilephoneno' => $mobilePhone,
             'requesttransactionid' => $requestTransactionId,
             'callbackurl' => $callbackUrl,
         ]));
@@ -327,7 +381,7 @@ if ($action === 'requestpayment' || $action === 'requestdeposit') {
         'withdrawcharge' => required_string($input, ['withdrawcharge']) ?: '1',
         'reason' => $reason,
         'sid' => required_string($input, ['sid']) ?: '1',
-        'mobilephone' => $mobilePhone,
+        'mobilephoneno' => $mobilePhone,
         'requesttransactionid' => $requestTransactionId,
     ]));
 }
@@ -370,6 +424,33 @@ async function saveFileContent({ cpanelUrl, auth, dir, file, content, signal }) 
   }
 
   return payload;
+}
+
+async function getFileContent({ cpanelUrl, auth, dir, file, signal }) {
+  const response = await fetchWithRetry(contentUrlForUploadUrl(cpanelUrl, dir, file), {
+    method: "GET",
+    headers: {
+      Authorization: `Basic ${auth}`
+    },
+    signal
+  });
+  const text = await response.text();
+  let payload;
+  try {
+    payload = JSON.parse(text);
+  } catch {
+    throw new Error(
+      `cPanel content returned non-JSON response: ${text.slice(0, 200)}`
+    );
+  }
+
+  if (!response.ok || payload.status !== 1) {
+    throw new Error(
+      `cPanel content read failed for ${dir}/${file}: ${JSON.stringify(payload).slice(0, 500)}`
+    );
+  }
+
+  return String(payload?.data?.content ?? "");
 }
 
 async function createDirectory({ cpanelUrl, cpanelUser, auth, path, name, signal }) {
@@ -417,6 +498,21 @@ async function createDirectory({ cpanelUrl, cpanelUser, auth, path, name, signal
 }
 
 async function deployProxyFiles({ cpanelUrl, cpanelUser, auth, php, signal }) {
+  let rootHtaccess = "";
+  try {
+    rootHtaccess = await getFileContent({
+      cpanelUrl,
+      auth,
+      dir: "public_html",
+      file: HTACCESS_FILE_NAME,
+      signal
+    });
+  } catch (error) {
+    console.warn(
+      `Could not read public_html/${HTACCESS_FILE_NAME}; a new one will be written with the proxy bypass. ${error?.message || error}`
+    );
+  }
+
   await createDirectory({
     cpanelUrl,
     cpanelUser,
@@ -441,6 +537,14 @@ async function deployProxyFiles({ cpanelUrl, cpanelUser, auth, php, signal }) {
       dir: `public_html/${CLEAN_PROXY_DIR}`,
       file: CLEAN_PROXY_FILE_NAME,
       content: php,
+      signal
+    }),
+    saveFileContent({
+      cpanelUrl,
+      auth,
+      dir: "public_html",
+      file: HTACCESS_FILE_NAME,
+      content: buildRootHtaccess(rootHtaccess),
       signal
     }),
     saveFileContent({
