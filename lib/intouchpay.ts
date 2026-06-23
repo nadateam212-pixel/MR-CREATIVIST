@@ -724,6 +724,55 @@ export function callbackStatusMessage(payload: IntouchPayload) {
   );
 }
 
+function isTemporaryServiceFailure(response: IntouchResponse): boolean {
+  return (
+    !response.ok &&
+    (response.code === "2510" || // Service temporarily unavailable
+      /temporarily unavailable|temporary|service unavailable|connection.*being restored/i.test(
+        response.message
+      ))
+  );
+}
+
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxAttempts = 3,
+  baseDelayMs = 1000
+): Promise<T> {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      const result = await fn();
+
+      // Check if response indicates temporary failure
+      if (
+        result &&
+        typeof result === "object" &&
+        "ok" in result &&
+        !result.ok &&
+        isTemporaryServiceFailure(result as IntouchResponse)
+      ) {
+        if (attempt < maxAttempts - 1) {
+          const delayMs = baseDelayMs * Math.pow(2, attempt);
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+          continue;
+        }
+      }
+
+      return result;
+    } catch (error) {
+      lastError = error;
+      if (attempt < maxAttempts - 1) {
+        const delayMs = baseDelayMs * Math.pow(2, attempt);
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+  }
+
+  throw lastError || new Error("Max retry attempts reached");
+}
+
 export async function requestIntouchPayment(input: IntouchPaymentInput) {
   const mobilePhone = formatRwandaMobilePhone(input.mobilePhone);
   if (!mobilePhone)
@@ -737,15 +786,18 @@ export async function requestIntouchPayment(input: IntouchPaymentInput) {
     requesttransactionid: requestTransactionId,
     callbackurl: input.callbackUrl || getIntouchCallbackUrl()
   };
-  const proxyResponse = await postProxy("requestpayment", proxyFields);
-  if (proxyResponse && !shouldTryDirectAfterProxyFailure(proxyResponse))
-    return { ...proxyResponse, requestTransactionId, mobilePhone };
 
-  const response = await postForm("/api/requestpayment/", {
-    ...signedFields(),
-    ...proxyFields
-  });
-  return { ...response, requestTransactionId, mobilePhone };
+  return retryWithBackoff(async () => {
+    const proxyResponse = await postProxy("requestpayment", proxyFields);
+    if (proxyResponse && !shouldTryDirectAfterProxyFailure(proxyResponse))
+      return { ...proxyResponse, requestTransactionId, mobilePhone };
+
+    const response = await postForm("/api/requestpayment/", {
+      ...signedFields(),
+      ...proxyFields
+    });
+    return { ...response, requestTransactionId, mobilePhone };
+  }, 3, 1500);
 }
 
 export async function requestIntouchDeposit(input: IntouchDepositInput) {
@@ -763,15 +815,18 @@ export async function requestIntouchDeposit(input: IntouchDepositInput) {
     mobilephoneno: mobilePhone,
     requesttransactionid: requestTransactionId
   };
-  const proxyResponse = await postProxy("requestdeposit", proxyFields);
-  if (proxyResponse && !shouldTryDirectAfterProxyFailure(proxyResponse))
-    return { ...proxyResponse, requestTransactionId, mobilePhone };
 
-  const response = await postForm("/api/requestdeposit/", {
-    ...signedFields(),
-    ...proxyFields
-  });
-  return { ...response, requestTransactionId, mobilePhone };
+  return retryWithBackoff(async () => {
+    const proxyResponse = await postProxy("requestdeposit", proxyFields);
+    if (proxyResponse && !shouldTryDirectAfterProxyFailure(proxyResponse))
+      return { ...proxyResponse, requestTransactionId, mobilePhone };
+
+    const response = await postForm("/api/requestdeposit/", {
+      ...signedFields(),
+      ...proxyFields
+    });
+    return { ...response, requestTransactionId, mobilePhone };
+  }, 3, 1500);
 }
 
 export async function getIntouchTransactionStatus(input: IntouchStatusInput) {
@@ -785,42 +840,47 @@ export async function getIntouchTransactionStatus(input: IntouchStatusInput) {
     requesttransactionid: input.requestTransactionId ?? "",
     transactionid: input.transactionId ?? ""
   };
-  const proxyResponse = await postProxy("gettransactionstatus", proxyFields);
-  if (proxyResponse && !shouldTryDirectAfterProxyFailure(proxyResponse))
-    return proxyResponse;
 
-  return postJson("/api/gettransactionstatus/", {
-    ...signedFields(),
-    ...proxyFields
-  });
+  return retryWithBackoff(async () => {
+    const proxyResponse = await postProxy("gettransactionstatus", proxyFields);
+    if (proxyResponse && !shouldTryDirectAfterProxyFailure(proxyResponse))
+      return proxyResponse;
+
+    return postJson("/api/gettransactionstatus/", {
+      ...signedFields(),
+      ...proxyFields
+    });
+  }, 3, 1500);
 }
 
 export async function getIntouchBalance() {
-  const proxyResponse = await postProxy("getbalance", {});
-  if (proxyResponse && !shouldTryDirectAfterProxyFailure(proxyResponse)) {
+  return retryWithBackoff(async () => {
+    const proxyResponse = await postProxy("getbalance", {});
+    if (proxyResponse && !shouldTryDirectAfterProxyFailure(proxyResponse)) {
+      const balance = Number(
+        field(
+          proxyResponse.data,
+          "balance",
+          "availablebalance",
+          "availableBalance"
+        ) ?? 0
+      );
+
+      return {
+        ...proxyResponse,
+        balance: Number.isFinite(balance) ? balance : 0
+      };
+    }
+
+    const fields = signedFields();
+    const response = await postForm("/api/getbalance/", fields);
     const balance = Number(
-      field(
-        proxyResponse.data,
-        "balance",
-        "availablebalance",
-        "availableBalance"
-      ) ?? 0
+      field(response.data, "balance", "availablebalance", "availableBalance") ?? 0
     );
 
     return {
-      ...proxyResponse,
+      ...response,
       balance: Number.isFinite(balance) ? balance : 0
     };
-  }
-
-  const fields = signedFields();
-  const response = await postForm("/api/getbalance/", fields);
-  const balance = Number(
-    field(response.data, "balance", "availablebalance", "availableBalance") ?? 0
-  );
-
-  return {
-    ...response,
-    balance: Number.isFinite(balance) ? balance : 0
-  };
+  }, 3, 1500);
 }
