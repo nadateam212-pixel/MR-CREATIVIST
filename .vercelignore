@@ -1,0 +1,12 @@
+.env
+.env*.local
+.intouch-proxy-secret.local
+.git
+.next
+.vercel
+node_modules
+coverage
+dist
+*.log
+prisma/dev.db
+public/uploads
