@@ -147,6 +147,12 @@ export function AdminPaymentsConsole({ initialSnapshot, initialProviderBalance =
   const [message, setMessage] = useState("");
   const [providerDiagnostics, setProviderDiagnostics] = useState<ProxyAttemptDiagnostic[]>([]);
   const [detail, setDetail] = useState<PaymentDetail | null>(null);
+  const payoutAmount = Number(amount);
+  const payoutExceedsProviderBalance =
+    providerBalance !== null &&
+    Number.isFinite(payoutAmount) &&
+    payoutAmount > 0 &&
+    payoutAmount > providerBalance;
 
   const stats = useMemo(
     () => [
@@ -186,6 +192,13 @@ export function AdminPaymentsConsole({ initialSnapshot, initialProviderBalance =
   }
 
   async function sendPayment() {
+    if (payoutExceedsProviderBalance) {
+      setMessage(
+        `Intouch balance is only ${money(providerBalance ?? 0)}. Top up Intouch before sending ${money(payoutAmount)}.`
+      );
+      return;
+    }
+
     setBusy("send");
     setMessage("Sending payment...");
 
@@ -374,8 +387,17 @@ export function AdminPaymentsConsole({ initialSnapshot, initialProviderBalance =
               <Input className="pl-9" value={mobilePhone} onChange={(event) => setMobilePhone(event.target.value)} inputMode="tel" placeholder="MTN number" />
             </div>
             <Input value={amount} onChange={(event) => setAmount(event.target.value)} inputMode="decimal" placeholder="Enter Amount" />
+            {payoutExceedsProviderBalance ? (
+              <p className="text-xs font-semibold text-[hsl(var(--destructive))]">
+                Intouch balance is only {money(providerBalance ?? 0)}. Top up before sending this payout.
+              </p>
+            ) : providerBalance !== null ? (
+              <p className="text-xs text-[hsl(var(--muted-foreground))]">
+                Available to send: {money(providerBalance)}
+              </p>
+            ) : null}
             <Input value={reason} onChange={(event) => setReason(event.target.value)} />
-            <Button type="button" className="w-full" disabled={busy === "send"} onClick={() => void sendPayment()}>
+            <Button type="button" className="w-full" disabled={busy === "send" || payoutExceedsProviderBalance} onClick={() => void sendPayment()}>
               <Send className="size-4" />
               Send via MTN
             </Button>
