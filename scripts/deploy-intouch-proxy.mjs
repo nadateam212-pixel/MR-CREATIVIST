@@ -260,6 +260,10 @@ function intouch_call($path, $fields, $json = false)
         CURLOPT_TIMEOUT => REQUEST_TIMEOUT_SECONDS,
         CURLOPT_HTTPHEADER => $headers,
         CURLOPT_POSTFIELDS => $body,
+        CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
+        CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+        CURLOPT_SSLVERSION => CURL_SSLVERSION_TLSv1_2,
+        CURLOPT_USERAGENT => 'MR-Creativist-IntouchPay-Proxy/1.1',
     ]);
 
     $raw = curl_exec($ch);
@@ -302,6 +306,82 @@ function intouch_call($path, $fields, $json = false)
     return $payload;
 }
 
+function proxy_probe($url, $fields = null)
+{
+    $ch = curl_init($url);
+    $headers = [];
+    $options = [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_CONNECTTIMEOUT => 8,
+        CURLOPT_TIMEOUT => 18,
+        CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
+        CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+        CURLOPT_SSLVERSION => CURL_SSLVERSION_TLSv1_2,
+        CURLOPT_USERAGENT => 'MR-Creativist-IntouchPay-Diagnostic/1.1',
+    ];
+
+    if (is_array($fields)) {
+        $options[CURLOPT_POST] = true;
+        $options[CURLOPT_POSTFIELDS] = http_build_query($fields);
+        $headers[] = 'Content-Type: application/x-www-form-urlencoded';
+    }
+
+    if ($headers) {
+        $options[CURLOPT_HTTPHEADER] = $headers;
+    }
+
+    curl_setopt_array($ch, $options);
+    $started = microtime(true);
+    $raw = curl_exec($ch);
+    $info = curl_getinfo($ch);
+    $result = [
+        'url' => $url,
+        'errno' => curl_errno($ch),
+        'error' => curl_error($ch),
+        'elapsed_ms' => (int) round((microtime(true) - $started) * 1000),
+        'http_code' => isset($info['http_code']) ? $info['http_code'] : null,
+        'primary_ip' => isset($info['primary_ip']) ? $info['primary_ip'] : null,
+        'content_type' => isset($info['content_type']) ? $info['content_type'] : null,
+        'body_preview' => substr((string) $raw, 0, 220),
+    ];
+    curl_close($ch);
+
+    return $result;
+}
+
+function proxy_diagnostics()
+{
+    $host = parse_url(INTOUCH_BASE_URL, PHP_URL_HOST) ?: 'www.intouchpay.co.rw';
+    $socketStarted = microtime(true);
+    $socketErrno = 0;
+    $socketError = '';
+    $socket = @fsockopen('ssl://' . $host, 443, $socketErrno, $socketError, 10);
+    $socketElapsed = (int) round((microtime(true) - $socketStarted) * 1000);
+    if ($socket) fclose($socket);
+
+    return [
+        'success' => true,
+        'server_ip_hint' => isset($_SERVER['SERVER_ADDR']) ? $_SERVER['SERVER_ADDR'] : null,
+        'php_version' => PHP_VERSION,
+        'curl_version' => function_exists('curl_version') ? curl_version()['version'] : null,
+        'dns_gethostbyname' => gethostbyname($host),
+        'dns_records' => function_exists('dns_get_record') ? dns_get_record($host, DNS_A + DNS_AAAA) : [],
+        'socket_443' => [
+            'ok' => (bool) $socket,
+            'errno' => $socketErrno,
+            'error' => $socketError,
+            'elapsed_ms' => $socketElapsed,
+        ],
+        'curl_home' => proxy_probe(INTOUCH_BASE_URL . '/'),
+        'curl_api_missing_fields' => proxy_probe(INTOUCH_BASE_URL . '/api/getbalance/', [
+            'username' => '',
+            'timestamp' => '',
+            'accountno' => '',
+            'password' => '',
+        ]),
+    ];
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     respond(200, [
         'success' => true,
@@ -329,6 +409,10 @@ if ($action === 'ping') {
         'server_ip_hint' => isset($_SERVER['SERVER_ADDR']) ? $_SERVER['SERVER_ADDR'] : null,
         'php_version' => PHP_VERSION,
     ]);
+}
+
+if ($action === 'diagnose') {
+    respond(200, proxy_diagnostics());
 }
 
 if ($action === 'getbalance') {

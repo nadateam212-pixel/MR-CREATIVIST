@@ -282,8 +282,8 @@ export function PublicAppShell({
       </aside>
 
       <div className="lg:pl-64">
-        <header className="sticky top-0 z-30 border-b border-[hsl(var(--border))] bg-[hsl(var(--background))]/90 py-3 backdrop-blur-xl">
-          <div className="app-frame flex items-center gap-3">
+        <header className="sticky top-0 z-30 border-b border-[hsl(var(--border))] bg-[hsl(var(--background))]/90 px-4 py-3 backdrop-blur-xl sm:px-6">
+          <div className="mx-auto flex w-full max-w-[100rem] items-center gap-3">
             <Link href="/" className="relative flex size-11 shrink-0 overflow-hidden rounded-md bg-white p-1 lg:hidden">
               <Image src={brand.logo} alt={brand.name} fill sizes="44px" className="object-contain p-1" />
             </Link>
@@ -413,7 +413,7 @@ export function PublicAppShell({
           </div>
         </div>
 
-        <main className="min-w-0">{children}</main>
+        <main>{children}</main>
         <div className="hidden lg:block">
           <MarketingFooter />
         </div>

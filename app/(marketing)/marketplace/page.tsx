@@ -7,7 +7,7 @@ export const metadata: Metadata = {
 };
 
 export default async function MarketplacePage() {
-  const products = await getProducts();
+  const products = await getProducts({ limit: 120 });
 
   return <CatalogExperience mode="marketplace" products={products} />;
 }

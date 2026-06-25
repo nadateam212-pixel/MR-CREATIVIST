@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { auth } from "@/auth";
 import { ShopDirectory, type PublicShopProfile } from "@/components/platform/job-shop-workbenches";
 import { Button } from "@/components/ui/button";
 import { getShopProfiles } from "@/lib/platform-db";
@@ -12,8 +11,12 @@ export const metadata: Metadata = {
 };
 
 export default async function BusinessDirectoryPage() {
-  const [session, businesses] = await Promise.all([auth(), getShopProfiles({ limit: 48 })]);
-  const listHref = session?.user ? "/seller/shop" : "/login?callbackUrl=/seller/shop";
+  const businesses = await getShopProfiles({ limit: 120 });
+  const records = [...(businesses as PublicShopProfile[])].sort((left, right) => {
+    const leftScore = (left.isFeatured ? 100 : 0) + Number(left.rating ?? 0);
+    const rightScore = (right.isFeatured ? 100 : 0) + Number(right.rating ?? 0);
+    return rightScore - leftScore;
+  });
 
   return (
     <div className="border-y border-[hsl(var(--border))] bg-[hsl(var(--muted))]/35">
@@ -24,10 +27,10 @@ export default async function BusinessDirectoryPage() {
             <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">Listed businesses</h1>
           </div>
           <Button asChild>
-            <Link href={listHref}>List your business</Link>
+            <Link href="/seller/shop">List your business</Link>
           </Button>
         </div>
-          <ShopDirectory shops={businesses as PublicShopProfile[]} showHeader={false} />
+        <ShopDirectory shops={records} showHeader={false} />
       </section>
     </div>
   );

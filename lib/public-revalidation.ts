@@ -1,4 +1,5 @@
 import { revalidatePath } from "next/cache";
+import { clearPublicQueryCache } from "@/lib/platform-db";
 
 type PublicContentKind = "course" | "product" | "gig" | "shop" | "job" | "consulting" | "blog";
 
@@ -26,6 +27,8 @@ function slugPath(kind: PublicContentKind, slug?: unknown) {
 
 export function revalidatePublicContent(kind: PublicContentKind, slug?: unknown) {
   const paths = new Set(["/sitemap.xml", "/search", ...PUBLIC_PATHS[kind], ...slugPath(kind, slug)]);
+
+  clearPublicQueryCache();
 
   for (const path of paths) {
     try {

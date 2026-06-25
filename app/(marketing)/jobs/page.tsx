@@ -7,7 +7,7 @@ export const metadata: Metadata = {
 };
 
 export default async function JobsPage() {
-  const jobs = await getJobPosts();
+  const jobs = await getJobPosts({ limit: 120 });
 
   return (
     <div className="app-frame py-8">

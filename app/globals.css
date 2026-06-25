@@ -81,8 +81,8 @@ select option:checked {
 }
 
 :root {
-  --app-frame-max: 70rem;
-  --app-page-gutter: clamp(1rem, 1.2vw, 1.5rem);
+  --app-frame-max: 100rem;
+  --app-page-gutter: clamp(0.75rem, 1vw, 1.25rem);
 }
 
 .app-frame {
@@ -123,18 +123,153 @@ select option:checked {
 }
 
 .grid-catalog-courses {
-  --grid-gap: 1.25rem;
-  --grid-min: 20rem;
+  --grid-gap: 0.95rem;
+  --grid-min: 15rem;
 }
 
 .grid-catalog-products {
-  --grid-gap: 0.75rem;
-  --grid-min: 12rem;
+  --grid-gap: 0.95rem;
+  --grid-min: 15rem;
 }
 
 .grid-mini-records {
   --grid-gap: 1.25rem;
   --grid-min: 20rem;
+}
+
+.reference-toolbar {
+  display: grid;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.reference-filter-row {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+
+.reference-filter-chip {
+  height: 2.5rem;
+  flex-shrink: 0;
+  border-radius: 0.45rem;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+  padding-inline: 0.9rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: hsl(var(--foreground));
+}
+
+.reference-filter-chip-active {
+  border-color: hsl(var(--primary));
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+.reference-grid-4,
+.reference-grid-5,
+.reference-grid-3,
+.home-section-grid {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: 1fr;
+}
+
+.reference-card {
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  box-shadow: 0 10px 28px hsl(220 45% 2% / 0.16);
+}
+
+.reference-card-title {
+  font-size: 0.95rem;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.reference-card-meta {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: hsl(var(--muted-foreground));
+}
+
+.reference-card-media {
+  position: relative;
+  overflow: hidden;
+  background: hsl(var(--muted));
+}
+
+.reference-primary-action {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  font-weight: 900;
+}
+
+.reference-primary-action:hover {
+  opacity: 0.92;
+}
+
+.reference-action-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.business-actions-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 0.82fr 1fr;
+  gap: 0.45rem;
+}
+
+.business-action-button {
+  min-width: 0;
+  gap: 0.25rem;
+  padding-inline: 0.3rem;
+  font-size: clamp(0.56rem, 0.58vw, 0.75rem);
+  font-weight: 900;
+}
+
+.business-action-button svg {
+  width: 0.82rem;
+  height: 0.82rem;
+  flex-shrink: 0;
+}
+
+@media (min-width: 640px) {
+  .reference-grid-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .reference-grid-4,
+  .reference-grid-5,
+  .home-section-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 900px) {
+  .reference-grid-4,
+  .reference-grid-5,
+  .home-section-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .card-grid-fill.grid-catalog-courses,
+  .card-grid-fill.grid-catalog-products {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .reference-toolbar {
+    grid-template-columns: minmax(16rem, 26rem) 1fr auto;
+  }
 }
 
 .line-clamp-1,

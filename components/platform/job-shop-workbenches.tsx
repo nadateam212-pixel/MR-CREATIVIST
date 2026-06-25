@@ -6,7 +6,6 @@ import { useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import {
   BriefcaseBusiness,
-  CalendarDays,
   CheckCircle2,
   ExternalLink,
   Globe2,
@@ -136,102 +135,138 @@ export function JobsDirectory({ jobs }: { jobs: PublicJobPost[] }) {
   });
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       <section className="flex flex-col gap-3 text-[hsl(var(--foreground))] sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.18em] text-[hsl(var(--primary))]">Jobs</p>
-          <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">Open work</h1>
+          <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Find Your Dream Job</h1>
+          <p className="mt-1 text-sm font-semibold text-[hsl(var(--muted-foreground))]">Discover amazing opportunities and build your future.</p>
         </div>
         <Badge>{filtered.length} live</Badge>
       </section>
 
-      <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
+      <div className="reference-toolbar">
         <div className="relative">
-          <Search className="absolute left-4 top-1/2 size-5 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" />
-          <Input value={query} onChange={(event) => setQuery(event.target.value)} className="h-12 pl-12" placeholder="Search jobs, skills, location or company" />
+          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" />
+          <Input value={query} onChange={(event) => setQuery(event.target.value)} className="h-10 bg-[hsl(var(--card))] pl-10 text-sm font-semibold" placeholder="Search jobs, skills, location or company" />
         </div>
-        <div className="flex gap-2 overflow-x-auto">
+        <div className="reference-filter-row">
           {categories.map((category) => (
             <button
               key={category}
               type="button"
               onClick={() => setActiveCategory(category)}
-              className={`h-12 shrink-0 rounded-md border px-4 text-sm font-bold ${
-                activeCategory === category
-                  ? "border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]"
-                  : "border-[hsl(var(--border))] hover:bg-[hsl(var(--muted))]"
-              }`}
+              className={`reference-filter-chip ${activeCategory === category ? "reference-filter-chip-active" : ""}`}
             >
               {category}
             </button>
           ))}
         </div>
+        <Button variant="outline" className="hidden h-10 bg-[hsl(var(--card))] lg:inline-flex">
+          <BriefcaseBusiness className="size-4" />
+          Filters
+        </Button>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-2">
+      <div className="reference-grid-4">
         {filtered.length ? (
-          filtered.map((job) => (
-            <Card key={job.slug} className="overflow-hidden">
-              <CardHeader>
-                <div className="grid gap-4 sm:grid-cols-[1fr_12rem] sm:items-start">
-                  <div>
-                    <div className="flex flex-wrap gap-2">
-                      <Badge>{job.category}</Badge>
-                      <Badge>{job.employmentType}</Badge>
-                      <Badge>{job.workplaceType}</Badge>
-                      {job.isFeatured ? <Badge className="border-[hsl(var(--primary))]/50 text-[hsl(var(--primary))]">Featured</Badge> : null}
+          <>
+            {filtered.map((job) => (
+              <article key={job.slug} className="reference-card flex h-full flex-col">
+                <div className="reference-card-media aspect-[4/3]">
+                  <div className="relative flex h-full flex-col justify-between overflow-hidden bg-[hsl(var(--muted))] p-4">
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-[0.16em] text-[hsl(var(--muted-foreground))]">We are</p>
+                      <p className="mt-1 max-w-[12rem] text-3xl font-black uppercase leading-none text-[hsl(var(--foreground))]">Hiring!</p>
+                      <p className="mt-2 w-fit rounded bg-[hsl(var(--primary))] px-2 py-1 text-[0.68rem] font-black uppercase text-[hsl(var(--primary-foreground))]">{job.category}</p>
                     </div>
-                    <CardTitle className="mt-4 leading-tight">{job.title}</CardTitle>
-                    <p className="mt-2 text-sm font-semibold text-[hsl(var(--muted-foreground))]">{job.companyName}</p>
+                    <div className="grid gap-1.5 text-[0.68rem] font-bold text-[hsl(var(--muted-foreground))]">
+                      <span className="flex items-center gap-1.5">
+                        <CheckCircle2 className="size-3.5 text-[hsl(var(--success))]" />
+                        {job.workplaceType}
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <CheckCircle2 className="size-3.5 text-[hsl(var(--success))]" />
+                        {job.location}
+                      </span>
+                    </div>
+                    {job.companyLogo ? (
+                      <span className="absolute bottom-3 right-3 grid size-24 place-items-center overflow-hidden rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-2 shadow-xl">
+                        <img src={job.companyLogo} alt={`${job.companyName} logo`} className="h-full w-full object-contain" />
+                      </span>
+                    ) : (
+                      <BriefcaseBusiness className="absolute bottom-4 right-4 size-16 text-[hsl(var(--primary))]" />
+                    )}
                   </div>
-                  {job.companyLogo ? (
-                    <div className="h-28 overflow-hidden rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--muted))] sm:h-32">
-                      <img src={job.companyLogo} alt={`${job.companyName} logo`} className="h-full w-full object-cover" />
-                    </div>
-                  ) : (
-                    <div className="flex h-28 items-center justify-center rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--muted))] sm:h-32">
-                      <BriefcaseBusiness className="size-10 text-[hsl(var(--primary))]" />
-                    </div>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-5">
-                <p className="line-clamp-3 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{job.description}</p>
-                <div className="grid gap-2 text-sm sm:grid-cols-2">
-                  <span className="flex items-center gap-2">
-                    <MapPin className="size-4 text-[hsl(var(--primary))]" />
-                    {job.location}
+                  <span className="absolute right-2 top-2 rounded bg-black/75 px-2 py-1 text-[0.65rem] font-black uppercase text-white">
+                    {job.employmentType}
                   </span>
-                  <span className="font-semibold">{money(job.salaryMin, job.salaryMax, job.currency, preferences.currency, preferences.usdToFrw)}</span>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {(job.skills ?? []).slice(0, 6).map((skill) => (
-                    <Badge key={`${job.slug}-${skill}`}>{skill}</Badge>
-                  ))}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button onClick={() => setSelectedJob(job)}>
-                    <ExternalLink className="size-4" />
-                    Apply
-                  </Button>
-                  {job.contactEmail ? (
-                    <Button asChild variant="outline">
-                      <a href={`mailto:${job.contactEmail}?subject=${encodeURIComponent(job.title)}`}>
-                        <Mail className="size-4" />
-                        Contact
-                      </a>
+                <div className="flex flex-1 flex-col gap-2.5 p-3">
+                  <div className="flex items-start gap-2">
+                    <span className="grid size-7 shrink-0 place-items-center rounded bg-[hsl(var(--muted))] text-xs font-black text-[hsl(var(--primary))]">
+                      {job.companyName?.[0] ?? "M"}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="reference-card-meta flex items-center gap-1">
+                        <span className="truncate">{job.companyName}</span>
+                        {job.isFeatured ? <VerifiedMark label="Featured employer" className="size-3.5" /> : null}
+                      </p>
+                      <h2 className="reference-card-title mt-1 line-clamp-2 min-h-10">{job.title}</h2>
+                    </div>
+                  </div>
+                  <div className="reference-card-meta flex flex-wrap gap-x-3 gap-y-1">
+                    <span className="flex items-center gap-1">
+                      <MapPin className="size-3.5 text-[hsl(var(--primary))]" />
+                      {job.location}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <BriefcaseBusiness className="size-3.5 text-[hsl(var(--primary))]" />
+                      {job.workplaceType}
+                    </span>
+                  </div>
+                  <p className="reference-card-meta font-black text-[hsl(var(--foreground))]">{money(job.salaryMin, job.salaryMax, job.currency, preferences.currency, preferences.usdToFrw)}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    <Badge>{job.category}</Badge>
+                    {(job.skills ?? []).slice(0, 2).map((skill) => (
+                      <Badge key={`${job.slug}-${skill}`}>{skill}</Badge>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedJob(job)}
+                    className="reference-card-meta flex w-full items-center justify-between border-t border-[hsl(var(--border))] pt-2 text-left"
+                  >
+                    <span>Job Description</span>
+                    <ExternalLink className="size-3.5" />
+                  </button>
+                  <div className="mt-auto">
+                    <Button className="h-8 w-full reference-primary-action" onClick={() => setSelectedJob(job)}>
+                      <ExternalLink className="size-4" />
+                      Apply Now
                     </Button>
-                  ) : null}
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
-          ))
+              </article>
+            ))}
+            {Array.from({ length: (4 - (filtered.length % 4)) % 4 }).map((_, index) => (
+              <article key={`job-cta-${index}`} className="reference-card flex h-full min-h-[18rem] flex-col justify-between p-4">
+                <BriefcaseBusiness className="size-8 text-[hsl(var(--primary))]" />
+                <div>
+                  <p className="reference-card-title">Hiring?</p>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-[hsl(var(--muted-foreground))]">
+                    Publish a job and reach MR Creativist talent.
+                  </p>
+                </div>
+                <Button asChild className="reference-primary-action">
+                  <Link href="/admin/jobs">Post a job</Link>
+                </Button>
+              </article>
+            ))}
+          </>
         ) : (
-          <Card className="xl:col-span-2">
-            <CardContent className="p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">
-              No published jobs match this search yet.
-            </CardContent>
-          </Card>
+          <div className="reference-card p-8 text-center text-sm text-[hsl(var(--muted-foreground))] md:col-span-4">
+            No published jobs match this search yet.
+          </div>
         )}
       </div>
 
@@ -327,13 +362,15 @@ export function JobsDirectory({ jobs }: { jobs: PublicJobPost[] }) {
 
 export function ShopDirectory({ shops, showHeader = true }: { shops: PublicShopProfile[]; showHeader?: boolean }) {
   const [query, setQuery] = useState("");
+  const [activeCategory, setActiveCategory] = useState("All");
+  const categories = useMemo(() => ["All", ...Array.from(new Set(shops.map((shop) => shop.category).filter(Boolean)))], [shops]);
   const filtered = shops.filter((shop) => {
     const target = `${shop.name} ${shop.category} ${shop.city} ${shop.country} ${(shop.tags ?? []).join(" ")}`.toLowerCase();
-    return target.includes(query.toLowerCase());
+    return target.includes(query.toLowerCase()) && (activeCategory === "All" || shop.category === activeCategory);
   });
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       {showHeader ? (
         <section className="flex flex-col gap-3 text-[hsl(var(--foreground))] sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -349,105 +386,149 @@ export function ShopDirectory({ shops, showHeader = true }: { shops: PublicShopP
         </section>
       ) : null}
 
-      <div className="relative">
-        <Search className="absolute left-4 top-1/2 size-5 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" />
-        <Input value={query} onChange={(event) => setQuery(event.target.value)} className="h-12 pl-12" placeholder="Search businesses, services, city or category" />
+      <div className="reference-toolbar">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" />
+          <Input value={query} onChange={(event) => setQuery(event.target.value)} className="h-10 bg-[hsl(var(--card))] pl-10 text-sm font-semibold" placeholder="Search businesses, services, city or category" />
+        </div>
+        <div className="reference-filter-row">
+          {categories.map((category) => (
+            <button
+              key={category}
+              type="button"
+              onClick={() => setActiveCategory(category)}
+              className={`reference-filter-chip ${activeCategory === category ? "reference-filter-chip-active" : ""}`}
+            >
+              {category}
+            </button>
+          ))}
+        </div>
+        <Button asChild variant="outline" className="hidden h-10 bg-[hsl(var(--card))] lg:inline-flex">
+          <Link href="/seller/shop">
+            <Store className="size-4" />
+            List
+          </Link>
+        </Button>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
+      <div className="reference-grid-4">
         {filtered.length ? (
-          filtered.map((shop) => (
-            <Card key={shop.slug} className="overflow-hidden">
-              <div className="relative h-40 bg-slate-950">
-                <img src={shop.coverImage || "/icons/logo.png"} alt={shop.name} className="h-full w-full object-cover opacity-85" />
-                <div className="absolute inset-x-0 bottom-0 flex items-end gap-3 bg-gradient-to-t from-slate-950 p-4 text-white">
-                  <img src={shop.logo || "/icons/logo.png"} alt={`${shop.name} logo`} className="size-14 rounded-md bg-white object-contain p-1" />
-                  <div className="min-w-0">
-                    <p className="flex min-w-0 items-center gap-2 text-lg font-black">
-                      <span className="truncate">{shop.name}</span>
-                      {shop.isVerified ? <VerifiedMark label="Verified business" className="size-4" /> : null}
-                    </p>
-                    <p className="truncate text-xs font-bold uppercase tracking-[0.14em] text-white/80">{shop.category}</p>
+          <>
+            {filtered.map((shop) => {
+              const address = [shop.address, shop.city, shop.country].filter(Boolean).join(", ") || "Online";
+              const status = String(shop.status ?? "published").toLowerCase();
+              const isOpen = !["closed", "archived"].includes(status);
+              const directionsHref = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+              const websiteHref = shop.website?.startsWith("http") ? shop.website : shop.website ? `https://${shop.website}` : "";
+
+              return (
+                <article key={shop.slug} className="reference-card flex h-full flex-col p-3">
+                  <div className="flex items-start gap-3">
+                    <span className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-md border border-[hsl(var(--border))] bg-white p-1">
+                      <img src={shop.logo || shop.coverImage || "/icons/logo.png"} alt={`${shop.name} logo`} className="h-full w-full object-contain" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="flex min-w-0 items-center gap-1.5 font-black leading-tight">
+                        <span className="truncate">{shop.name}</span>
+                        {shop.isVerified ? <VerifiedMark label="Verified business" className="size-3.5" /> : null}
+                      </p>
+                      <p className="mt-1 line-clamp-1 text-xs font-semibold text-[hsl(var(--muted-foreground))]">{shop.category}</p>
+                      <p className="mt-2 text-xs font-semibold text-[hsl(var(--muted-foreground))]">
+                        <Star className="mr-1 inline size-3 fill-amber-400 text-amber-400" />
+                        {(shop.rating ?? 0).toFixed(1)} {shop.isFeatured ? "(Featured)" : "(Reviews)"}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              </div>
-              <CardContent className="space-y-5 p-5">
-                <div className="flex flex-wrap gap-2">
-                  {shop.isFeatured ? <Badge className="border-[hsl(var(--primary))]/50 text-[hsl(var(--primary))]">Featured</Badge> : null}
-                  <Badge>
-                    <Star className="mr-1 size-3 fill-current" />
-                    {(shop.rating ?? 0).toFixed(1)}
-                  </Badge>
-                  {shop.city ? <Badge>{shop.city}</Badge> : null}
-                  {shop.country ? <Badge>{shop.country}</Badge> : null}
-                </div>
-                <p className="line-clamp-3 text-sm leading-6 text-[hsl(var(--muted-foreground))]">
-                  {shop.tagline || shop.description}
-                </p>
-                <div className="grid gap-2 rounded-md border border-[hsl(var(--border))] p-3 text-sm text-[hsl(var(--muted-foreground))]">
-                  {shop.ownerName ? <p className="font-semibold text-[hsl(var(--foreground))]">Owner: {shop.ownerName}</p> : null}
-                  {shop.address || shop.city || shop.country ? (
-                    <p className="flex items-start gap-2">
-                      <MapPin className="mt-0.5 size-4 text-[hsl(var(--primary))]" />
-                      <span>{[shop.address, shop.city, shop.country].filter(Boolean).join(", ")}</span>
+
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {(shop.tags?.length ? shop.tags : [shop.category, shop.openingHours, shop.ownerName])
+                      .filter(Boolean)
+                      .slice(0, 3)
+                      .map((tag) => (
+                        <Badge key={`${shop.slug}-${tag}`}>{tag}</Badge>
+                      ))}
+                  </div>
+
+                  <div className="mt-4 grid gap-2 text-sm">
+                    <p className={`flex items-center gap-2 font-semibold ${isOpen ? "text-[hsl(var(--success))]" : "text-red-500"}`}>
+                      <CheckCircle2 className="size-4" />
+                      {isOpen ? "Open now" : "Closed"}
                     </p>
-                  ) : null}
-                  {shop.openingHours ? (
-                    <p className="flex items-start gap-2">
-                      <CalendarDays className="mt-0.5 size-4 text-[hsl(var(--primary))]" />
-                      <span>{shop.openingHours}</span>
+                    <p className="reference-card-meta flex items-start gap-2">
+                      <MapPin className="mt-0.5 size-4 shrink-0 text-[hsl(var(--foreground))]" />
+                      <span className="line-clamp-1">{address}</span>
                     </p>
-                  ) : null}
-                  {shop.website ? (
-                    <a href={shop.website} target="_blank" rel="noreferrer" className="flex items-start gap-2 text-[hsl(var(--primary))]">
-                      <Globe2 className="mt-0.5 size-4" />
-                      <span className="truncate">{shop.website}</span>
+                    <a href={directionsHref} target="_blank" rel="noreferrer" className="reference-card-meta flex items-center gap-2 text-[hsl(var(--primary))]">
+                      <ExternalLink className="size-4" />
+                      Get Directions
                     </a>
-                  ) : null}
-                </div>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  {shop.ownerId ? (
-                    <Button asChild size="sm" className="h-9 min-w-0 gap-1 px-2 text-xs font-semibold">
-                      <Link href={`/messages/${shop.ownerId}`} className="whitespace-nowrap">
+                  </div>
+
+                  <p className="mt-3 line-clamp-2 text-sm leading-5 text-[hsl(var(--muted-foreground))]">
+                    {shop.tagline || shop.description}
+                  </p>
+
+                  <div className="business-actions-grid mt-auto pt-4">
+                    <Button asChild size="sm" className="business-action-button h-9">
+                      <a href={shop.whatsapp ? `https://wa.me/${shop.whatsapp.replace(/\D/g, "")}` : `mailto:${shop.contactEmail ?? ""}`} target={shop.whatsapp ? "_blank" : undefined} rel={shop.whatsapp ? "noreferrer" : undefined}>
                         <MessageSquare className="size-4" />
-                        Message
-                      </Link>
+                        <span className="reference-action-label">{shop.whatsapp ? "WhatsApp" : "Email"}</span>
+                      </a>
                     </Button>
-                  ) : null}
-                  {shop.phone ? (
-                    <Button asChild size="sm" variant="outline" className="h-9 min-w-0 gap-1 px-2 text-xs font-semibold">
-                      <a href={`tel:${shop.phone.replaceAll(" ", "")}`} className="whitespace-nowrap">
+                    <Button asChild size="sm" variant="outline" className="business-action-button h-9">
+                      <a href={shop.phone ? `tel:${shop.phone.replace(/\D/g, "")}` : `mailto:${shop.contactEmail ?? ""}`}>
                         <Phone className="size-4" />
-                        Call
+                        <span className="reference-action-label">Call</span>
                       </a>
                     </Button>
-                  ) : null}
-                  {shop.contactEmail ? (
-                    <Button asChild size="sm" variant="outline" className="h-9 min-w-0 gap-1 px-2 text-xs font-semibold">
-                      <a href={`mailto:${shop.contactEmail}?subject=${encodeURIComponent(shop.name)}`} className="whitespace-nowrap">
-                        <Mail className="size-4" />
-                        Email
-                      </a>
-                    </Button>
-                  ) : null}
-                  {shop.whatsapp ? (
-                    <Button asChild size="sm" variant="outline" className="h-9 min-w-0 gap-1 px-2 text-xs font-semibold">
-                      <a href={`https://wa.me/${shop.whatsapp.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="whitespace-nowrap">
-                        <MessageSquare className="size-4" />
-                        WhatsApp
-                      </a>
-                    </Button>
-                  ) : null}
+                    {websiteHref ? (
+                      <Button asChild size="sm" variant="outline" className="business-action-button h-9">
+                        <a href={websiteHref} target="_blank" rel="noreferrer">
+                          <Globe2 className="size-4" />
+                          <span className="reference-action-label">Website</span>
+                        </a>
+                      </Button>
+                    ) : shop.ownerId ? (
+                      <Button asChild size="sm" variant="outline" className="business-action-button h-9">
+                        <Link href={`/messages/${shop.ownerId}`}>
+                          <Mail className="size-4" />
+                          <span className="reference-action-label">Message</span>
+                        </Link>
+                      </Button>
+                    ) : (
+                      <Button asChild size="sm" variant="outline" className="business-action-button h-9">
+                        <a href={`mailto:${shop.contactEmail ?? ""}`}>
+                          <Mail className="size-4" />
+                          <span className="reference-action-label">Email</span>
+                        </a>
+                      </Button>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+            {Array.from({ length: (4 - (filtered.length % 4)) % 4 }).map((_, index) => (
+              <article key={`business-cta-${index}`} className="reference-card flex h-full min-h-[18rem] flex-col justify-between p-4">
+                <Store className="size-8 text-[hsl(var(--primary))]" />
+                <div>
+                  <p className="reference-card-title">Grow your business</p>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-[hsl(var(--muted-foreground))]">
+                    Add your services, location, calls, WhatsApp, and website.
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
-          ))
+                <Button asChild className="reference-primary-action">
+                  <Link href="/seller/shop">
+                    <Store className="size-4" />
+                    List business
+                  </Link>
+                </Button>
+              </article>
+            ))}
+          </>
         ) : (
-          <Card className="lg:col-span-2 xl:col-span-3">
-            <CardContent className="p-8 text-center text-sm text-[hsl(var(--muted-foreground))]">
-              No published businesses match this search yet.
-            </CardContent>
-          </Card>
+          <div className="reference-card p-8 text-center text-sm text-[hsl(var(--muted-foreground))] md:col-span-4">
+            No published businesses match this search yet.
+          </div>
         )}
       </div>
     </div>
