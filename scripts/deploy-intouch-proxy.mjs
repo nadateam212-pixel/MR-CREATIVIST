@@ -169,6 +169,13 @@ Header always set Cache-Control "no-store"
 Header always set X-Robots-Tag "noindex, nofollow"
 </FilesMatch>
 </IfModule>
+
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteCond %{HTTP_HOST} ^mrcreativist\\.ca$ [NC]
+RewriteCond %{REQUEST_URI} !^/(~mrcreati/)?(intouch-proxy\\.php|intouch-pay(/|$)) [NC]
+RewriteRule ^ https://www.mrcreativist.ca%{REQUEST_URI} [R=302,L]
+</IfModule>
 ${ROOT_HTACCESS_BLOCK_END}`;
   const withoutExistingBlock = String(existing)
     .replace(
