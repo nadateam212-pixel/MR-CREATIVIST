@@ -65,6 +65,71 @@ describe("IntouchPay request payloads", () => {
     expect(body).not.toHaveProperty("mobilephone");
   });
 
+  it("tries the sibling cPanel proxy file when the configured endpoint is blocked", async () => {
+    configureIntouchEnv({
+      INTOUCH_USE_PROXY: "true",
+      INTOUCH_PROXY_URL:
+        "https://myhosting.zubahost.com/~mrcreati/intouch-pay/index.php",
+      INTOUCH_PROXY_SECRET: "secret"
+    });
+
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementationOnce(() =>
+        Promise.resolve(
+          new Response("<html><body>Bot verification</body></html>", {
+            status: 200,
+            headers: { "Content-Type": "text/html" }
+          })
+        )
+      )
+      .mockImplementationOnce(() =>
+        jsonResponse({ success: true, responsecode: "1000" })
+      );
+
+    await requestIntouchPayment({
+      amount: 500,
+      mobilePhone: "0788819111",
+      requestTransactionId: "MRC-RCV-TEST",
+      callbackUrl: "https://mrcreativist.ca/api/intouchpay/callback"
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
+      "https://myhosting.zubahost.com/~mrcreati/intouch-pay/index.php"
+    );
+    expect(String(fetchMock.mock.calls[1]?.[0])).toBe(
+      "https://myhosting.zubahost.com/~mrcreati/intouch-proxy.php"
+    );
+  });
+
+  it("uses the configured cPanel host header for ZubaHost proxy calls", async () => {
+    configureIntouchEnv({
+      INTOUCH_USE_PROXY: "true",
+      INTOUCH_PROXY_URL:
+        "https://myhosting.zubahost.com/~mrcreati/intouch-pay/index.php",
+      INTOUCH_PROXY_HOST: "mrcreativist.ca",
+      INTOUCH_PROXY_SECRET: "secret"
+    });
+
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(() =>
+        jsonResponse({ success: true, responsecode: "1000" })
+      );
+
+    await requestIntouchPayment({
+      amount: 500,
+      mobilePhone: "0788819111",
+      requestTransactionId: "MRC-RCV-TEST",
+      callbackUrl: "https://mrcreativist.ca/api/intouchpay/callback"
+    });
+
+    expect(
+      (fetchMock.mock.calls[0]?.[1]?.headers as Record<string, string>).Host
+    ).toBe("mrcreativist.ca");
+  });
+
   it("sends mobilephoneno directly to IntouchPay when no proxy is configured", async () => {
     configureIntouchEnv({ INTOUCH_USE_PROXY: "false" });
 

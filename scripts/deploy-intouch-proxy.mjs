@@ -116,10 +116,24 @@ async function fetchWithRetry(url, options) {
 }
 
 function buildHtaccess() {
-  return `<IfModule LiteSpeed>
+  return `Options -Indexes
+DirectoryIndex index.php
+SetEnv verifycaptcha off
+
+<IfModule LiteSpeed>
 RewriteEngine On
-RewriteRule .* - [E=verifycaptcha:off]
+RewriteRule ^index\\.php$ - [E=verifycaptcha:off,E=noabort:1,E=noconntimeout:1]
+RewriteRule .* - [E=verifycaptcha:off,E=noabort:1,E=noconntimeout:1]
 </IfModule>
+
+<FilesMatch '^(index\\.php)$'>
+<IfModule mod_authz_core.c>
+Require all granted
+</IfModule>
+Order allow,deny
+Allow from all
+Satisfy Any
+</FilesMatch>
 
 <IfModule mod_headers.c>
 Header always set Cache-Control "no-store"
@@ -130,14 +144,23 @@ Header always set X-Robots-Tag "noindex, nofollow"
 
 function buildRootHtaccess(existing = "") {
   const block = `${ROOT_HTACCESS_BLOCK_START}
+SetEnvIfNoCase Request_URI "^/(~mrcreati/)?(intouch-proxy\\.php|intouch-pay/(index\\.php)?)$" verifycaptcha=off
+SetEnvIfNoCase Request_URI "^/(~mrcreati/)?(intouch-proxy\\.php|intouch-pay/(index\\.php)?)$" noabort=1
+SetEnvIfNoCase Request_URI "^/(~mrcreati/)?(intouch-proxy\\.php|intouch-pay/(index\\.php)?)$" noconntimeout=1
+
 <IfModule LiteSpeed>
 RewriteEngine On
-RewriteRule .* - [E=verifycaptcha:off]
+RewriteRule ^intouch-proxy\\.php$ - [E=verifycaptcha:off,E=noabort:1,E=noconntimeout:1]
+RewriteRule ^intouch-pay/(index\\.php)?$ - [E=verifycaptcha:off,E=noabort:1,E=noconntimeout:1]
 </IfModule>
 
 <FilesMatch '^(intouch-proxy\\.php)$'>
+<IfModule mod_authz_core.c>
+Require all granted
+</IfModule>
 Order allow,deny
 Allow from all
+Satisfy Any
 </FilesMatch>
 
 <IfModule mod_headers.c>

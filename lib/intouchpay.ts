@@ -133,6 +133,56 @@ function splitEnvList(value: string) {
     .filter(Boolean);
 }
 
+function addUniqueProxyUrl(urls: string[], value: string) {
+  const cleaned = stripSlashes(value);
+  if (cleaned && !urls.includes(cleaned)) urls.push(cleaned);
+}
+
+function intouchProxyUrlAlternates(value: string) {
+  const alternates: string[] = [];
+
+  try {
+    const parsed = new URL(value);
+    const pathname = parsed.pathname.replace(/\/+$/, "");
+
+    if (/\/intouch-pay\/index\.php$/i.test(pathname)) {
+      parsed.pathname = pathname.replace(
+        /\/intouch-pay\/index\.php$/i,
+        "/intouch-proxy.php"
+      );
+      addUniqueProxyUrl(alternates, parsed.toString());
+    } else if (/\/intouch-proxy\.php$/i.test(pathname)) {
+      parsed.pathname = pathname.replace(
+        /\/intouch-proxy\.php$/i,
+        "/intouch-pay/index.php"
+      );
+      addUniqueProxyUrl(alternates, parsed.toString());
+    }
+  } catch {
+    return alternates;
+  }
+
+  return alternates;
+}
+
+function intouchProxyUrls() {
+  const primaryUrl = stripSlashes(env("INTOUCH_PROXY_URL"));
+  const configured = [
+    ...splitEnvList(env("INTOUCH_PROXY_URLS")),
+    ...(primaryUrl ? [primaryUrl] : [])
+  ];
+  const urls: string[] = [];
+
+  for (const url of configured) {
+    addUniqueProxyUrl(urls, url);
+    for (const alternate of intouchProxyUrlAlternates(url)) {
+      addUniqueProxyUrl(urls, alternate);
+    }
+  }
+
+  return urls;
+}
+
 function cleanProxySecret(value: string) {
   return value
     .replace(/^(?:INTOUCH_PROXY_SECRET|PROXY_SECRET)\s*=\s*/i, "")
@@ -155,15 +205,10 @@ function intouchConfig() {
 
 function intouchProxyConfig() {
   const rawSecret = env("INTOUCH_PROXY_SECRET");
-  const primaryUrl = stripSlashes(env("INTOUCH_PROXY_URL"));
-  const urls = [
-    ...splitEnvList(env("INTOUCH_PROXY_URLS")),
-    ...(primaryUrl ? [primaryUrl] : [])
-  ];
 
   return {
     enabled: envBoolean("INTOUCH_USE_PROXY", false),
-    urls: Array.from(new Set(urls)),
+    urls: intouchProxyUrls(),
     host: env("INTOUCH_PROXY_HOST"),
     secret: cleanProxySecret(rawSecret),
     rawSecret
@@ -496,8 +541,16 @@ function shouldAttachProxyHost(url: string, host: string) {
   if (!host) return false;
 
   try {
-    const hostname = new URL(url).hostname;
-    return /^[\d.]+$/.test(hostname) || hostname.includes(":");
+    const hostname = new URL(url).hostname.toLowerCase();
+    const proxyHost = host.toLowerCase().replace(/:\d+$/, "");
+
+    if (hostname === proxyHost) return false;
+
+    return (
+      /^[\d.]+$/.test(hostname) ||
+      hostname.includes(":") ||
+      hostname.endsWith("zubahost.com")
+    );
   } catch {
     return false;
   }
